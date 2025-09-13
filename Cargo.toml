@@ -1,0 +1,18 @@
+[package]
+name = "plabble-codec"
+version = "0.1.0"
+edition = "2024"
+description = "Plabble Transport Protocol codec"
+license = "BSD-3-Clause"
+categories = ["cryptography", "encoding", "chat", "plabble"]
+repository = "https://github.com/plabble/ptp-codec"
+
+[lib]
+name = "plabble_codec"
+crate-type = ["rlib"]
+
+[dependencies]
+binary-codec = "0.1.2"
+serde = { version = "*", features = ["derive"] }
+serde_with = { version = "*", features = ["base64"] }
+toml = "*"
