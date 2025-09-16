@@ -13,7 +13,7 @@ pub struct EncryptionSettings {
     #[serde(default)]
     encrypt_with_aes_ctr: bool,
 
-    /// Use 32-byte hashes and MACs instead of 16-byte ones.
+    /// Use 32-byte hashes instead of 16-byte ones.
     #[serde(default)]
     larger_hashes: bool,
 
@@ -81,4 +81,59 @@ pub struct PostQuantumSettings {
     /// Reserved for future use
     #[serde(default)]
     flag_128: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_serialize_encryption_settings_with_pqc() {
+        let toml = r#"
+        encrypt_with_cha_cha20 = true
+        encrypt_with_aes_ctr = false
+        larger_hashes = true
+        use_blake3 = false
+        sign_ed25519 = true
+        key_exchange_x25519 = true
+        use_post_quantum = true
+
+        [post_quantum_settings]
+        sign_pqc_dsa_44 = true
+        sign_pqc_dsa_65 = false
+        sign_pqc_falcon = true
+        sign_pqc_slh_dsa = false
+        key_exchange_pqc_kem_512 = true
+        key_exchange_pqc_kem_768 = false
+        "#;
+
+        let settings: EncryptionSettings = toml::from_str(toml).unwrap();
+        let bytes = settings.to_bytes().unwrap();
+
+        let deserialized_settings = EncryptionSettings::from_bytes(&bytes).unwrap();
+        assert_eq!(settings, deserialized_settings);
+        assert_eq!(vec![0b1011_0101, 0b0001_0101], bytes);
+    }
+
+    #[test]
+    fn can_serialize_encryption_settings_without_pqc_and_with_defaults() {
+        let toml = r#"
+        encrypt_with_aes_ctr = true
+        larger_hashes = false
+        use_blake3 = true
+        use_post_quantum = false
+        "#;
+
+        let settings: EncryptionSettings = toml::from_str(toml).unwrap();
+        let bytes = settings.to_bytes().unwrap();
+
+        let deserialized_settings = EncryptionSettings::from_bytes(&bytes).unwrap();
+        assert_eq!(settings, deserialized_settings);
+        assert_eq!(settings.encrypt_with_cha_cha20, true);
+        assert_eq!(settings.sign_ed25519, true);
+        assert_eq!(settings.key_exchange_x25519, true);
+        assert_eq!(settings.flag_64, false);
+
+        assert_eq!(vec![0b0011_1011], bytes);
+    }
 }

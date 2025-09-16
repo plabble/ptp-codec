@@ -11,6 +11,7 @@ Goals:
 - [Password-Authenticated Key Agreement](https://github.com/RustCrypto/PAKEs): to prevent "offline guessing"
 
 - TODO Use [X.509](https://github.com/RustCrypto/formats/tree/master/x509-cert) certficates instead?
+- TODO more unqiue buckets by hasing (named bucket, server ID/domain?)
 
 # Codec
 - Custom binary format
@@ -25,15 +26,17 @@ Header (3-32B)
 	Length (dynint) (1-4B)
 	Version (4b) [Plabble version 0-127]
 	Flags   (4b) [4 flags]
-		- UseEncryption: Encryption Enabled [if disabled, use a MAC]
-		- SpecifyAlgorithm: Specify algorithms used
 		- FireAndForget: Fire-and-Forget [if encryption enabled, use PskId. If off, use counter]
 		- PreSharedKey: Use pre-shared key/PSK [required when using FireAndForget]
+		- UseEncryption: Encryption Enabled [if disabled, use a MAC]
+		- SpecifyEncryptionSettings: Specify algorithms used (adds 1 byte of encryption settings)
+	EncryptionSettings (1B)* [required if SpecifyEncryptionSettings set]
+	PostQuantumSettings (1B)* [required if EncryptionSettings.UsePostQuantum set]
 	PskId (12B)* [required if PreSharedKey is set]
-	Salt  (12B)* [required if PreSharedKey is set]
+	PskSalt  (12B)* [required if PreSharedKey is set]
 	
 	---- header encryption ----
-	Type         (4b)  [CERTIFICATE, SESSION, PROXY, GET, POST, PATCH, PUT, DELETE, SUBSCRIBE, UNSUBSCRIBE, STREAM, IDENTIFY, REGISTER, ERROR] 
+	Type         (4b)  [CERTIFICATE, SESSION, GET, POST, PATCH, PUT, DELETE, SUBSCRIBE, UNSUBSCRIBE, STREAM, REGISTER, IDENTIFY, PROXY, ERROR] 
 	Secure Flags (4b)  [4 flags]
 	ResponseTo   (2B)* [counter of request to respond to, if in session]
 
@@ -56,19 +59,19 @@ How an encrypted packet can be read and parsed:
 - Decrypt the entire body and parse it according to the type
 
 ```toml
-version = 0
-flags.UseEncryption = true
-flags.FireAndForget = false
-flags.SpecifyAlgorithm = false
+version = 1
+use_encryption = true
+fire_and_forget = false
+pre_shared_key = true
 
-pskId = "<preshared key id base64>"
-salt = "<salt base64>"
+psk_id = "<preshared key id base64>"
+psk_salt = "<salt base64>"
 mac = "<Message Authentication Code base64>"
 
 [header]
-type = "TYPE"
-flags.flags1 = false # etc...
-responseTo = 0
+packet_type = "Session" # or any other CERTIFICATE, PUT, PATCH etc.
+flags = [false, true, false, false] # 4 type-specific packet flags
+response_to = 0
 ```
 
 Client state
@@ -96,10 +99,28 @@ Server state
 
 > If fire-and-forget or using a PSK, a Salt is **required**.
 
-- Header encryption key: `HKDF_Sha256(ikm: PSK? + Session Key, info: counter (of other party, if present) + 0x00, salt: Salt?)`
-- Body encryption key:    `HKDF_Sha256(ikm: PSK? + Session Key, info: counter (of other party, if present) + 0xFF, salt: Salt?)`
+- Header encryption key: `Blake2b_256(ikm: PSK? + Session Key, info: counter (of other party, if present) + 0x00, salt: Salt?)`
+- Body encryption key: `Blake2b_256(ikm: PSK? + Session Key, info: counter (of other party, if present) + 0xFF, salt: Salt?)`
 
-> After using a PSK, it should be ROTATED. The PSK counter should be incremented at both sides and the request salt will be used to rotate the PSK like this: `HKDF_Sha256(ikm: PSK, info: Session key? + counter, salt: Salt)`
+> After using a PSK, it should be ROTATED. The PSK counter should be incremented at both sides and the request salt will be used to rotate the PSK like this: `Blake2b_256(ikm: PSK, info: Session key? + counter, salt: Salt)`
+
+## Packet type
+The following packet types are supported:
+- **0** [CERTIFICATE](#certificate)
+- **1** [SESSION](#session)
+- **2** [GET](#get)
+- **3** [POST](#post)
+- **4** [PATCH](#patch)
+- **5** [PUT](#put)
+- **6** [DELETE](#delete)
+- **7** [SUBSCRIBE](#subscribe)
+- **8** [UNSUBSCRIBE](#unsubscribe)	 
+- **9** [STREAM](#stream)
+- **10** [REGISTER](#register)
+- **11** [IDENTITY](#identify)
+- **12** [PROXY](#proxy)
+- 13, 14: reserved for future use
+- **15** [ERROR](#error) (only for responses)
 
 ## Crypto Settings
 ```
@@ -145,20 +166,21 @@ Header Flags
 	- EnableEncryption: Switch to encrypted session	
 
 Body (32-36B+)
-	Public/encapsulation keys (fixed) [based on algorithm header. Defaults to X25519, 32B]
+	Public/encapsulation keys (fixed) [based on crypto settings in header. Defaults to X25519, 32B]
 
 	PskExpiration (4B)* [Plabble Timestamp, if Persist Key is set]
 ```
 
 ```toml
 [header]
-type = "SESSION"
-flags.PersistKey = true
-flags.EnableEncryption = true
+packet_type = "Session"
+flags = [true, true, false, false]
+# flags[0] = persist_key
+# flags[1] = enable_encryption
 
 [body]
 keys = ["<public key base64>"]
-pskExpiration = 2025-05-27T07:32:00-08:00Z
+psk_expiration = 2025-05-27T07:32:00-08:00Z
 ```
 
 > To stop a Session, the user can send a new SESSION request or disconnect from the server.
@@ -184,7 +206,6 @@ flags.WithPSK = true
 [body]
 pskId = "pre-shared key id"
 keys = ["<x25519 server key base64>"]
-encapsulatedSecret = "<ML-KEM encapsulated secret base64>"
 signatures = ["<ed25519 server signature base64>"]
 ```
 
