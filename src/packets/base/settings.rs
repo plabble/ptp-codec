@@ -36,10 +36,11 @@ pub struct EncryptionSettings {
     /// Use post-quantum cryptography (e.g., Kyber etc.)
     /// This adds the Post-Quantum settings
     #[serde(default)]
+    #[toggles("pqc")]
     use_post_quantum: bool,
 
     /// Post-Quantum settings
-    #[toggled_by = "use_post_quantum"]
+    #[toggled_by = "pqc"]
     post_quantum_settings: Option<PostQuantumSettings>,
 }
 
@@ -86,6 +87,7 @@ pub struct PostQuantumSettings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use binary_codec::{BinarySerializer, BinaryDeserializer};
 
     #[test]
     fn can_serialize_encryption_settings_with_pqc() {
@@ -108,9 +110,9 @@ mod tests {
         "#;
 
         let settings: EncryptionSettings = toml::from_str(toml).unwrap();
-        let bytes = settings.to_bytes().unwrap();
+        let bytes = settings.to_bytes(None).unwrap();
 
-        let deserialized_settings = EncryptionSettings::from_bytes(&bytes).unwrap();
+        let deserialized_settings = EncryptionSettings::from_bytes(&bytes, None).unwrap();
         assert_eq!(settings, deserialized_settings);
         assert_eq!(vec![0b1011_0101, 0b0001_0101], bytes);
     }
@@ -125,9 +127,9 @@ mod tests {
         "#;
 
         let settings: EncryptionSettings = toml::from_str(toml).unwrap();
-        let bytes = settings.to_bytes().unwrap();
+        let bytes = settings.to_bytes(None).unwrap();
 
-        let deserialized_settings = EncryptionSettings::from_bytes(&bytes).unwrap();
+        let deserialized_settings = EncryptionSettings::from_bytes(&bytes, None).unwrap();
         assert_eq!(settings, deserialized_settings);
         assert_eq!(settings.encrypt_with_cha_cha20, true);
         assert_eq!(settings.sign_ed25519, true);

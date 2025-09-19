@@ -1,38 +1,17 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
-/// Plabble Protocol packet types
-#[derive(ToBytes, FromBytes, Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
-#[no_disc_prefix]
-pub enum PacketType {
-    Certificate = 0,
-    Session = 1,
-    Get = 2,
-    Stream = 3,
-    Post = 4,
-    Patch = 5,
-    Put = 6,
-    Delete = 7,
-    Subscribe = 8,
-    Unsubscribe = 9,
-    Register = 10,
-    Identify = 11,
-    Proxy = 12,
-    _Reserved13 = 13,
-    _Reserved14 = 14,
-    Error = 15
-}
-
 /// Plabble Protocol packet header
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug)]
+#[derive(FromBytes, ToBytes, Deserialize, Serialize, PartialEq, Debug)]
 pub struct PlabblePacketHeader {
     /// Packet type
     #[serde(skip_serializing, skip_deserializing)]
     #[bits = 4]
+    #[variant_for("packet_type")]
     _type: u8,
 
     /// Packet type (derived from `_type`)
-    #[variant_by = "_type"]
+    #[variant_by = "packet_type"]
     packet_type: PacketType,
 
     /// Packet flags, specific to the packet type
@@ -52,6 +31,7 @@ impl PlabblePacketHeader {
 
 #[cfg(test)]
 mod tests {
+    use binary_codec::{BinarySerializer, BinaryDeserializer};
     use super::*;
     
     #[test]
@@ -65,11 +45,11 @@ mod tests {
         let header: PlabblePacketHeader = toml::from_str(toml).unwrap();
         let header = header.pre_process();
         println!("{:?}", header);
-        let bytes = header.to_bytes().unwrap();
+        let bytes = header.to_bytes(None).unwrap();
+        assert_eq!(vec![0b0110_0001, 0, 123], bytes);
 
-        let deserialized_header = PlabblePacketHeader::from_bytes(&bytes).unwrap();
+        let deserialized_header = PlabblePacketHeader::from_bytes(&bytes, None).unwrap();
         assert_eq!(deserialized_header.packet_type, PacketType::Session);
         assert_eq!(header, deserialized_header);
-        assert_eq!(vec![0b0110_0001, 0, 123], bytes);
     }
 }

@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "packet_type")]
-#[no_disc_prefix]
+#[repr(u8)]
+#[no_discriminator]
 pub enum RequestPacketType {
-    Certificate { full_chain: bool, challenge: bool, query_mode: bool },
+    Certificate { full_chain: bool, challenge: bool, query_mode: bool } = 0,
     Session { persist_key: bool, enable_encryption: bool },
     Get { binary_keys: bool, subscribe: bool, range_mode_until: bool },
     Stream { binary_keys: bool, subscribe: bool, range_mode_until: bool, stream_append: bool },
@@ -25,9 +26,9 @@ pub enum RequestPacketType {
 
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "packet_type")]
-#[no_disc_prefix]
-pub enum ResponsePacketFlags {
-    Certificate,
+#[no_discriminator]
+pub enum ResponsePacketType {
+    Certificate = 0,
     Session { with_psk: bool },
     Get { binary_keys: bool },
     Stream,
@@ -55,6 +56,7 @@ enum RequestBody {
 
 #[cfg(test)]
 mod tests {
+    use binary_codec::{BinarySerializer, BinaryDeserializer};
     use super::*;
 
     // TODO: not yet sure how to fix this
@@ -79,6 +81,7 @@ mod tests {
     struct RequestPacketTest {
         #[serde(skip_serializing, skip_deserializing)]
         #[bits = 4]
+        #[variant_for = "_type"]
         _type: u8,
 
         #[serde(flatten)]
@@ -105,10 +108,10 @@ mod tests {
         let toml_str = toml::to_string_pretty(&t).unwrap();
         println!("{}", toml_str);
 
-        let bytes = t.to_bytes().unwrap();
+        let bytes = t.to_bytes(None).unwrap();
         println!("{:?}", bytes.iter().map(|b| format!("{:08b}", b)).collect::<Vec<_>>());
 
-        let deserialized_bytes = RequestPacketTest::from_bytes(&bytes).unwrap();
+        let deserialized_bytes = RequestPacketTest::from_bytes(&bytes, None).unwrap();
         assert_eq!(t, deserialized_bytes);
 
         println!("{:?}", deserialized_bytes);
