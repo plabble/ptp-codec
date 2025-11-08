@@ -29,9 +29,9 @@ Header (3-32B)
 		- FireAndForget: Fire-and-Forget [if encryption enabled, use PskId. If off, use counter]
 		- PreSharedKey: Use pre-shared key/PSK [required when using FireAndForget]
 		- UseEncryption: Encryption Enabled [if disabled, use a MAC]
-		- SpecifyEncryptionSettings: Specify algorithms used (adds 1 byte of encryption settings)
-	EncryptionSettings (1B)* [required if SpecifyEncryptionSettings set]
-	PostQuantumSettings (1B)* [required if EncryptionSettings.UsePostQuantum set]
+		- SpecifyCryptoSettings: Specify algorithms used (adds 1 byte of encryption settings)
+	CryptoSettings (1B)* [required if SpecifyCryptoSettings set]
+	PostQuantumSettings (1B)* [required if CryptoSettings.UsePostQuantum set]
 	PskId (12B)* [required if PreSharedKey is set]
 	PskSalt  (12B)* [required if PreSharedKey is set]
 	

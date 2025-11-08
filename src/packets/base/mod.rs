@@ -1,15 +1,13 @@
-use binary_codec::{BinaryDeserializer, FromBytes, ToBytes};
+use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::{Unpadded};
 
-use settings::EncryptionSettings;
+use settings::CryptoSettings;
 
-use crate::packets::header::request_header::PlabbleRequestHeader;
-
-pub mod packet_type;
 pub mod settings;
+pub mod crypto_keys;
 
 /// Plabble Protocol Packet
 #[serde_as]
@@ -37,12 +35,12 @@ pub struct PlabblePacketBase {
 
     /// If set to true, use custom encryption settings.
     #[serde(default)]
-    #[toggles("encryption_settings")]
-    specify_encryption_settings: bool,
+    #[toggles("crypto_settings")]
+    specify_crypto_settings: bool,
 
     /// Encryption settings
-    #[toggled_by = "encryption_settings"]
-    encryption_settings: Option<EncryptionSettings>,
+    #[toggled_by = "crypto_settings"]
+    crypto_settings: Option<CryptoSettings>,
 
     /// Pre-shared key ID, if using a pre-shared key
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
@@ -57,24 +55,8 @@ pub struct PlabblePacketBase {
     /// Message Authentication Code (MAC)
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     #[toggled_by = "!encryption"]
-    mac: Option<[u8; 16]>,
-
-    /// Packet payload, encrypted or not depending on the settings above.
-    /// It also contains the encrypted part of the header
-    #[serde(skip_serializing)]
-    payload: Option<Vec<u8>>
+    mac: Option<[u8; 16]>
 }
-
-// impl PlabblePacketBase {
-//     // TODO: encryption settings etc.
-//     pub fn deserialize_to_request(self) -> PlabbleRequestPacket {
-//         let payload = self.payload.unwrap(); // TODO: error handling
-//         let header_bytes = &payload[0..1];
-//         let body_bytes = &payload[1..];
-//         let header = PlabbleRequestHeader::from_bytes(header_bytes, None).unwrap(); // TODO, config, error handling
-        
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
@@ -100,7 +82,7 @@ mod tests {
 
         // Check some defaults
         assert_eq!(packet.pre_shared_key, false);
-        assert_eq!(packet.specify_encryption_settings, false);
+        assert_eq!(packet.specify_crypto_settings, false);
 
         assert_eq!(vec![0b0101_0001], bytes);
     }
@@ -127,15 +109,15 @@ mod tests {
         version = 1
         use_encryption = true
         pre_shared_key = true
-        specify_encryption_settings = true
+        specify_crypto_settings = true
 
         psk_id = "AQIDBAUGBwgJEBESExQVFg"
         psk_salt = "BwAAAAAAAAAAAAAAAAAABw"
 
-        [encryption_settings]
+        [crypto_settings]
         use_post_quantum = true
 
-        [encryption_settings.post_quantum_settings]
+        [crypto_settings.post_quantum_settings]
         sign_pqc_dsa_44 = true
         "#;
 
