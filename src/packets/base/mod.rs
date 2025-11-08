@@ -1,4 +1,4 @@
-use binary_codec::{FromBytes, ToBytes};
+use binary_codec::{BinaryDeserializer, FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::base64::{Base64, UrlSafe};
@@ -6,7 +6,8 @@ use serde_with::formats::{Unpadded};
 
 use settings::EncryptionSettings;
 
-mod flags;
+use crate::packets::header::request_header::PlabbleRequestHeader;
+
 pub mod packet_type;
 pub mod settings;
 
@@ -63,6 +64,17 @@ pub struct PlabblePacketBase {
     #[serde(skip_serializing)]
     payload: Option<Vec<u8>>
 }
+
+// impl PlabblePacketBase {
+//     // TODO: encryption settings etc.
+//     pub fn deserialize_to_request(self) -> PlabbleRequestPacket {
+//         let payload = self.payload.unwrap(); // TODO: error handling
+//         let header_bytes = &payload[0..1];
+//         let body_bytes = &payload[1..];
+//         let header = PlabbleRequestHeader::from_bytes(header_bytes, None).unwrap(); // TODO, config, error handling
+        
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

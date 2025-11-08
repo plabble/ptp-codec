@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[repr(u8)]
 #[no_discriminator]
 pub enum RequestPacketType {
-    Certificate { full_chain: bool, challenge: bool, query_mode: bool } = 0,
+    Certificate { full_chain: bool, challenge: bool, query_mode: bool },
     Session { persist_key: bool, enable_encryption: bool },
     Get { binary_keys: bool, subscribe: bool, range_mode_until: bool },
     Stream { binary_keys: bool, subscribe: bool, range_mode_until: bool, stream_append: bool },
@@ -26,9 +26,10 @@ pub enum RequestPacketType {
 
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "packet_type")]
+#[repr(u8)]
 #[no_discriminator]
 pub enum ResponsePacketType {
-    Certificate = 0,
+    Certificate,
     Session { with_psk: bool },
     Get { binary_keys: bool },
     Stream,
@@ -47,12 +48,12 @@ pub enum ResponsePacketType {
 }
 
 
-enum RequestBody {
-    Session { keys: Vec<Vec<u8>>, psk_expiration: Option<u32> },
-    Bucket { bucket_id: [u8; 16], from: Option<u32>, to: Option<u32> },
-    BucketBinary { bucket_id: [u8; 16], from: Option<u32>, to: Option<u32> }
-    // etc.
-}
+// enum RequestBody {
+//     Session { keys: Vec<Vec<u8>>, psk_expiration: Option<u32> },
+//     Bucket { bucket_id: [u8; 16], from: Option<u32>, to: Option<u32> },
+//     BucketBinary { bucket_id: [u8; 16], from: Option<u32>, to: Option<u32> }
+//     // etc.
+// }
 
 #[cfg(test)]
 mod tests {
