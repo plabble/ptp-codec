@@ -166,9 +166,8 @@ Header Flags
 	- EnableEncryption: Switch to encrypted session	
 
 Body (32-36B+)
-	Public/encapsulation keys (fixed) [based on crypto settings in header. Defaults to X25519, 32B]
-
 	PskExpiration (4B)* [Plabble Timestamp, if Persist Key is set]
+	Public/encapsulation keys (fixed) [based on crypto settings in header. Defaults to X25519, 32B]
 ```
 
 ```toml
@@ -179,8 +178,8 @@ flags = [true, true, false, false]
 # flags[1] = enable_encryption
 
 [body]
-keys = ["<public key base64>"]
 psk_expiration = 2025-05-27T07:32:00-08:00Z
+keys = ["<public key base64>"]
 ```
 
 > To stop a Session, the user can send a new SESSION request or disconnect from the server.

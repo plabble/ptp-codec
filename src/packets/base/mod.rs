@@ -16,46 +16,46 @@ pub struct PlabblePacketBase {
     /// Plabble Protocol version
     /// 0 = debug
     #[bits = 4]
-    version: u8,
+    pub version: u8,
 
     /// If set to true, this packet is sent outside of a session
     /// and no follow-up responses are expected.
     #[serde(default)]
-    fire_and_forget: bool,
+    pub fire_and_forget: bool,
 
     /// If set to true, this packet uses a pre-shared key for encryption.
     #[serde(default)]
     #[toggles("pre_shared_key")]
-    pre_shared_key: bool,
+    pub pre_shared_key: bool,
 
     /// If set to true, this packet uses encryption. If false, use a MAC (Message Authentication Code).
     #[serde(default)]
     #[toggles("encryption")]
-    use_encryption: bool,
+    pub use_encryption: bool,
 
     /// If set to true, use custom encryption settings.
     #[serde(default)]
     #[toggles("crypto_settings")]
-    specify_crypto_settings: bool,
+    pub specify_crypto_settings: bool,
 
     /// Encryption settings
     #[toggled_by = "crypto_settings"]
-    crypto_settings: Option<CryptoSettings>,
+    pub crypto_settings: Option<CryptoSettings>,
 
     /// Pre-shared key ID, if using a pre-shared key
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     #[toggled_by = "pre_shared_key"]
-    psk_id: Option<[u8; 16]>,
+    pub psk_id: Option<[u8; 16]>,
 
     /// Pre-shared key salt, if using a pre-shared key
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     #[toggled_by = "pre_shared_key"]
-    psk_salt: Option<[u8; 16]>,
+    pub psk_salt: Option<[u8; 16]>,
 
     /// Message Authentication Code (MAC)
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     #[toggled_by = "!encryption"]
-    mac: Option<[u8; 16]>
+    pub mac: Option<[u8; 16]>
 }
 
 #[cfg(test)]

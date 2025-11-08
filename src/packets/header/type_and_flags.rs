@@ -6,22 +6,90 @@ use serde::{Deserialize, Serialize};
 #[repr(u8)]
 #[no_discriminator]
 pub enum RequestPacketType {
-    Certificate { full_chain: bool, challenge: bool, query_mode: bool },
-    Session { persist_key: bool, enable_encryption: bool },
-    Get { binary_keys: bool, subscribe: bool, range_mode_until: bool },
-    Stream { binary_keys: bool, subscribe: bool, range_mode_until: bool, stream_append: bool },
-    Post { binary_keys: bool, subscribe: bool, range_mode_until: bool, do_not_persist: bool },
+    Certificate {
+        #[serde(default)]
+        full_chain: bool,
+        #[serde(default)]
+        challenge: bool,
+        #[serde(default)]
+        query_mode: bool,
+    },
+    Session {
+        #[serde(default)]
+        persist_key: bool,
+        #[serde(default)]
+        enable_encryption: bool,
+    },
+    Get {
+        #[serde(default)]
+        binary_keys: bool,
+        #[serde(default)]
+        subscribe: bool,
+        #[serde(default)]
+        range_mode_until: bool,
+    },
+    Stream {
+        #[serde(default)]
+        binary_keys: bool,
+        #[serde(default)]
+        subscribe: bool,
+        #[serde(default)]
+        range_mode_until: bool,
+        #[serde(default)]
+        stream_append: bool,
+    },
+    Post {
+        #[serde(default)]
+        binary_keys: bool,
+        #[serde(default)]
+        subscribe: bool,
+        #[serde(default)]
+        range_mode_until: bool,
+        #[serde(default)]
+        do_not_persist: bool,
+    },
     Patch,
-    Put { binary_keys: bool, subscribe: bool, with_keys: bool, append: bool },
-    Delete { binary_keys: bool, range_mode_until: bool },
-    Subscribe { binary_keys: bool, range_mode_until: bool },
-    Unsubscribe { binary_keys: bool, range_mode_until: bool },
+    Put {
+        #[serde(default)]
+        binary_keys: bool,
+        #[serde(default)]
+        subscribe: bool,
+        #[serde(default)]
+        with_keys: bool,
+        #[serde(default)]
+        append: bool,
+    },
+    Delete {
+        #[serde(default)]
+        binary_keys: bool,
+        #[serde(default)]
+        range_mode_until: bool,
+    },
+    Subscribe {
+        #[serde(default)]
+        binary_keys: bool,
+        #[serde(default)]
+        range_mode_until: bool,
+    },
+    Unsubscribe {
+        #[serde(default)]
+        binary_keys: bool,
+        #[serde(default)]
+        range_mode_until: bool,
+    },
     Register,
     Identify,
-    Proxy { init_session: bool, keep_connection: bool, select_random_hops: bool },
+    Proxy {
+        #[serde(default)]
+        init_session: bool,
+        #[serde(default)]
+        keep_connection: bool,
+        #[serde(default)]
+        select_random_hops: bool,
+    },
     _Reserved13,
     _Reserved14,
-    _Reserved15
+    _Reserved15,
 }
 
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
@@ -30,8 +98,14 @@ pub enum RequestPacketType {
 #[no_discriminator]
 pub enum ResponsePacketType {
     Certificate,
-    Session { with_psk: bool },
-    Get { binary_keys: bool },
+    Session {
+        #[serde(default)]
+        with_psk: bool,
+    },
+    Get {
+        #[serde(default)]
+        binary_keys: bool,
+    },
     Stream,
     Post,
     Patch,
@@ -41,8 +115,11 @@ pub enum ResponsePacketType {
     Unsubscribe,
     Register,
     Identify,
-    Proxy { include_hop_info: bool },
+    Proxy {
+        #[serde(default)]
+        include_hop_info: bool,
+    },
     _Reserved13,
     _Reserved14,
-    Error
+    Error,
 }

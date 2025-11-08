@@ -12,5 +12,15 @@ pub struct PlabbleRequestHeader {
 
     /// Packet type (derived from `_type`)
     #[variant_by = "packet_type"]
+    #[serde(flatten)]
     pub packet_type: RequestPacketType,
+}
+
+impl PlabbleRequestHeader {
+    pub fn new(packet_type: RequestPacketType) -> Self {
+        Self {
+            _type: packet_type.get_discriminator(),
+            packet_type
+        }
+    }
 }

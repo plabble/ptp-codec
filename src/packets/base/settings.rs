@@ -1,8 +1,8 @@
+use crate::default_true;
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
-use crate::{default_true};
 
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct CryptoSettings {
     /// If true, encrypt with ChaCha20 (Poly1305).
     /// This is the default if no encryption settings are specified.
@@ -21,11 +21,11 @@ pub struct CryptoSettings {
     #[serde(default)]
     pub use_blake3: bool,
 
-    /// Sign with Ed25519 (default)
+    /// Sign with Ed25519 (default), 32 B keys, signature 64 B.
     #[serde(default = "default_true")]
     pub sign_ed25519: bool,
 
-    /// Key exchange with X25519 (default)
+    /// Key exchange with X25519 (default), 32 B keys.
     #[serde(default = "default_true")]
     pub key_exchange_x25519: bool,
 
@@ -44,7 +44,7 @@ pub struct CryptoSettings {
     pub post_quantum_settings: Option<PostQuantumSettings>,
 }
 
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct PostQuantumSettings {
     /// Sign with ML-DSA-44, public key size 1312 B, signature 2420 B.
     /// Super fast, NIST level 1 security.
@@ -61,7 +61,7 @@ pub struct PostQuantumSettings {
     #[serde(default)]
     pub sign_pqc_falcon: bool,
 
-    /// Sign with SLH-DSA-SHA128s, public key size 32 B, signature 7856 B. 
+    /// Sign with SLH-DSA-SHA128s, public key size 32 B, signature 7856 B.
     /// Very slow, but might be more secure because its based on hash functions only.
     /// NIST level 1 security.
     #[serde(default)]
@@ -74,7 +74,7 @@ pub struct PostQuantumSettings {
     /// Use ML-KEM-768 for key exchange, public key size 1184 B, ciphertext size 1088 B
     #[serde(default)]
     pub key_exchange_pqc_kem_768: bool,
-    
+
     /// Reserved for future use
     #[serde(default)]
     flag_64: bool,
@@ -84,10 +84,41 @@ pub struct PostQuantumSettings {
     flag_128: bool,
 }
 
+impl Default for CryptoSettings {
+    fn default() -> Self {
+        Self {
+            encrypt_with_cha_cha20: true,
+            encrypt_with_aes: false,
+            larger_hashes: false,
+            use_blake3: false,
+            sign_ed25519: true,
+            key_exchange_x25519: true,
+            flag_64: false,
+            use_post_quantum: false,
+            post_quantum_settings: None,
+        }
+    }
+}
+
+impl Default for PostQuantumSettings {
+    fn default() -> Self {
+        Self {
+            sign_pqc_dsa_44: false,
+            sign_pqc_dsa_65: false,
+            sign_pqc_falcon: false,
+            sign_pqc_slh_dsa: false,
+            key_exchange_pqc_kem_512: false,
+            key_exchange_pqc_kem_768: false,
+            flag_64: false,
+            flag_128: false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use binary_codec::{BinarySerializer, BinaryDeserializer};
+    use binary_codec::{BinaryDeserializer, BinarySerializer};
 
     #[test]
     fn can_serialize_encryption_settings_with_pqc() {

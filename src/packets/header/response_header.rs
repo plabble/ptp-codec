@@ -12,9 +12,10 @@ pub struct PlabbleResponseHeader {
 
     /// Packet type (derived from `_type`)
     #[variant_by = "packet_type"]
-    packet_type: ResponsePacketType,
+    #[serde(flatten)]
+    pub packet_type: ResponsePacketType,
 
     /// Counter of request to reply to, if in session
     #[toggled_by = "TODO"]
-    request_counter: Option<u16>
+    pub request_counter: Option<u16>
 }

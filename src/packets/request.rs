@@ -1,7 +1,7 @@
 use binary_codec::{BinaryDeserializer, SerializerConfig};
 use serde::{Deserialize, Serialize};
 
-use crate::packets::{base::PlabblePacketBase, header::request_header::PlabbleRequestHeader};
+use crate::packets::{base::PlabblePacketBase, body::RequestSerializationContext, header::request_header::PlabbleRequestHeader};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct PlabbleRequestPacket {
@@ -18,6 +18,12 @@ impl BinaryDeserializer for PlabbleRequestPacket {
         let base = PlabblePacketBase::from_bytes(bytes, Some(config))?;
         let header = PlabbleRequestHeader::from_bytes(bytes, Some(config))?;
         config.reset_bits(true); // TODO check if this is correct. But I think it is at this point.
+
+        let context = RequestSerializationContext {
+            header: &header,
+            packet: &base,
+            config
+        };
         
         Ok(Self {
             base,
