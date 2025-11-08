@@ -10,17 +10,17 @@ use crate::packets::header::type_and_flags::ResponsePacketType;
 use crate::packets::{base::crypto_keys::CryptoKey, body::SerializableRequestBody, header::type_and_flags::RequestPacketType};
 
 /// Session request body
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SessionRequestBody {
     /// PSK expiration Plabble timestamp. Filled if request flag persist_key is set.
-    psk_expiration: Option<[u8; 4]>,
+    pub psk_expiration: Option<[u8; 4]>,
 
     /// Public/encapsulation keys for creating a shared secret with the server
-    keys: Vec<CryptoKey>,
+    pub keys: Vec<CryptoKey>,
 }
 
 impl SerializableRequestBody for SessionRequestBody {
-    fn to_bytes(&self, context: super::RequestSerializationContext) -> Result<Vec<u8>, SerializationError> {
+    fn to_bytes(&self, context: &mut super::RequestSerializationContext) -> Result<Vec<u8>, SerializationError> {
         let mut bytes: Vec<u8> = Vec::new();
         if let RequestPacketType::Session { persist_key, .. } = context.header.packet_type {
             if persist_key && self.psk_expiration.is_none() {
@@ -40,16 +40,16 @@ impl SerializableRequestBody for SessionRequestBody {
         CryptoKey::verify_keys(key_types, &self.keys)?;
 
         for key in self.keys.iter() {
-            key.write_bytes(&mut bytes, Some(context.config))?;
+            key.write_bytes(&mut bytes, Some(&mut context.config))?;
         }
 
         Ok(bytes)
     }
 
-    fn from_bytes(bytes: &[u8], context: super::RequestSerializationContext) -> Result<Self, DeserializationError> where Self: Sized {
+    fn from_bytes(bytes: &[u8], context: &mut super::RequestSerializationContext) -> Result<Self, DeserializationError> where Self: Sized {
         if let RequestPacketType::Session { persist_key, .. } = context.header.packet_type {
             let psk_expiration = if persist_key {
-                Some(slice(context.config, bytes, 4, true)?.try_into().unwrap())
+                Some(slice(&mut context.config, bytes, 4, true)?.try_into().unwrap())
             } else {
                 None
             };
@@ -57,7 +57,7 @@ impl SerializableRequestBody for SessionRequestBody {
             // TODO: get_crypto_settings method
             let crypto_settings = context.packet.crypto_settings.clone().unwrap_or_default();
             let key_types = CryptoKey::get_key_exchange_key_types(&crypto_settings, true);
-            let keys = CryptoKey::read_keys(bytes, key_types, context.config)?;
+            let keys = CryptoKey::read_keys(bytes, key_types, &mut context.config)?;
 
             Ok(Self {
                 psk_expiration,
@@ -70,7 +70,7 @@ impl SerializableRequestBody for SessionRequestBody {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SessionResponseBody {
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     psk_id: Option<[u8; 12]>,
@@ -83,7 +83,7 @@ pub struct SessionResponseBody {
 }
 
 impl SerializableResponseBody for SessionResponseBody {
-    fn to_bytes(&self, context: super::ResponseSerializationContext) -> Result<Vec<u8>, SerializationError> {
+    fn to_bytes(&self, context: &mut super::ResponseSerializationContext) -> Result<Vec<u8>, SerializationError> {
         let mut bytes: Vec<u8> = Vec::new();
         if let ResponsePacketType::Session { with_psk } = context.header.packet_type {
             if with_psk && self.psk_id.is_none() {
@@ -106,20 +106,20 @@ impl SerializableResponseBody for SessionResponseBody {
         CryptoKey::verify_signatures(signature_types, &self.signatures)?;
 
         for key in self.keys.iter() {
-            key.write_bytes(&mut bytes, Some(context.config))?;
+            key.write_bytes(&mut bytes, Some(&mut context.config))?;
         }
 
         for signature in self.signatures.iter() {
-            signature.write_bytes(&mut bytes, Some(context.config))?;
+            signature.write_bytes(&mut bytes, Some(&mut context.config))?;
         }
 
         Ok(bytes)
     }
 
-    fn from_bytes(bytes: &[u8], context: super::ResponseSerializationContext) -> Result<Self, DeserializationError> where Self: Sized {
+    fn from_bytes(bytes: &[u8], context: &mut super::ResponseSerializationContext) -> Result<Self, DeserializationError> where Self: Sized {
          if let ResponsePacketType::Session { with_psk } = context.header.packet_type {
             let psk_id = if with_psk {
-                Some(slice(context.config, bytes, 12, true)?.try_into().unwrap())
+                Some(slice(&mut context.config, bytes, 12, true)?.try_into().unwrap())
             } else {
                 None
             };
@@ -129,8 +129,8 @@ impl SerializableResponseBody for SessionResponseBody {
             let key_types = CryptoKey::get_key_exchange_key_types(&crypto_settings, false);
             let signature_types = CryptoKey::get_signature_types(&crypto_settings);
 
-            let keys = CryptoKey::read_keys(bytes, key_types, context.config)?;
-            let signatures = CryptoKey::read_signatures(bytes, signature_types, context.config)?;
+            let keys = CryptoKey::read_keys(bytes, key_types, &mut context.config)?;
+            let signatures = CryptoKey::read_signatures(bytes, signature_types, &mut context.config)?;
 
             Ok(Self {
                 psk_id,
@@ -145,10 +145,38 @@ impl SerializableResponseBody for SessionResponseBody {
 
 #[cfg(test)]
 mod tests {
-    use crate::packets::{base::PlabblePacketBase, body::session::SessionRequestBody, header::request_header::PlabbleRequestHeader};
+    use std::iter::repeat;
+
+    use binary_codec::SerializerConfig;
+
+    use crate::packets::{base::PlabblePacketBase, body::{RequestSerializationContext, SerializableRequestBody, session::SessionRequestBody}, header::request_header::PlabbleRequestHeader};
 
     #[test]
     fn can_serialize_and_deserialize_session_request() {
+        let (base, header) = get_context();
+        let mut context = RequestSerializationContext {
+            header: &header,
+            packet: &base,
+            config: SerializerConfig::new()
+        };
+
+        // [body]
+        let body : SessionRequestBody = toml::from_str(format!(r#"
+        psk_expiration = [1,2,3,4]
+
+        [[keys]]
+        X25519 = "si6IcNvysw_Ex8D9Z1Q0LFi1vNrvfA3lAhfwy2_Hw24"
+        
+        [[keys]]
+        Kem512 = "{}"
+        "#, repeat('A').take(1067).collect::<String>()).as_str()).unwrap();
+
+        let bytes = body.to_bytes(&mut context).unwrap();
+        assert!(matches!(bytes[..], [1,2,3,4, 178, 46, 136, 112, 219, 242, 179, 15, 196, 199, 192, 253, 103, 84, 52, 44, 88, 181, 188, 218, 239, 124, 13, 229, 2, 23, 240, 203, 111, 199, 195, 110, 0, .., 0]));
+
+    }
+
+    fn get_context() -> (PlabblePacketBase, PlabbleRequestHeader) {
         // Packet
         let base: PlabblePacketBase = toml::from_str(r#"
         version = 0
@@ -167,12 +195,6 @@ mod tests {
         persist_key = true
         "#).unwrap();
 
-        // [body]
-        let body : SessionRequestBody = toml::from_str(r#"
-        psk_expiration = [1,2,3,4]
-
-        [[keys]]
-        X25519 = "..."
-        "#).unwrap();
+        (base, header)
     }
 }

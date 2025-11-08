@@ -1,34 +1,57 @@
 use binary_codec::{BinaryDeserializer, SerializerConfig};
 use serde::{Deserialize, Serialize};
 
-use crate::packets::{base::PlabblePacketBase, body::RequestSerializationContext, header::request_header::PlabbleRequestHeader};
+use crate::packets::{
+    base::PlabblePacketBase,
+    body::{PlabbleRequestBody, RequestSerializationContext},
+    header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
+};
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Debug)]
 pub struct PlabbleRequestPacket {
     #[serde(flatten)]
     base: PlabblePacketBase,
 
     header: PlabbleRequestHeader,
+
+    body: PlabbleRequestBody,
 }
 
-impl BinaryDeserializer for PlabbleRequestPacket {
-    fn from_bytes(bytes: &[u8], config: Option<&mut binary_codec::SerializerConfig>) -> Result<Self, binary_codec::DeserializationError> {
-        let mut default_config = SerializerConfig::new();
-        let config = config.unwrap_or(&mut default_config);
-        let base = PlabblePacketBase::from_bytes(bytes, Some(config))?;
-        let header = PlabbleRequestHeader::from_bytes(bytes, Some(config))?;
-        config.reset_bits(true); // TODO check if this is correct. But I think it is at this point.
+impl<'de> Deserialize<'de> for PlabbleRequestPacket {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize, Debug)]
+        struct RawPacket {
+            #[serde(flatten)]
+            base: PlabblePacketBase,
+            header: PlabbleRequestHeader,
+            // We'll temporarily store the body as untyped data
+            body: toml::Value, // or `Vec<u8>` if it’s binary
+        }
 
-        let context = RequestSerializationContext {
-            header: &header,
-            packet: &base,
-            config
+        let raw = RawPacket::deserialize(deserializer)?;
+        let body = match raw.header.packet_type {
+            RequestPacketType::Certificate { .. } => todo!(),
+            RequestPacketType::Session { .. } => PlabbleRequestBody::Session(raw.body.try_into().unwrap()),
+            RequestPacketType::Get { .. } => todo!(),
+            RequestPacketType::Stream { .. } => todo!(),
+            RequestPacketType::Post { .. } => todo!(),
+            RequestPacketType::Patch => todo!(),
+            RequestPacketType::Put { .. } => todo!(),
+            RequestPacketType::Delete { .. } => todo!(),
+            RequestPacketType::Subscribe { .. } => todo!(),
+            RequestPacketType::Unsubscribe { .. } => todo!(),
+            RequestPacketType::Register => todo!(),
+            RequestPacketType::Identify => todo!(),
+            RequestPacketType::Proxy { .. } => todo!(),
+            RequestPacketType::_Reserved13 => todo!(),
+            RequestPacketType::_Reserved14 => todo!(),
+            RequestPacketType::_Reserved15 => todo!(),
         };
-        
-        Ok(Self {
-            base,
-            header
-        })
+
+        Ok(PlabbleRequestPacket { base: raw.base, header: raw.header, body })
     }
 }
 
@@ -36,12 +59,41 @@ impl BinaryDeserializer for PlabbleRequestPacket {
 mod tests {
     use binary_codec::BinaryDeserializer;
 
-    use crate::packets::request::PlabbleRequestPacket;
+    use crate::packets::{
+        base::{PlabblePacketBase, crypto_keys::CryptoKey},
+        body::{PlabbleRequestBody, session::SessionRequestBody},
+        header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
+        request::PlabbleRequestPacket,
+    };
 
     #[test]
-    fn try_deserialize_request_packet() {
-        let bytes = vec![0b0100_0000, 0b1111_0101];
-        let req = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
-        println!("{:?}", req);
+    pub fn try_serde_serialize() {
+        let packet = PlabbleRequestPacket {
+            base: PlabblePacketBase {
+                version: 0,
+                fire_and_forget: false,
+                pre_shared_key: false,
+                use_encryption: true,
+                specify_crypto_settings: false,
+                crypto_settings: None,
+                psk_id: None,
+                psk_salt: None,
+                mac: None,
+            },
+            header: PlabbleRequestHeader::new(RequestPacketType::Session {
+                persist_key: true,
+                enable_encryption: true,
+            }),
+            body: PlabbleRequestBody::Session(SessionRequestBody {
+                psk_expiration: Some([1, 2, 3, 4]),
+                keys: vec![CryptoKey::X25519([0u8; 32])],
+            }),
+        };
+
+        let data = toml::to_string(&packet).unwrap();
+        println!("{}", data);
+
+        let des: PlabbleRequestPacket = toml::from_str(&data).unwrap();
+        println!("{:?}", des);
     }
 }
