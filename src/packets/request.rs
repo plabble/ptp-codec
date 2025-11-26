@@ -1,9 +1,8 @@
-use binary_codec::{BinaryDeserializer, SerializerConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::{
     base::PlabblePacketBase,
-    body::{PlabbleRequestBody, RequestSerializationContext},
+    body::{PlabbleRequestBody},
     header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
 };
 
@@ -57,8 +56,6 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
 
 #[cfg(test)]
 mod tests {
-    use binary_codec::BinaryDeserializer;
-
     use crate::packets::{
         base::{PlabblePacketBase, crypto_keys::CryptoKey},
         body::{PlabbleRequestBody, session::SessionRequestBody},
