@@ -132,14 +132,95 @@ request_counter = 1     # counter of the request to reply to (the server counts 
 - **Goal**: _exchange keys_ with a server, create a [Session Key](#session-key).
 - Implementation: [session.rs](./src/packets/body/session.rs)
 
-### Session request
+> WARNING: You can only start a secure session if you know and trust the server's certificate!
 
-Request flags:
+### Session flow
+1. The client generates one or more keypairs using one or more algorithms it wants to use for this session.
+2. The client sends a [session request](#session-request) packet. The client COULD specify the cryptographic algorithms it wants to use using the `crypto_settings`. The public keys or encapsulation keys should be included.
+3. The server also generates the keypairs for the algorithms the client requested, if applicable. Or it encapsulates a shared secret.
+4. The server signs the entire **plain text** request (in binary form) the client sent using each signature algorithm the client specified in the `crypto_settings` AND the response (psk_id and keys) it will return to the client to ensure integrity.
+5. The server generates a shared secret and derives a [session key](#session-key) from it. Optionally it stores the key if the client requested to store it as a PSK.
+6. The server returns a [session response](#session-response).
+7. The client checks the signatures the server returned using the public keys in the **server certificates** it already SHOULD know. This step is optional, but strongly recommended for integrity.
+8. The client also generates a shared secret and derives the session key from it.
+
+### Session request
+Request header flags:
 - **persist_key**: If set to true, persist the generated shared secret key and return a server-generated [PSK ID](#psk-id).
 - **enable_encryption**: If set to true, switch to Plabble [encrypted communication](#encrypted-client-server-communication) between the client and the server.
 
+Request body:
+- **psk_expiration**: 4-byte [Plabble timestamp](#plabble-timestamp) to request the server to delete the pre-shared key afterwards. REQUIRED if *persist_key* header flag is set.
+- **keys**: One or more key exchange algorithm from the following options: `X25519` (32B), `Kem512` (800B) or `Kem768` (1184B).
 
+Example:
+```toml
+version = 1
+specifiy_crypto_settings = true
 
+[crypto_settings]
+key_exchange_x25519 = true # this is the default
+sign_ed25519 = true # this is the default
+use_post_quantum = true
+
+[crypto_settings.post_quantum_settings]
+key_exchange_pqc_kem_512 = true
+key_exchange_pqc_kem_768 = true
+
+[header]
+packet_type = "Session"
+persist_key = true
+
+[body]
+psk_expiration = 2025-05-27T07:32:00-08:00Z
+
+[[body.keys]]
+X25519 = "..."
+
+[[body.keys]]
+Kem512 = "..."
+
+[[body.keys]]
+Kem786 = "..."
+```
+
+> The server SHOULD respect the cryptography settings of the client. If the server does not support the cryptographic algorithms the client asked for, it MUST abort the connection with an error code.
+
+### Session response
+Response header flags:
+- **with_psk**: If set, the client requested to store the session key as a PSK. This is a 12-byte ID.
+
+Response header body:
+- **psk_id**: 12-byte ID the server assigned to the stored key derived from the shared secret of this session. REQUIRED if *with_psk* is set.
+- **keys**: List of public keys or encapsulated secrets the server generated according to the request. Similar to the request.
+- **signatures**: List of signatures the server created from the client request and the *psk_id* and *keys* to ensure integrity. Similar to the keys.
+
+Example:
+```toml
+version = 1
+# crypto settings etc. inherited from request
+
+[header]
+packet_type = "Session"
+with_psk = true
+
+[body]
+psk_id = "..." # base64url encoded 12-byte key ID
+
+[[body.keys]]
+X25519 = "..."
+
+[[body.keys]]
+Kem512Cipher = "..." # The KEM keys are named differently, because it aren't public keys but encapsulated secrets
+
+[[body.keys]]
+Kem768Cipher = "..."
+
+[[body.signatures]]
+Ed25519 = "..."
+```
+
+> The client SHOULD validate the signatures and validate if the server returned the algorithms it asked for! Else it should not trust the session and disconnect.
 
 ## Concepts
 
@@ -152,3 +233,5 @@ Request flags:
 ### Packet integrity
 
 ### Encrypted client-server communication
+
+### Plabble Timestamp

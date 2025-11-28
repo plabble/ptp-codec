@@ -19,9 +19,9 @@ pub enum CryptoKey {
     Falcon(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1793]),
     SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
     Kem512(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 800]),
-    Kem512Secret(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 768]),
+    Kem512Cipher(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 768]),
     Kem768(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1184]),
-    Kem768Secret(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1088])
+    Kem768Cipher(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1088])
 }
 
 #[serde_as]
@@ -47,9 +47,9 @@ pub enum Algorithm {
     Falcon,
     SlhDsaSha128s,
     Kem512Key,
-    Kem512Secret,
+    Kem512Cipher,
     Kem768Key,
-    Kem768Secret
+    Kem768Cipher
 }
 
 impl CryptoKey {
@@ -67,8 +67,8 @@ impl CryptoKey {
                 Algorithm::SlhDsaSha128s => Self::read_fixed_n(config, bytes, CryptoKey::SlhDsaSha128s),
                 Algorithm::Kem512Key => Self::read_fixed_n(config, bytes, CryptoKey::Kem512),
                 Algorithm::Kem768Key => Self::read_fixed_n(config, bytes, CryptoKey::Kem768),
-                Algorithm::Kem512Secret => Self::read_fixed_n(config, bytes, CryptoKey::Kem512Secret),
-                Algorithm::Kem768Secret => Self::read_fixed_n(config, bytes, CryptoKey::Kem768Secret),
+                Algorithm::Kem512Cipher => Self::read_fixed_n(config, bytes, CryptoKey::Kem512Cipher),
+                Algorithm::Kem768Cipher => Self::read_fixed_n(config, bytes, CryptoKey::Kem768Cipher),
             }?);
         }
 
@@ -104,8 +104,8 @@ impl CryptoKey {
                 CryptoKey::Dsa65(_) => Algorithm::Dsa65,
                 CryptoKey::Falcon(_) => Algorithm::Falcon,
                 CryptoKey::SlhDsaSha128s(_) => Algorithm::SlhDsaSha128s,
-                CryptoKey::Kem512Secret(_) => Algorithm::Kem512Secret,
-                CryptoKey::Kem768Secret(_) => Algorithm::Kem768Secret,
+                CryptoKey::Kem512Cipher(_) => Algorithm::Kem512Cipher,
+                CryptoKey::Kem768Cipher(_) => Algorithm::Kem768Cipher,
             };
 
             if expected.get(i).cloned() != Some(variant) {
@@ -157,11 +157,11 @@ impl CryptoKey {
         // For KEM, we do not need the response to also contain an encapsulation key
         if settings.use_post_quantum && let Some(settings) = &settings.post_quantum_settings {
             if settings.key_exchange_pqc_kem_512 {
-                expected.push(if is_request { Algorithm::Kem512Key } else { Algorithm::Kem512Secret });
+                expected.push(if is_request { Algorithm::Kem512Key } else { Algorithm::Kem512Cipher });
             }
 
             if settings.key_exchange_pqc_kem_768 {
-                expected.push(if is_request { Algorithm::Kem768Key } else { Algorithm::Kem768Secret });
+                expected.push(if is_request { Algorithm::Kem768Key } else { Algorithm::Kem768Cipher });
             }
         }
 
