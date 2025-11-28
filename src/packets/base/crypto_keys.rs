@@ -7,7 +7,7 @@ use serde_with::formats::{Unpadded};
 use crate::packets::base::settings::CryptoSettings;
 
 #[serde_as]
-#[derive(ToBytes, Serialize, Deserialize, Debug)]
+#[derive(ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[no_discriminator]
 pub enum CryptoKey {
     ChaCha20(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
@@ -25,7 +25,7 @@ pub enum CryptoKey {
 }
 
 #[serde_as]
-#[derive(ToBytes, Serialize, Deserialize, Debug)]
+#[derive(ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[no_discriminator]
 pub enum CryptoSignature {
     Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 64]),

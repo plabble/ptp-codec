@@ -21,6 +21,7 @@ pub struct PlabblePacketBase {
     /// If set to true, this packet is sent outside of a session
     /// and no follow-up responses are expected.
     #[serde(default)]
+    #[toggles("fire_and_forget")]
     pub fire_and_forget: bool,
 
     /// If set to true, this packet uses a pre-shared key for encryption.

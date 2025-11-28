@@ -29,13 +29,13 @@ pub trait SerializableResponseBody {
     fn from_bytes(bytes: &[u8], context: &mut ResponseSerializationContext) -> Result<Self, DeserializationError> where Self: Sized;
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum PlabbleRequestBody {
     Session(SessionRequestBody)
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum PlabbleResponseBody {
     Session(SessionResponseBody)

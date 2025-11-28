@@ -16,6 +16,6 @@ pub struct PlabbleResponseHeader {
     pub packet_type: ResponsePacketType,
 
     /// Counter of request to reply to, if in session
-    #[toggled_by = "TODO"]
+    #[toggled_by = "!fire_and_forget"]
     pub request_counter: Option<u16>
 }

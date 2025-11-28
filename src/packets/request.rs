@@ -6,7 +6,7 @@ use crate::packets::{
     header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
 };
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, PartialEq)]
 pub struct PlabbleRequestPacket {
     #[serde(flatten)]
     base: PlabblePacketBase,
@@ -54,43 +54,4 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::packets::{
-        base::{PlabblePacketBase, crypto_keys::CryptoKey},
-        body::{PlabbleRequestBody, session::SessionRequestBody},
-        header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
-        request::PlabbleRequestPacket,
-    };
-
-    #[test]
-    pub fn try_serde_serialize() {
-        let packet = PlabbleRequestPacket {
-            base: PlabblePacketBase {
-                version: 0,
-                fire_and_forget: false,
-                pre_shared_key: false,
-                use_encryption: true,
-                specify_crypto_settings: false,
-                crypto_settings: None,
-                psk_id: None,
-                psk_salt: None,
-                mac: None,
-            },
-            header: PlabbleRequestHeader::new(RequestPacketType::Session {
-                persist_key: true,
-                enable_encryption: true,
-            }),
-            body: PlabbleRequestBody::Session(SessionRequestBody {
-                psk_expiration: Some([1, 2, 3, 4]),
-                keys: vec![CryptoKey::X25519([0u8; 32])],
-            }),
-        };
-
-        let data = toml::to_string(&packet).unwrap();
-        println!("{}", data);
-
-        let des: PlabbleRequestPacket = toml::from_str(&data).unwrap();
-        println!("{:?}", des);
-    }
-}
+// Tests for the request and response packets are in the type-specific files

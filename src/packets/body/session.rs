@@ -10,7 +10,7 @@ use crate::packets::header::type_and_flags::ResponsePacketType;
 use crate::packets::{base::crypto_keys::CryptoKey, body::SerializableRequestBody, header::type_and_flags::RequestPacketType};
 
 /// Session request body
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct SessionRequestBody {
     /// PSK expiration Plabble timestamp. Filled if request flag persist_key is set.
     pub psk_expiration: Option<[u8; 4]>,
@@ -70,7 +70,7 @@ impl SerializableRequestBody for SessionRequestBody {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct SessionResponseBody {
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     psk_id: Option<[u8; 12]>,
@@ -100,6 +100,7 @@ impl SerializableResponseBody for SessionResponseBody {
 
         let crypto_settings = context.packet.crypto_settings.clone().unwrap_or_default();
 
+        // Check if key and signature types match the crypto settings
         let key_types = CryptoKey::get_key_exchange_key_types(&crypto_settings, false);
         CryptoKey::verify_keys(key_types, &self.keys)?;
         let signature_types = CryptoKey::get_signature_types(&crypto_settings);
@@ -149,7 +150,7 @@ mod tests {
 
     use binary_codec::SerializerConfig;
 
-    use crate::packets::{base::PlabblePacketBase, body::{RequestSerializationContext, SerializableRequestBody, session::SessionRequestBody}, header::request_header::PlabbleRequestHeader};
+    use crate::{packets::{base::PlabblePacketBase, body::{RequestSerializationContext, SerializableRequestBody, session::SessionRequestBody}, header::request_header::PlabbleRequestHeader, request::PlabbleRequestPacket}};
 
     #[test]
     fn can_serialize_and_deserialize_session_request() {
@@ -173,7 +174,30 @@ mod tests {
 
         let bytes = body.to_bytes(&mut context).unwrap();
         assert!(matches!(bytes[..], [1,2,3,4, 178, 46, 136, 112, 219, 242, 179, 15, 196, 199, 192, 253, 103, 84, 52, 44, 88, 181, 188, 218, 239, 124, 13, 229, 2, 23, 240, 203, 111, 199, 195, 110, 0, .., 0]));
+    }
 
+    #[test]
+    fn can_serde_toml_session_request_packet() {
+        let toml = r#"
+        version = 1
+        use_encryption = false
+        mac = "6k0bdANb3Q2TkCIioHE71A"
+
+        [header]
+        packet_type = "Session"
+        persist_key = true
+        
+        [body]
+        psk_expiration = [1,2,3,4]
+
+        [[body.keys]]
+        X25519 = "si6IcNvysw_Ex8D9Z1Q0LFi1vNrvfA3lAhfwy2_Hw24"
+        "#;
+        
+        let request: PlabbleRequestPacket = toml::from_str(toml).unwrap();
+        let serialized = toml::to_string(&request).unwrap();
+        let deserialized: PlabbleRequestPacket = toml::from_str(&serialized).unwrap();
+        assert_eq!(request, deserialized);
     }
 
     fn get_context() -> (PlabblePacketBase, PlabbleRequestHeader) {
