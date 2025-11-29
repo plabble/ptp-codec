@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::packets::{
     base::PlabblePacketBase,
-    body::{PlabbleRequestBody},
+    body::PlabbleRequestBody,
     header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
 };
 
@@ -27,13 +27,15 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             base: PlabblePacketBase,
             header: PlabbleRequestHeader,
             // We'll temporarily store the body as untyped data
-            body: toml::Value, // or `Vec<u8>` if it’s binary
+            body: serde_value::Value, // or `Vec<u8>` if it’s binary
         }
 
         let raw = RawPacket::deserialize(deserializer)?;
         let body = match raw.header.packet_type {
             RequestPacketType::Certificate { .. } => todo!(),
-            RequestPacketType::Session { .. } => PlabbleRequestBody::Session(raw.body.try_into().unwrap()),
+            RequestPacketType::Session { .. } => {
+                PlabbleRequestBody::Session(raw.body.deserialize_into().unwrap())
+            }
             RequestPacketType::Get { .. } => todo!(),
             RequestPacketType::Stream { .. } => todo!(),
             RequestPacketType::Post { .. } => todo!(),
@@ -50,7 +52,11 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::_Reserved15 => todo!(),
         };
 
-        Ok(PlabbleRequestPacket { base: raw.base, header: raw.header, body })
+        Ok(PlabbleRequestPacket {
+            base: raw.base,
+            header: raw.header,
+            body,
+        })
     }
 }
 

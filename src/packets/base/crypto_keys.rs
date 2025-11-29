@@ -1,8 +1,8 @@
 use binary_codec::{DeserializationError, SerializationError, ToBytes, utils::slice};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use serde_with::base64::{Base64, UrlSafe};
-use serde_with::formats::{Unpadded};
+use serde_with::formats::Unpadded;
+use serde_with::serde_as;
 
 use crate::packets::base::settings::CryptoSettings;
 
@@ -21,7 +21,7 @@ pub enum CryptoKey {
     Kem512(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 800]),
     Kem512Cipher(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 768]),
     Kem768(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1184]),
-    Kem768Cipher(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1088])
+    Kem768Cipher(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1088]),
 }
 
 #[serde_as]
@@ -49,11 +49,15 @@ pub enum Algorithm {
     Kem512Key,
     Kem512Cipher,
     Kem768Key,
-    Kem768Cipher
+    Kem768Cipher,
 }
 
 impl CryptoKey {
-    pub fn read_keys(bytes: &[u8], key_types: Vec<Algorithm>, config: &mut binary_codec::SerializerConfig) -> Result<Vec<CryptoKey>, DeserializationError> {
+    pub fn read_keys(
+        bytes: &[u8],
+        key_types: Vec<Algorithm>,
+        config: &mut binary_codec::SerializerConfig,
+    ) -> Result<Vec<CryptoKey>, DeserializationError> {
         let mut keys = Vec::new();
         for key_type in key_types {
             keys.push(match key_type {
@@ -64,18 +68,28 @@ impl CryptoKey {
                 Algorithm::Dsa44 => Self::read_fixed_n(config, bytes, CryptoKey::Dsa44),
                 Algorithm::Dsa65 => Self::read_fixed_n(config, bytes, CryptoKey::Dsa65),
                 Algorithm::Falcon => Self::read_fixed_n(config, bytes, CryptoKey::Falcon),
-                Algorithm::SlhDsaSha128s => Self::read_fixed_n(config, bytes, CryptoKey::SlhDsaSha128s),
+                Algorithm::SlhDsaSha128s => {
+                    Self::read_fixed_n(config, bytes, CryptoKey::SlhDsaSha128s)
+                }
                 Algorithm::Kem512Key => Self::read_fixed_n(config, bytes, CryptoKey::Kem512),
                 Algorithm::Kem768Key => Self::read_fixed_n(config, bytes, CryptoKey::Kem768),
-                Algorithm::Kem512Cipher => Self::read_fixed_n(config, bytes, CryptoKey::Kem512Cipher),
-                Algorithm::Kem768Cipher => Self::read_fixed_n(config, bytes, CryptoKey::Kem768Cipher),
+                Algorithm::Kem512Cipher => {
+                    Self::read_fixed_n(config, bytes, CryptoKey::Kem512Cipher)
+                }
+                Algorithm::Kem768Cipher => {
+                    Self::read_fixed_n(config, bytes, CryptoKey::Kem768Cipher)
+                }
             }?);
         }
 
         Ok(keys)
     }
 
-    pub fn read_signatures(bytes: &[u8], signature_types: Vec<Algorithm>, config: &mut binary_codec::SerializerConfig) -> Result<Vec<CryptoSignature>, DeserializationError> {
+    pub fn read_signatures(
+        bytes: &[u8],
+        signature_types: Vec<Algorithm>,
+        config: &mut binary_codec::SerializerConfig,
+    ) -> Result<Vec<CryptoSignature>, DeserializationError> {
         let mut signatures = Vec::new();
         for signature_type in signature_types {
             signatures.push(match signature_type {
@@ -83,15 +97,23 @@ impl CryptoKey {
                 Algorithm::Dsa44 => Self::read_fixed_n(config, bytes, CryptoSignature::Dsa44),
                 Algorithm::Dsa65 => Self::read_fixed_n(config, bytes, CryptoSignature::Dsa65),
                 Algorithm::Falcon => Self::read_fixed_n(config, bytes, CryptoSignature::Falcon),
-                Algorithm::SlhDsaSha128s => Self::read_fixed_n(config, bytes, CryptoSignature::SlhDsaSha128s),
-                other => Err(DeserializationError::InvalidData(format!("{:?} is not a signature algorithm", other)))
+                Algorithm::SlhDsaSha128s => {
+                    Self::read_fixed_n(config, bytes, CryptoSignature::SlhDsaSha128s)
+                }
+                other => Err(DeserializationError::InvalidData(format!(
+                    "{:?} is not a signature algorithm",
+                    other
+                ))),
             }?);
         }
 
         Ok(signatures)
     }
 
-    pub fn verify_keys(expected: Vec<Algorithm>, actual: &Vec<CryptoKey>) -> Result<(), SerializationError> {
+    pub fn verify_keys(
+        expected: Vec<Algorithm>,
+        actual: &Vec<CryptoKey>,
+    ) -> Result<(), SerializationError> {
         for (i, key) in actual.iter().enumerate() {
             let variant = match key {
                 CryptoKey::X25519(_) => Algorithm::X25519,
@@ -111,19 +133,26 @@ impl CryptoKey {
             if expected.get(i).cloned() != Some(variant) {
                 return Err(SerializationError::InvalidData(format!(
                     "Unexpected algorithm at position {}: expected type {:?}, got {:?}",
-                    i, expected.get(i), variant
+                    i,
+                    expected.get(i),
+                    variant
                 )));
             }
         }
 
         if expected.len() != actual.len() {
-            return Err(SerializationError::InvalidData(String::from("Missing required algorithms")));
+            return Err(SerializationError::InvalidData(String::from(
+                "Missing required algorithms",
+            )));
         }
 
         Ok(())
     }
 
-    pub fn verify_signatures(expected: Vec<Algorithm>, actual: &Vec<CryptoSignature>) -> Result<(), SerializationError> {
+    pub fn verify_signatures(
+        expected: Vec<Algorithm>,
+        actual: &Vec<CryptoSignature>,
+    ) -> Result<(), SerializationError> {
         for (i, signature) in actual.iter().enumerate() {
             let variant = match signature {
                 CryptoSignature::Ed25519(_) => Algorithm::Ed25519,
@@ -136,32 +165,49 @@ impl CryptoKey {
             if expected.get(i).cloned() != Some(variant) {
                 return Err(SerializationError::InvalidData(format!(
                     "Unexpected algorithm at position {}: expected type {:?}, got {:?}",
-                    i, expected.get(i), variant
+                    i,
+                    expected.get(i),
+                    variant
                 )));
             }
         }
 
         if expected.len() != actual.len() {
-            return Err(SerializationError::InvalidData(String::from("Missing required algorithms")));
+            return Err(SerializationError::InvalidData(String::from(
+                "Missing required algorithms",
+            )));
         }
 
         Ok(())
     }
 
-    pub fn get_key_exchange_key_types(settings: &CryptoSettings, is_request: bool) -> Vec<Algorithm> {
+    pub fn get_key_exchange_key_types(
+        settings: &CryptoSettings,
+        is_request: bool,
+    ) -> Vec<Algorithm> {
         let mut expected = Vec::new();
         if settings.key_exchange_x25519 {
             expected.push(Algorithm::X25519);
         }
 
         // For KEM, we do not need the response to also contain an encapsulation key
-        if settings.use_post_quantum && let Some(settings) = &settings.post_quantum_settings {
+        if settings.use_post_quantum
+            && let Some(settings) = &settings.post_quantum_settings
+        {
             if settings.key_exchange_pqc_kem_512 {
-                expected.push(if is_request { Algorithm::Kem512Key } else { Algorithm::Kem512Cipher });
+                expected.push(if is_request {
+                    Algorithm::Kem512Key
+                } else {
+                    Algorithm::Kem512Cipher
+                });
             }
 
             if settings.key_exchange_pqc_kem_768 {
-                expected.push(if is_request { Algorithm::Kem768Key } else { Algorithm::Kem768Cipher });
+                expected.push(if is_request {
+                    Algorithm::Kem768Key
+                } else {
+                    Algorithm::Kem768Cipher
+                });
             }
         }
 
@@ -174,7 +220,9 @@ impl CryptoKey {
             expected.push(Algorithm::Ed25519);
         }
 
-        if settings.use_post_quantum && let Some(settings) = &settings.post_quantum_settings {
+        if settings.use_post_quantum
+            && let Some(settings) = &settings.post_quantum_settings
+        {
             if settings.sign_pqc_dsa_44 {
                 expected.push(Algorithm::Dsa44);
             }
@@ -200,9 +248,7 @@ impl CryptoKey {
     where
         F: FnOnce([u8; N]) -> C,
     {
-        let data: [u8; N] = slice(config, bytes, N, true)?
-            .try_into()
-            .unwrap();
+        let data: [u8; N] = slice(config, bytes, N, true)?.try_into().unwrap();
         Ok(constructor(data))
     }
 }

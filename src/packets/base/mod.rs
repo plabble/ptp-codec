@@ -1,13 +1,13 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use serde_with::base64::{Base64, UrlSafe};
-use serde_with::formats::{Unpadded};
+use serde_with::formats::Unpadded;
+use serde_with::serde_as;
 
 use settings::CryptoSettings;
 
-pub mod settings;
 pub mod crypto_keys;
+pub mod settings;
 
 /// Plabble Protocol Packet
 #[serde_as]
@@ -56,12 +56,12 @@ pub struct PlabblePacketBase {
     /// Message Authentication Code (MAC)
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     #[toggled_by = "!encryption"]
-    pub mac: Option<[u8; 16]>
+    pub mac: Option<[u8; 16]>,
 }
 
 #[cfg(test)]
 mod tests {
-    use binary_codec::{BinarySerializer, BinaryDeserializer};
+    use binary_codec::{BinaryDeserializer, BinarySerializer};
 
     use super::*;
 
@@ -101,7 +101,28 @@ mod tests {
         let deserialized_packet = PlabblePacketBase::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized_packet);
 
-        assert_eq!(vec![0b0000_0000, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16], bytes);
+        assert_eq!(
+            vec![
+                0b0000_0000,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                0x10,
+                0x11,
+                0x12,
+                0x13,
+                0x14,
+                0x15,
+                0x16
+            ],
+            bytes
+        );
     }
 
     #[test]
@@ -126,8 +147,45 @@ mod tests {
         let bytes = packet.to_bytes(None).unwrap();
         let deserialized_packet = PlabblePacketBase::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized_packet);
-        assert_eq!(vec![0b1110_0001, 0b1011_0001, 0b0000_0001, 
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 
-            7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7], bytes);
+        assert_eq!(
+            vec![
+                0b1110_0001,
+                0b1011_0001,
+                0b0000_0001,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                0x10,
+                0x11,
+                0x12,
+                0x13,
+                0x14,
+                0x15,
+                0x16,
+                7,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                7
+            ],
+            bytes
+        );
     }
 }

@@ -20,7 +20,7 @@ impl PlabbleRequestHeader {
     pub fn new(packet_type: RequestPacketType) -> Self {
         Self {
             _type: packet_type.get_discriminator(),
-            packet_type
+            packet_type,
         }
     }
 }

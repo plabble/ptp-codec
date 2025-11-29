@@ -17,5 +17,5 @@ pub struct PlabbleResponseHeader {
 
     /// Counter of request to reply to, if in session
     #[toggled_by = "!fire_and_forget"]
-    pub request_counter: Option<u16>
+    pub request_counter: Option<u16>,
 }
