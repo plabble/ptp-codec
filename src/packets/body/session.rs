@@ -5,12 +5,10 @@ use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
 use crate::packets::base::crypto_keys::CryptoSignature;
-use crate::packets::body::SerializableResponseBody;
+use crate::packets::body::request_body::SerializableRequestBody;
+use crate::packets::body::response_body::SerializableResponseBody;
 use crate::packets::header::type_and_flags::ResponsePacketType;
-use crate::packets::{
-    base::crypto_keys::CryptoKey, body::SerializableRequestBody,
-    header::type_and_flags::RequestPacketType,
-};
+use crate::packets::{base::crypto_keys::CryptoKey, header::type_and_flags::RequestPacketType};
 
 /// Session request body
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -40,8 +38,9 @@ impl SerializableRequestBody for SessionRequestBody {
                 context.config.pos += expiration_bytes.len();
             }
         } else {
-            return Err(SerializationError::InvalidData(String::from(
-                "Header type did not match body",
+            return Err(SerializationError::InvalidData(format!(
+                "Header type {:?} did not match body (Session)",
+                context.header.packet_type
             )));
         }
 
@@ -84,9 +83,10 @@ impl SerializableRequestBody for SessionRequestBody {
                 keys,
             })
         } else {
-            Err(DeserializationError::InvalidData(String::from(
-                "Header type did not match body",
-            )))
+            return Err(DeserializationError::InvalidData(format!(
+                "Header type {:?} did not match body (Session)",
+                context.header.packet_type
+            )));
         }
     }
 }
@@ -195,8 +195,9 @@ mod tests {
     use crate::packets::{
         base::PlabblePacketBase,
         body::{
-            RequestSerializationContext, ResponseSerializationContext, SerializableRequestBody,
-            SerializableResponseBody,
+            RequestSerializationContext, ResponseSerializationContext,
+            request_body::SerializableRequestBody,
+            response_body::SerializableResponseBody,
             session::{SessionRequestBody, SessionResponseBody},
         },
         header::{request_header::PlabbleRequestHeader, response_header::PlabbleResponseHeader},

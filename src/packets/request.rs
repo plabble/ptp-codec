@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::packets::{
     base::PlabblePacketBase,
-    body::PlabbleRequestBody,
+    body::request_body::PlabbleRequestBody,
     header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
 };
 
