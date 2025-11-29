@@ -8,6 +8,7 @@ use crate::packets::{
 };
 
 pub mod session;
+pub mod bucket;
 
 #[derive(Clone)]
 pub struct RequestSerializationContext<'a> {
