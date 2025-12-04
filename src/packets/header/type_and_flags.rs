@@ -88,7 +88,12 @@ pub enum RequestPacketType {
         select_random_hops: bool,
     },
     _Reserved13,
-    _Reserved14,
+    Opcode {
+        #[serde(default)]
+        allow_bucket_operations: bool,
+        #[serde(default)]
+        allow_eval: bool
+    },
     _Reserved15,
 }
 
@@ -120,6 +125,6 @@ pub enum ResponsePacketType {
         include_hop_info: bool,
     },
     _Reserved13,
-    _Reserved14,
+    pcode,
     Error,
 }

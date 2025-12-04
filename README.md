@@ -29,7 +29,8 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **10** REGISTER
 - **11** IDENTIFY
 - **12** PROXY
-- 13,14 are reserved for future use
+- 13 is reserved for future use
+- **14** OPCODE
 - **15** ERROR
 
 ## Plabble packet base

@@ -8,6 +8,7 @@ use settings::CryptoSettings;
 
 pub mod crypto_keys;
 pub mod settings;
+pub mod opcode;
 
 /// Plabble Protocol Packet
 #[serde_as]

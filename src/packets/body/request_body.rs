@@ -187,7 +187,10 @@ impl SerializableRequestBody for PlabbleRequestBody {
                 select_random_hops,
             } => todo!(),
             RequestPacketType::_Reserved13 => todo!(),
-            RequestPacketType::_Reserved14 => todo!(),
+            RequestPacketType::Opcode {
+                allow_bucket_operations,
+                allow_eval
+            } => todo!(),
             RequestPacketType::_Reserved15 => todo!(),
         }
     }

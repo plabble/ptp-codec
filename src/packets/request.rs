@@ -48,7 +48,7 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Identify => todo!(),
             RequestPacketType::Proxy { .. } => todo!(),
             RequestPacketType::_Reserved13 => todo!(),
-            RequestPacketType::_Reserved14 => todo!(),
+            RequestPacketType::Opcode { .. } => todo!(),
             RequestPacketType::_Reserved15 => todo!(),
         };
 

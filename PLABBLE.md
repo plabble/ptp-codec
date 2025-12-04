@@ -7,6 +7,10 @@ When using local network/bluetooth, direct connections are used (client -> clien
 Goals:
 - General-purpose, anonymous and secure protocol for storing files, messages, chats, video streams etc.
 
+# Plabble Blockchain 
+- OPCODE engine & OPCODE packet to execute commands on the server.
+- Control flow, security for the server: maximum count of iterations/executions and memory to avoid exploits.
+
 # Security improvements
 - [Password-Authenticated Key Agreement](https://github.com/RustCrypto/PAKEs): to prevent "offline guessing"
 
