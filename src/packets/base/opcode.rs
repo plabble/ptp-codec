@@ -47,49 +47,49 @@ pub enum Opcode {
     // Boolean/logic operations
     NOT = 28, // Pop boolean and invert it
     AND = 29, // Pop two booleans and check if both true
-    OR = 30, // Pop two booleans and check if one is true
+    OR = 30,  // Pop two booleans and check if one is true
     XOR = 31, // Pop two booleans and check if exactly ONE is true
-    
-    EQ = 32, // Pop two items and check if they are equal
+
+    EQ = 32,  // Pop two items and check if they are equal
     NEQ = 33, // Pop two items and check if they are different
 
     // Advanced numerics
-    POW = 34, // Pop two numbers, calculate exponent
+    POW = 34,  // Pop two numbers, calculate exponent
     SQRT = 35, // Pop two numbers, calculate square root
     // 36 - 40
 
     // Control flow
-    NOP = 41, // Do nothing
-    IF = 42, // If statement (takes boolean)
-    ELSE = 43, // Else statement
-    ENDIF = 44, // End if
-    BREAK = 45, // Break if (skip to next ENDIF, or POOL)
-    LOOP = 46, // Start loop
-    POOL = 47, // End of loop
-    JMP = 48, // Jump to address (takes unsigned dynint as address)
+    NOP = 41,    // Do nothing
+    IF = 42,     // If statement (takes boolean)
+    ELSE = 43,   // Else statement
+    ENDIF = 44,  // End if
+    BREAK = 45,  // Break if (skip to next ENDIF, or POOL)
+    LOOP = 46,   // Start loop
+    POOL = 47,   // End of loop
+    JMP = 48,    // Jump to address (takes unsigned dynint as address)
     ASSERT = 49, // Crash if top is not true
     RETURN = 50, // Stop execution, return stack as result
 
     // Stack manipulation
-    DUP = 51, // Duplicate top item of stack
-    DUP2 = 52, // Duplicate top two items of stack
-    DUP3 = 53, // Duplicate top three items of stack
-    DUP4 = 54, // Duplicate top four items of stack
-    DUPN = 55, // Duplicate top item of stack N times (takes dynint for count)
-    SWAP = 56, // Swap top two items of stack
-    ROT = 57, // Rotate top three items of stack
-    POP = 58, // Take one item from stack
-    COPY = 59, // Take the item at index n (takes unsigned dynint as address) and copy it to top
-    BUBBLE = 60, // Take the item at index n (takes unsigned dynint as address) and move it to top
-    SINK = 61, // Take the top item and move it to index n (replace)
-    TOALT = 62, // Move top item to alt (other) stack
-    FROMALT = 63, // Move top item from alt (other) stack back
+    DUP = 51,      // Duplicate top item of stack
+    DUP2 = 52,     // Duplicate top two items of stack
+    DUP3 = 53,     // Duplicate top three items of stack
+    DUP4 = 54,     // Duplicate top four items of stack
+    DUPN = 55,     // Duplicate top item of stack N times (takes dynint for count)
+    SWAP = 56,     // Swap top two items of stack
+    ROT = 57,      // Rotate top three items of stack
+    POP = 58,      // Take one item from stack
+    COPY = 59,     // Take the item at index n (takes unsigned dynint as address) and copy it to top
+    BUBBLE = 60,   // Take the item at index n (takes unsigned dynint as address) and move it to top
+    SINK = 61,     // Take the top item and move it to index n (replace)
+    TOALT = 62,    // Move top item to alt (other) stack
+    FROMALT = 63,  // Move top item from alt (other) stack back
     SNAPSHOT = 64, // Store a snapshot of the current stack
-    RESTORE = 65, // Restore the snapshot (pushes items to current stack)
-    CLEAR = 66, // Clear current stack
-    SWITCH = 67, // Switches between current and alt stack
-    CONCAT = 68, // Merge top two items together as bytes
-    COUNT = 69, // Push number of items in stack to stack (excluding itself)
+    RESTORE = 65,  // Restore the snapshot (pushes items to current stack)
+    CLEAR = 66,    // Clear current stack
+    SWITCH = 67,   // Switches between current and alt stack
+    CONCAT = 68,   // Merge top two items together as bytes
+    COUNT = 69,    // Push number of items in stack to stack (excluding itself)
     // 70 - 80,
 
     // Bucket operations
@@ -102,7 +102,7 @@ pub enum Opcode {
     // 87 - 90
 
     // Slice operations
-    LEN = 91, // Push length of top item to the stack
+    LEN = 91,     // Push length of top item to the stack
     REVERSE = 92, // Reverse bytes of top item
 
     // Crypto operations

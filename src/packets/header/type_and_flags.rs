@@ -22,11 +22,17 @@ pub enum RequestPacketType {
     /// Start a new session.
     /// - persist_key: Request that the server persist the session key.
     /// - enable_encryption: Request that the server enable encryption for this session.
+    /// - with_salt: Provide a salt to the server for session key derivation.
+    /// - request_salt: Request that the server (also) provides a salt for session key derivation
     Session {
         #[serde(default)]
         persist_key: bool,
         #[serde(default)]
         enable_encryption: bool,
+        #[serde(default)]
+        with_salt: bool,
+        #[serde(default)]
+        request_salt: bool,
     },
     /// Retrieve values from a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
@@ -138,7 +144,7 @@ pub enum RequestPacketType {
         #[serde(default)]
         allow_bucket_operations: bool,
         #[serde(default)]
-        allow_eval: bool
+        allow_eval: bool,
     },
     _Reserved15,
 }
@@ -153,9 +159,12 @@ pub enum ResponsePacketType {
     Certificate,
     /// Response to a session initiation request.
     /// - with_psk: Response contains a PSK ID the server created
+    /// - with_salt: Response contains a salt for session key derivation
     Session {
         #[serde(default)]
         with_psk: bool,
+        #[serde(default)]
+        with_salt: bool,
     },
     /// Response to a get request.
     /// - binary_keys: Keys in the response are in binary format.

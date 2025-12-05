@@ -13,7 +13,7 @@ use crate::packets::{
 /// A trait for serializing and deserializing request bodies.
 /// Implementors of this trait can convert their data to and from byte arrays
 /// using the provided serialization context.
-/// 
+///
 /// # Methods
 /// - `to_bytes`: Serializes the request body into a byte vector.
 /// - `from_bytes`: Deserializes a byte slice into the request body.
@@ -34,7 +34,7 @@ pub trait SerializableRequestBody {
 /// that can be sent in a Plabble request.
 /// Each variant corresponds to a specific request type and may contain
 /// associated data relevant to that request.
-/// 
+///
 /// # Variants
 /// - `Certificate`: Represents a certificate request body.
 /// - `Session`: Represents a session request body.
@@ -66,7 +66,7 @@ pub enum PlabbleRequestBody {
     Register,
     Identify,
     Proxy,
-    Opcode
+    Opcode,
 }
 
 impl SerializableRequestBody for PlabbleRequestBody {
@@ -171,6 +171,8 @@ impl SerializableRequestBody for PlabbleRequestBody {
             RequestPacketType::Session {
                 persist_key,
                 enable_encryption,
+                with_salt,
+                request_salt
             } => todo!(),
             RequestPacketType::Get {
                 binary_keys,
@@ -218,7 +220,7 @@ impl SerializableRequestBody for PlabbleRequestBody {
             RequestPacketType::_Reserved13 => todo!(),
             RequestPacketType::Opcode {
                 allow_bucket_operations,
-                allow_eval
+                allow_eval,
             } => todo!(),
             RequestPacketType::_Reserved15 => todo!(),
         }

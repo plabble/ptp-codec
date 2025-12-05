@@ -12,7 +12,7 @@ pub mod session;
 
 /// Context information required for serializing request packets.
 /// Includes references to the packet header, base packet, and serializer configuration.
-/// 
+///
 /// # Fields
 /// - `header`: Reference to the request packet header.
 /// - `packet`: Reference to the base packet structure.
@@ -26,7 +26,7 @@ pub struct RequestSerializationContext<'a> {
 
 /// Context information required for serializing response packets.
 /// Includes references to the packet header, base packet, and serializer configuration.
-/// 
+///
 /// # Fields
 /// - `header`: Reference to the response packet header.
 /// - `packet`: Reference to the base packet structure.

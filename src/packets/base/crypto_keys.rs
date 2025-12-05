@@ -6,6 +6,22 @@ use serde_with::serde_as;
 
 use crate::packets::base::settings::CryptoSettings;
 
+/// Cryptographic keys used in various algorithms
+/// The keys are stored as fixed-size byte arrays, serialized/deserialized using base64 encoding (when using serde)
+/// 
+/// # Variants:
+/// - ChaCha20: 32 bytes secret key for ChaCha20 or ChaCha20-Poly1305 encryption
+/// - Aes: 32 bytes secret key for AES-CTR/AES-GCM encryption
+/// - Ed25519: 32 bytes public key for validating Ed25519 signatures
+/// - X25519: 32 bytes public key for X25519 key exchange
+/// - Dsa44: 1312 bytes public key for DSA-44 post-quantum signatures
+/// - Dsa65: 1952 bytes public key for DSA-65 post-quantum signatures
+/// - Falcon: 1793 bytes public key for Falcon post-quantum signatures
+/// - SlhDsaSha128s: 32 bytes public key for SLH-DSA-SHA128s post-quantum signatures
+/// - Kem512: 800 bytes public key for KEM-512 post-quantum key exchange
+/// - Kem512Cipher: 768 bytes encapsulated key for KEM-512 post-quantum key exchange
+/// - Kem768: 1184 bytes public key for KEM-768 post-quantum key exchange
+/// - Kem768Cipher: 1088 bytes encapsulated key for KEM-768 post-quantum key exchange
 #[serde_as]
 #[derive(ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[no_discriminator]
@@ -24,6 +40,15 @@ pub enum CryptoKey {
     Kem768Cipher(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1088]),
 }
 
+/// Cryptographic signatures used in various algorithms
+/// The signatures are stored as fixed-size byte arrays, serialized/deserialized using base64 encoding (when using serde)
+/// 
+/// # Variants:
+/// - Ed25519: 64 bytes signature for Ed25519 signatures
+/// - Dsa44: 2420 bytes signature for DSA-44 post-quantum signatures
+/// - Dsa65: 3309 bytes signature for DSA-65 post-quantum signatures
+/// - Falcon: 1462 bytes signature for Falcon post-quantum signatures
+/// - SlhDsaSha128s: 7856 bytes signature for SLH-DSA-SHA128s post-quantum signatures
 #[serde_as]
 #[derive(ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[no_discriminator]
@@ -35,6 +60,21 @@ pub enum CryptoSignature {
     SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 7856]),
 }
 
+/// Enum of supported cryptographic algorithms
+/// 
+/// # Variants:
+/// - ChaCha20: ChaCha20 or ChaCha20-Poly1305 encryption
+/// - Aes: AES-CTR/AES-GCM encryption
+/// - Ed25519: Ed25519 signatures
+/// - X25519: X25519 key exchange
+/// - Dsa44: DSA-44 post-quantum signatures
+/// - Dsa65: DSA-65 post-quantum signatures
+/// - Falcon: Falcon post-quantum signatures
+/// - SlhDsaSha128s: SLH-DSA-SHA128s post-quantum signatures
+/// - Kem512Key: KEM-512 post-quantum key exchange (public key)
+/// - Kem512Cipher: KEM-512 post-quantum key exchange (encapsulated key)
+/// - Kem768Key: KEM-768 post-quantum key exchange (public key)
+/// - Kem768Cipher: KEM-768 post-quantum key exchange (encapsulated key)
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Algorithm {
@@ -52,7 +92,17 @@ pub enum Algorithm {
     Kem768Cipher,
 }
 
+/// CryptoKey implementation
 impl CryptoKey {
+    /// Reads multiple CryptoKeys from bytes based on the provided key types
+    /// 
+    /// # Arguments
+    /// - `bytes`: The byte slice to read from
+    /// - `key_types`: A vector of Algorithm variants indicating which keys to read
+    /// - `config`: The serializer configuration to use
+    /// 
+    /// # Returns
+    /// A Result containing a vector of CryptoKeys or a DeserializationError
     pub fn read_keys(
         bytes: &[u8],
         key_types: Vec<Algorithm>,
@@ -85,6 +135,15 @@ impl CryptoKey {
         Ok(keys)
     }
 
+    /// Reads multiple CryptoSignatures from bytes based on the provided signature types
+    /// 
+    /// # Arguments
+    /// - `bytes`: The byte slice to read from
+    /// - `signature_types`: A vector of Algorithm variants indicating which signatures to read
+    /// - `config`: The serializer configuration to use
+    /// 
+    /// # Returns
+    /// A Result containing a vector of CryptoSignatures or a DeserializationError
     pub fn read_signatures(
         bytes: &[u8],
         signature_types: Vec<Algorithm>,
@@ -110,6 +169,14 @@ impl CryptoKey {
         Ok(signatures)
     }
 
+    /// Verifies that the provided CryptoKeys match the expected algorithms
+    /// 
+    /// # Arguments
+    /// - `expected`: A vector of Algorithm variants indicating the expected key types
+    /// - `actual`: A reference to a vector of CryptoKeys to verify
+    /// 
+    /// # Returns
+    /// A Result indicating success or a SerializationError if verification fails
     pub fn verify_keys(
         expected: Vec<Algorithm>,
         actual: &Vec<CryptoKey>,
@@ -149,6 +216,14 @@ impl CryptoKey {
         Ok(())
     }
 
+    /// Verifies that the provided CryptoSignatures match the expected algorithms
+    /// 
+    /// # Arguments
+    /// - `expected`: A vector of Algorithm variants indicating the expected signature types
+    /// - `actual`: A reference to a vector of CryptoSignatures to verify
+    /// 
+    /// # Returns
+    /// A Result indicating success or a SerializationError if verification fails
     pub fn verify_signatures(
         expected: Vec<Algorithm>,
         actual: &Vec<CryptoSignature>,
@@ -181,6 +256,14 @@ impl CryptoKey {
         Ok(())
     }
 
+    /// Helper function to get expected key exchange types based on settings
+    /// 
+    /// # Arguments
+    /// - `settings`: Reference to CryptoSettings
+    /// - `is_request`: Boolean indicating if it's for a request (true) or response (false)
+    /// 
+    /// # Returns
+    /// A vector of Algorithm variants indicating the expected key exchange types
     pub fn get_key_exchange_key_types(
         settings: &CryptoSettings,
         is_request: bool,
@@ -214,6 +297,13 @@ impl CryptoKey {
         expected
     }
 
+    /// Helper function to get expected signature types based on settings
+    /// 
+    /// # Arguments
+    /// - `settings`: Reference to CryptoSettings
+    /// 
+    /// # Returns
+    /// A vector of Algorithm variants indicating the expected signature types
     pub fn get_signature_types(settings: &CryptoSettings) -> Vec<Algorithm> {
         let mut expected = Vec::new();
         if settings.sign_ed25519 {
@@ -241,6 +331,14 @@ impl CryptoKey {
     }
 
     /// Helper function to read fixed amount of bytes
+    /// 
+    /// # Arguments
+    /// - `config`: The serializer configuration to use
+    /// - `bytes`: The byte slice to read from
+    /// - `constructor`: A function that constructs the desired type from a fixed-size byte array
+    /// 
+    /// # Returns
+    /// A Result containing the constructed type or a DeserializationError
     fn read_fixed_n<const N: usize, F, C>(
         config: &mut binary_codec::SerializerConfig,
         bytes: &[u8],

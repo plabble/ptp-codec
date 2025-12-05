@@ -8,7 +8,7 @@ use crate::packets::{
 
 /// A Plabble request packet, consisting of a base, header, and body.
 /// The body type is determined by the packet type in the header.
-/// 
+///
 /// # Members
 /// - `base`: The base packet information common to all Plabble packets (both requests and responses).
 /// - `header`: The request-specific header containing metadata.
@@ -20,7 +20,7 @@ pub struct PlabbleRequestPacket {
     base: PlabblePacketBase,
 
     header: PlabbleRequestHeader,
-    
+
     body: PlabbleRequestBody,
 }
 

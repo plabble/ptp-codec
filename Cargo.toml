@@ -12,6 +12,7 @@ name = "plabble_codec"
 crate-type = ["rlib"]
 
 [dependencies]
+base64 = "0.22.1"
 binary-codec = "0.2.9"
 serde = { version = "1.0.225", features = ["derive"] }
 serde-value = "0.7.0"

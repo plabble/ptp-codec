@@ -10,7 +10,7 @@ The Plabble Protocol works with messages called **packets**. There are two group
 
 Plabble packets can be used in two forms: TOML and binary. The TOML variant is only used for unencrypted payloads or to communicate with a library or service that translates the packets to encrypted, binary payloads. The TOML variant is not meant to be sent over the Plabble network, but can be used with [Plabble-over-HTTP(S)](#plabble-over-https-poh). In this documentation we use the TOML variant a lot because it is very human-readable and easy to explain.
 
-Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the **header** and the **body**.
+Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the **header** and the **body**. The header and body are different depending on if it is a request or response and the [packet type](#packet-type).
 
 ## Packet type
 - The Plabble Transport Protocol is build upon several **packet types**.
@@ -60,7 +60,7 @@ specifiy_crypto_settings = true
 # [16B] required if pre_shared_key flag is set.
 psk_id = "base64url pre-shared key ID"
 
-# [16B] required if pre_shared_key flag is set. Random bytes to salt key generated from PSK
+# [16B] required if pre_shared_key flag is set. Random bytes to salt the key generated from PSK
 psk_salt = "base64url random generated salt"
 
 # [16B] required if use_encryption flag is not set. 
@@ -139,20 +139,23 @@ request_counter = 1     # counter of the request to reply to (the server counts 
 1. The client generates one or more keypairs using one or more algorithms it wants to use for this session.
 2. The client sends a [session request](#session-request) packet. The client COULD specify the cryptographic algorithms it wants to use using the `crypto_settings`. The public keys or encapsulation keys should be included.
 3. The server also generates the keypairs for the algorithms the client requested, if applicable. Or it encapsulates a shared secret.
-4. The server signs the entire **plain text** request (in binary form) the client sent using each signature algorithm the client specified in the `crypto_settings` AND the response (psk_id and keys) it will return to the client to ensure integrity.
+4. The server signs the entire **plain text** request (in binary form) the client sent using each signature algorithm the client specified in the `crypto_settings` AND the response (*psk_id* and *keys*) it will return to the client to ensure integrity.
 5. The server generates a shared secret and derives a [session key](#session-key) from it. Optionally it stores the key if the client requested to store it as a PSK.
 6. The server returns a [session response](#session-response).
 7. The client checks the signatures the server returned using the public keys in the **server certificates** it already SHOULD know. This step is optional, but strongly recommended for integrity.
-8. The client also generates a shared secret and derives the session key from it.
+8. The client also generates a shared secret and derives the [session key](#session-key) from it.
 
 ### Session request
 Request header flags:
 - **persist_key**: If set to true, persist the generated shared secret key and return a server-generated [PSK ID](#psk-id).
 - **enable_encryption**: If set to true, switch to Plabble [encrypted communication](#encrypted-client-server-communication) between the client and the server.
+- **with_salt**: If set to true, include 16-byte random generated salt by client
+- **request_salt**: If set to true, force server to (also) generate and use a salt
 
 Request body:
 - **psk_expiration**: 4-byte [Plabble timestamp](#plabble-timestamp) to request the server to delete the pre-shared key afterwards. REQUIRED if *persist_key* header flag is set.
-- **keys**: One or more key exchange algorithm from the following options: `X25519` (32B), `Kem512` (800B) or `Kem768` (1184B).
+- **salt**: 16-byte salt for the KDF algorithm that is used to create the [session key](#session-key). REQUIRED if *with_salt* is set.
+- **keys**: One or more key exchange algorithm from the following options: `X25519` (32B), `Kem512` (800B) or `Kem768` (1184B). They are encoded in the same order as they are in the [crypto settings](#plabble-packet-base). See [crypto_keys.rs](./src/packets/base/crypto_keys.rs).
 
 Example:
 ```toml
@@ -171,9 +174,12 @@ key_exchange_pqc_kem_768 = true
 [header]
 packet_type = "Session"
 persist_key = true
+with_salt = true
+request_salt = true
 
 [body]
 psk_expiration = 2025-05-27T07:32:00-08:00Z
+salt = "..."
 
 [[body.keys]]
 X25519 = "..."
@@ -190,11 +196,13 @@ Kem786 = "..."
 ### Session response
 Response header flags:
 - **with_psk**: If set, the client requested to store the session key as a PSK. This is a 12-byte ID.
+- **with_salt**: If set to true, the response contains a 16-byte random generated salt by the server.
 
 Response header body:
 - **psk_id**: 12-byte ID the server assigned to the stored key derived from the shared secret of this session. REQUIRED if *with_psk* is set.
+- **salt**: 16-byte salt generated by server. REQUIRED if *with_salt* is set.
 - **keys**: List of public keys or encapsulated secrets the server generated according to the request. Similar to the request.
-- **signatures**: List of signatures the server created from the client request and the *psk_id* and *keys* to ensure integrity. Similar to the keys.
+- **signatures**: List of signatures the server created from the client request and the *psk_id* and *keys* to ensure integrity. Encoded the same way as the keys in the request.
 
 Example:
 ```toml
@@ -204,9 +212,11 @@ version = 1
 [header]
 packet_type = "Session"
 with_psk = true
+with_salt = true
 
 [body]
 psk_id = "..." # base64url encoded 12-byte key ID
+salt = "..."
 
 [[body.keys]]
 X25519 = "..."
@@ -225,9 +235,21 @@ Ed25519 = "..."
 
 ## Concepts
 
+### Buckets
+The Plabble Protocol is built around the concept of a **bucket**. A bucket is an isolated key-value database collection. A server can host many buckets, but a Plabble request is always targeting one bucket. Every bucket contains **slots** which are the entries inside the buckets. You can modify the binary content of a slot using its **key**. The **value** inside the slot is always binary (in bytes), no other data types are supported using the Plabble protocol. 
+
+#### Bucket key types
+There are two types of keys:
+- **Numeric keys**: A _uint16_ value between 0 and 65535. So numeric buckets have a maximum amount of slots, exactly 65536. The big advantage of numeric slots is that they are very small to send (only 2 bytes) and that they follow a numeric order.
+- **Binary keys**: A _utf-8_ encoded string. This gives the protocol more flexibility when working with buckets. The disadvantages are bigger requests and the dynamic length, so we need to prefix the keys with a [dynint](#plabble-dynamic-int) to encode the length in Plabble packets when using binary keys.
+
 ### Plabble-over-HTTPS (PoH)
 
 ### Session key
+When creating a [session](#session-flow), the client and server will generate a **session key**.
+This is how to create a session key:
+1. Use the `blake2b_512` with _salt and personal_ or `blake3` in KDF mode algorithm
+TODO
 
 ### PSK ID
 
@@ -236,3 +258,5 @@ Ed25519 = "..."
 ### Encrypted client-server communication
 
 ### Plabble Timestamp
+
+### Plabble dynamic int
