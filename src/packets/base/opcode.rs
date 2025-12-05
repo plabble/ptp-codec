@@ -103,7 +103,7 @@ pub enum Opcode {
 
     // Slice operations
     LEN = 91, // Push length of top item to the stack
-    REVERSE = 92, // Reverse top item
+    REVERSE = 92, // Reverse bytes of top item
 
     // Crypto operations
     HASH = 101, // Take byte from stack for algorithm, hashes bytes and put them back on stack

@@ -6,13 +6,21 @@ use crate::packets::{
     header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
 };
 
+/// A Plabble request packet, consisting of a base, header, and body.
+/// The body type is determined by the packet type in the header.
+/// 
+/// # Members
+/// - `base`: The base packet information common to all Plabble packets (both requests and responses).
+/// - `header`: The request-specific header containing metadata.
+/// - `body`: The request-specific body, whose structure depends on the packet type.
 #[derive(Serialize, Debug, PartialEq)]
 pub struct PlabbleRequestPacket {
+    /// The base packet information common to all Plabble packets.
     #[serde(flatten)]
     base: PlabblePacketBase,
 
     header: PlabbleRequestHeader,
-
+    
     body: PlabbleRequestBody,
 }
 

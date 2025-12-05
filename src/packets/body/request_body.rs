@@ -10,6 +10,13 @@ use crate::packets::{
     header::type_and_flags::RequestPacketType,
 };
 
+/// A trait for serializing and deserializing request bodies.
+/// Implementors of this trait can convert their data to and from byte arrays
+/// using the provided serialization context.
+/// 
+/// # Methods
+/// - `to_bytes`: Serializes the request body into a byte vector.
+/// - `from_bytes`: Deserializes a byte slice into the request body.
 pub trait SerializableRequestBody {
     fn to_bytes(
         &self,
@@ -23,6 +30,26 @@ pub trait SerializableRequestBody {
         Self: Sized;
 }
 
+/// An enumeration representing the different types of request bodies
+/// that can be sent in a Plabble request.
+/// Each variant corresponds to a specific request type and may contain
+/// associated data relevant to that request.
+/// 
+/// # Variants
+/// - `Certificate`: Represents a certificate request body.
+/// - `Session`: Represents a session request body.
+/// - `Get`: Represents a get request body with a bucket query.
+/// - `Stream`: Represents a stream request body.
+/// - `Post`: Represents a post request body.
+/// - `Patch`: Represents a patch request body.
+/// - `Put`: Represents a put request body with a put request body.
+/// - `Delete`: Represents a delete request body with a bucket query.
+/// - `Subscribe`: Represents a subscribe request body with a bucket query.
+/// - `Unsubscribe`: Represents an unsubscribe request body with a bucket query.
+/// - `Register`: Represents a register request body.
+/// - `Identify`: Represents an identify request body.
+/// - `Proxy`: Represents a proxy request body.
+/// - `Opcode`: Represents an opcode request body.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum PlabbleRequestBody {
@@ -39,6 +66,7 @@ pub enum PlabbleRequestBody {
     Register,
     Identify,
     Proxy,
+    Opcode
 }
 
 impl SerializableRequestBody for PlabbleRequestBody {
@@ -123,6 +151,7 @@ impl SerializableRequestBody for PlabbleRequestBody {
             PlabbleRequestBody::Register => todo!(),
             PlabbleRequestBody::Identify => todo!(),
             PlabbleRequestBody::Proxy => todo!(),
+            PlabbleRequestBody::Opcode => todo!(),
         }
     }
 
@@ -164,7 +193,7 @@ impl SerializableRequestBody for PlabbleRequestBody {
             RequestPacketType::Put {
                 binary_keys,
                 subscribe,
-                with_keys,
+                assert_keys,
                 append,
             } => todo!(),
             RequestPacketType::Delete {

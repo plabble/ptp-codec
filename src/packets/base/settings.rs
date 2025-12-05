@@ -2,6 +2,7 @@ use crate::default_true;
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
+/// Cryptography settings for a session, request or response
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct CryptoSettings {
     /// If true, encrypt with ChaCha20 (Poly1305).
@@ -44,6 +45,7 @@ pub struct CryptoSettings {
     pub post_quantum_settings: Option<PostQuantumSettings>,
 }
 
+/// Post-Quantum cryptography settings
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct PostQuantumSettings {
     /// Sign with ML-DSA-44, public key size 1312 B, signature 2420 B.

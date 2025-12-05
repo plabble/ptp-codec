@@ -10,7 +10,7 @@ pub mod crypto_keys;
 pub mod settings;
 pub mod opcode;
 
-/// Plabble Protocol Packet
+/// Plabble Protocol Packet base
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug)]
 pub struct PlabblePacketBase {

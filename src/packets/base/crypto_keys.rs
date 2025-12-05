@@ -240,6 +240,7 @@ impl CryptoKey {
         expected
     }
 
+    /// Helper function to read fixed amount of bytes
     fn read_fixed_n<const N: usize, F, C>(
         config: &mut binary_codec::SerializerConfig,
         bytes: &[u8],
