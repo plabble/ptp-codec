@@ -29,7 +29,12 @@ impl SerializableRequestBody for SessionRequestBody {
         context: &mut super::RequestSerializationContext,
     ) -> Result<Vec<u8>, SerializationError> {
         let mut bytes: Vec<u8> = Vec::new();
-        if let RequestPacketType::Session { persist_key, with_salt, .. } = context.header.packet_type {
+        if let RequestPacketType::Session {
+            persist_key,
+            with_salt,
+            ..
+        } = context.header.packet_type
+        {
             if persist_key && self.psk_expiration.is_none() {
                 return Err(SerializationError::InvalidData(String::from(
                     "psk_expiration should be set if persist_key flag is set",
@@ -76,7 +81,12 @@ impl SerializableRequestBody for SessionRequestBody {
     where
         Self: Sized,
     {
-        if let RequestPacketType::Session { persist_key, with_salt, .. } = context.header.packet_type {
+        if let RequestPacketType::Session {
+            persist_key,
+            with_salt,
+            ..
+        } = context.header.packet_type
+        {
             let psk_expiration = if persist_key {
                 Some(
                     slice(&mut context.config, bytes, 4, true)?
@@ -139,7 +149,11 @@ impl SerializableResponseBody for SessionResponseBody {
         context: &mut super::ResponseSerializationContext,
     ) -> Result<Vec<u8>, SerializationError> {
         let mut bytes: Vec<u8> = Vec::new();
-        if let ResponsePacketType::Session { with_psk, with_salt } = context.header.packet_type {
+        if let ResponsePacketType::Session {
+            with_psk,
+            with_salt,
+        } = context.header.packet_type
+        {
             if with_psk && self.psk_id.is_none() {
                 return Err(SerializationError::InvalidData(String::from(
                     "psk_id should be set if with_psk flag is set",
@@ -193,7 +207,11 @@ impl SerializableResponseBody for SessionResponseBody {
     where
         Self: Sized,
     {
-        if let ResponsePacketType::Session { with_psk, with_salt } = context.header.packet_type {
+        if let ResponsePacketType::Session {
+            with_psk,
+            with_salt,
+        } = context.header.packet_type
+        {
             let psk_id = if with_psk {
                 Some(
                     slice(&mut context.config, bytes, 12, true)?
@@ -337,6 +355,183 @@ mod tests {
 
         let deserialized = SessionRequestBody::from_bytes(&bytes, &mut context).unwrap();
         assert_eq!(Some([1, 2, 3, 4]), deserialized.psk_expiration);
+        assert_eq!(body, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_session_request_with_salt() {
+        let base = get_base();
+        let header: PlabbleRequestHeader = toml::from_str(
+            r#"
+        packet_type = "Session"
+        persist_key = true
+        with_salt = true
+        "#,
+        )
+        .unwrap();
+        let mut context = RequestSerializationContext {
+            header: &header,
+            packet: &base,
+            config: SerializerConfig::new(),
+        };
+
+        // [body]
+        let body: SessionRequestBody = toml::from_str(
+            format!(
+                r#"
+        psk_expiration = [1,2,3,4]
+        salt = [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+
+        [[keys]]
+        X25519 = "si6IcNvysw_Ex8D9Z1Q0LFi1vNrvfA3lAhfwy2_Hw24"
+        
+        [[keys]]
+        Kem512 = "{}"
+        "#,
+                repeat('A').take(1067).collect::<String>()
+            )
+            .as_str(),
+        )
+        .unwrap();
+
+        let bytes = body.to_bytes(&mut context).unwrap();
+        // Verify salt is present in the serialized bytes
+        assert!(matches!(
+            bytes[..],
+            [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                178,
+                46,
+                136,
+                112,
+                ..,
+            ]
+        ));
+
+        let mut context = RequestSerializationContext {
+            header: &header,
+            packet: &base,
+            config: SerializerConfig::new(),
+        };
+
+        let deserialized = SessionRequestBody::from_bytes(&bytes, &mut context).unwrap();
+        assert_eq!(Some([1, 2, 3, 4]), deserialized.psk_expiration);
+        assert_eq!(
+            Some([5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]),
+            deserialized.salt
+        );
+        assert_eq!(body, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_session_response_with_salt() {
+        let base = toml::from_str("version = 0").unwrap();
+        let header: PlabbleResponseHeader = toml::from_str(
+            r#"
+        packet_type = "Session"
+        with_psk = true
+        with_salt = true
+        "#,
+        )
+        .unwrap();
+        let body: SessionResponseBody = toml::from_str(r#"
+        psk_id = "zJlmxMNqghPCm2Yy"
+        salt = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+
+        [[keys]]
+        X25519 = "WmvHVXE6LYidWO__qdhm_K-_0ztMmnMolgNN4G-7F4M"
+
+        [[signatures]]
+        Ed25519 = "uhPLHRi9z8fMZbR3f97Gft8QWOyF6nrjwmlLc3DBRCZTNSuadLtFpIwLS9d9IzItRgqAC52M_feoD4F0_IGJJw"
+
+        "#,
+        )
+        .unwrap();
+
+        let mut context = ResponseSerializationContext {
+            header: &header,
+            packet: &base,
+            config: SerializerConfig::new(),
+        };
+
+        let bytes = body.to_bytes(&mut context).unwrap();
+
+        // Verify salt is present in the serialized bytes
+        assert!(matches!(
+            bytes[..],
+            [
+                204,
+                153,
+                102,
+                196,
+                195,
+                106,
+                130,
+                19,
+                194,
+                155,
+                102,
+                50,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                90,
+                107,
+                199,
+                85,
+                ..,
+            ]
+        ));
+
+        let mut context = ResponseSerializationContext {
+            header: &header,
+            packet: &base,
+            config: SerializerConfig::new(),
+        };
+
+        let deserialized = SessionResponseBody::from_bytes(&bytes, &mut context).unwrap();
+        assert_eq!(
+            Some([
+                0xcc, 0x99, 0x66, 0xc4, 0xc3, 0x6a, 0x82, 0x13, 0xc2, 0x9b, 0x66, 0x32
+            ]),
+            deserialized.psk_id
+        );
+        assert_eq!(
+            Some([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
+            deserialized.salt
+        );
         assert_eq!(body, deserialized);
     }
 

@@ -32,7 +32,7 @@ pub struct CryptoSettings {
 
     /// Reserved for future use
     #[serde(default)]
-    flag_64: bool,
+    pub flag_64: bool,
 
     /// Use post-quantum cryptography (e.g., Kyber etc.)
     /// This adds the Post-Quantum settings
@@ -79,11 +79,11 @@ pub struct PostQuantumSettings {
 
     /// Reserved for future use
     #[serde(default)]
-    flag_64: bool,
+    pub flag_64: bool,
 
     /// Reserved for future use
     #[serde(default)]
-    flag_128: bool,
+    pub flag_128: bool,
 }
 
 impl Default for CryptoSettings {

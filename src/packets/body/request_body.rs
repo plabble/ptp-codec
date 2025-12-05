@@ -172,7 +172,7 @@ impl SerializableRequestBody for PlabbleRequestBody {
                 persist_key,
                 enable_encryption,
                 with_salt,
-                request_salt
+                request_salt,
             } => todo!(),
             RequestPacketType::Get {
                 binary_keys,
