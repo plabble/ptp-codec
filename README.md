@@ -139,7 +139,7 @@ request_counter = 1     # counter of the request to reply to (the server counts 
 1. The client generates one or more keypairs using one or more algorithms it wants to use for this session.
 2. The client sends a [session request](#session-request) packet. The client COULD specify the cryptographic algorithms it wants to use using the `crypto_settings`. The public keys or encapsulation keys should be included.
 3. The server also generates the keypairs for the algorithms the client requested, if applicable. Or it encapsulates a shared secret.
-4. The server signs the entire **plain text** request (in binary form) the client sent using each signature algorithm the client specified in the `crypto_settings` AND the response (*psk_id* and *keys*) it will return to the client to ensure integrity.
+4. The server signs the entire **plain text** request (in binary form) the client sent using each signature algorithm the client specified in the `crypto_settings` AND the response (*psk_id*, optionally *salt* and *keys*) it will return to the client to ensure integrity.
 5. The server generates a shared secret and derives a [session key](#session-key) from it. Optionally it stores the key if the client requested to store it as a PSK.
 6. The server returns a [session response](#session-response).
 7. The client checks the signatures the server returned using the public keys in the **server certificates** it already SHOULD know. This step is optional, but strongly recommended for integrity.
@@ -233,6 +233,10 @@ Ed25519 = "..."
 
 > The client SHOULD validate the signatures and validate if the server returned the algorithms it asked for! Else it should not trust the session and disconnect.
 
+## Get
+- **Goal**: _request_ data from one or more slots inside a [bucket](#buckets) on the server.
+
+
 ## Concepts
 
 ### Buckets
@@ -247,9 +251,14 @@ There are two types of keys:
 
 ### Session key
 When creating a [session](#session-flow), the client and server will generate a **session key**.
+The session key is used as key material for cryptographic functions during the session.
+
 This is how to create a session key:
-1. Use the `blake2b_512` with _salt and personal_ or `blake3` in KDF mode algorithm
-TODO
+1. For each algorithm specified in the request, create a shared secret. Create a _hasher_ using the `blake2b` or `blake3` algorithm. Use blake3 if this is set in the crypto settings in the request. For each shared secret, _update_ the hash function. _Finalize_ the hasher into a 64-byte hash that will serve as the _input key material_.
+2. Use the `blake2b_512` with _salt and personal_ or `blake3` in KDF mode algorithm.
+3. If the client provided a salt in the [session request](#session-request), provide it to the _salt_ field of the blake KDF or MAC function. If the client did not provide a salt but asked the server for a salt, use the server salt. If also no server salt is available, use the ASCII equivalent of the string value `PLABBLE-PROTOCOL` (which should be exactly 16 bytes)
+4. If the client asked the server to create a salt in the [session request](#session-request), provide it to the _persona_ field of the blake KDF or MAC function. If not, use the ASCII equivalent of the string value `PROTOCOL.PLABBLE` (which should be exactly 16 bytes)
+5. Derive a 64-byte session key using the salts and keep it in memory for the connection. If the user asked in the session request to store it, generate a random 16-byte _PSK ID_ and return it to the client.
 
 ### PSK ID
 
