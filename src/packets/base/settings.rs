@@ -53,30 +53,36 @@ pub struct PostQuantumSettings {
     /// Sign with ML-DSA-44, public key size 1312 B, signature 2420 B.
     /// Super fast, NIST level 1 security.
     #[serde(default)]
+    #[toggles("dsa44")]
     pub sign_pqc_dsa_44: bool,
 
     /// Sign with ML-DSA-65, public key size 1952 B, signature 3309 B.
     /// Super fast, NIST level 3 security.
     #[serde(default)]
+    #[toggles("dsa65")]
     pub sign_pqc_dsa_65: bool,
 
     /// Sign with Falcon-1024, public key size 1793 B, signature 1462 B.
     /// 3x slower than ML-DSA, NIST level 5 security.
     #[serde(default)]
+    #[toggles("falcon")]
     pub sign_pqc_falcon: bool,
 
     /// Sign with SLH-DSA-SHA128s, public key size 32 B, signature 7856 B.
     /// Very slow, but might be more secure because its based on hash functions only.
     /// NIST level 1 security.
     #[serde(default)]
+    #[toggles("slh_dsa")]
     pub sign_pqc_slh_dsa: bool,
 
     /// Use ML-KEM-512 for key exchange, public key size 800 B, ciphertext size 768 B
     #[serde(default)]
+    #[toggles("kem512")]
     pub key_exchange_pqc_kem_512: bool,
 
     /// Use ML-KEM-768 for key exchange, public key size 1184 B, ciphertext size 1088 B
     #[serde(default)]
+    #[toggles("kem768")]
     pub key_exchange_pqc_kem_768: bool,
 
     /// Reserved for future use
@@ -122,7 +128,7 @@ impl Default for PostQuantumSettings {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use binary_codec::{BinaryDeserializer, BinarySerializer};
+    use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
     #[test]
     fn can_serialize_encryption_settings_with_pqc() {
@@ -145,11 +151,26 @@ mod tests {
         "#;
 
         let settings: CryptoSettings = toml::from_str(toml).unwrap();
-        let bytes = settings.to_bytes::<()>(None).unwrap();
+        let mut config = SerializerConfig::<()>::new(None);
+        let bytes = settings.serialize_bytes(Some(&mut config)).unwrap();
 
-        let deserialized_settings = CryptoSettings::from_bytes::<()>(&bytes, None).unwrap();
+        let deserialized_settings = BinaryDeserializer::<()>::from_bytes(&bytes).unwrap();
         assert_eq!(settings, deserialized_settings);
         assert_eq!(vec![0b1011_0101, 0b0001_0101], bytes);
+
+        assert_eq!(config.get_toggle("ed25519"), Some(true));
+        assert_eq!(config.get_toggle("x25519"), Some(true));
+        assert_eq!(config.get_toggle("dsa44"), Some(true));
+        assert_eq!(config.get_toggle("dsa65"), Some(false));
+        assert_eq!(config.get_toggle("falcon"), Some(true));
+        assert_eq!(config.get_toggle("slh_dsa"), Some(false));
+        assert_eq!(config.get_toggle("kem512"), Some(true));
+        assert_eq!(config.get_toggle("kem768"), Some(false));
+
+        // Not yet added toggles
+        assert_eq!(config.get_toggle("chacha20"), None);
+        assert_eq!(config.get_toggle("aes"), None);
+        assert_eq!(config.get_toggle("blake3"), None);
     }
 
     #[test]
@@ -162,9 +183,9 @@ mod tests {
         "#;
 
         let settings: CryptoSettings = toml::from_str(toml).unwrap();
-        let bytes = settings.to_bytes::<()>(None).unwrap();
+        let bytes = BinarySerializer::<()>::to_bytes(&settings).unwrap();
 
-        let deserialized_settings = CryptoSettings::from_bytes::<()>(&bytes, None).unwrap();
+        let deserialized_settings = BinaryDeserializer::<()>::from_bytes(&bytes).unwrap();
         assert_eq!(settings, deserialized_settings);
         assert_eq!(settings.encrypt_with_cha_cha20, true);
         assert_eq!(settings.sign_ed25519, true);

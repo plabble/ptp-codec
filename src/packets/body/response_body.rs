@@ -1,8 +1,8 @@
-use binary_codec::{DeserializationError, SerializationError};
+use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::body::{
-    ResponseSerializationContext, bucket::BucketBody, session::SessionResponseBody,
+    bucket::BucketBody, session::SessionResponseBody,
 };
 
 /// An enumeration representing the different types of response bodies
@@ -26,8 +26,9 @@ use crate::packets::body::{
 /// - `Proxy`: Represents a proxy response body.
 /// - `Opcode`: Represents an opcode response body.
 /// - `Error`: Represents an error response body.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
+#[no_discriminator]
 pub enum PlabbleResponseBody {
     Certificate,
     Session(SessionResponseBody),

@@ -1,3 +1,4 @@
+use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::{
@@ -17,11 +18,57 @@ use crate::packets::{
 pub struct PlabbleRequestPacket {
     /// The base packet information common to all Plabble packets.
     #[serde(flatten)]
-    base: PlabblePacketBase,
+    pub base: PlabblePacketBase,
 
-    header: PlabbleRequestHeader,
+    pub header: PlabbleRequestHeader,
 
-    body: PlabbleRequestBody,
+    pub body: PlabbleRequestBody,
+}
+
+impl BinarySerializer for PlabbleRequestPacket {
+    fn serialize_bytes(&self, config: Option<&mut binary_codec::SerializerConfig<()>>) -> Result<Vec<u8>, binary_codec::SerializationError> {
+        let mut buffer = Vec::new();
+        Self::write_bytes(&self, &mut buffer, config)?;
+        Ok(buffer)
+    }
+
+    fn write_bytes(&self, buffer: &mut Vec<u8>, config: Option<&mut binary_codec::SerializerConfig<()>>) -> Result<(), binary_codec::SerializationError> {
+        let mut new_config = SerializerConfig::new(None);
+        let config = config.unwrap_or(&mut new_config);
+
+        self.base.write_bytes(buffer, Some(config))?;
+
+        // TODO: header encryption
+        self.header.write_bytes(buffer, Some(config))?;
+
+        // TODO: body decryption
+        self.body.write_bytes(buffer, Some(config))?;
+
+        Ok(())
+    }
+}
+
+impl BinaryDeserializer for PlabbleRequestPacket {
+    fn deserialize_bytes(bytes: &[u8], config: Option<&mut SerializerConfig<()>>) -> Result<Self, binary_codec::DeserializationError> {
+        let mut new_config = SerializerConfig::new(None);
+        let config = config.unwrap_or(&mut new_config);
+
+        let base = PlabblePacketBase::deserialize_bytes(bytes, Some(config))?;
+
+        // TODO: header encryption
+        let header = PlabbleRequestHeader::deserialize_bytes(bytes, Some(config))?;
+
+        config.discriminator = Some(header.packet_type.get_discriminator());
+
+        // TODO: body encryption
+        let body = PlabbleRequestBody::deserialize_bytes(bytes, Some(config))?;
+
+        Ok(Self {
+            base,
+            header,
+            body
+        })
+    }
 }
 
 impl<'de> Deserialize<'de> for PlabbleRequestPacket {

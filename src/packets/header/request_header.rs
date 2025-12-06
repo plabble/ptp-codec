@@ -26,4 +26,8 @@ impl PlabbleRequestHeader {
             packet_type,
         }
     }
+
+    pub fn preprocess(&mut self) {
+        self._type = self.packet_type.get_discriminator();
+    }
 }

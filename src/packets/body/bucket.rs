@@ -13,8 +13,10 @@ use serde_with::{DisplayFromStr, serde_as};
 /// # Members
 /// - `id`: A 16-byte array representing the unique identifier of the bucket.
 /// - `range`: A `BucketRange` enum representing the range of data to query within the bucket.
+#[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 pub struct BucketQuery {
+    #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
     id: [u8; 16],
     range: BucketRange,
 }
@@ -25,8 +27,10 @@ pub struct BucketQuery {
 /// # Members
 /// - `id`: A 16-byte array representing the unique identifier of the bucket.
 /// - `body`: A `BucketBody` enum representing the data to be inserted into the bucket.
+#[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 pub struct PutRequestBody {
+    #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
     id: [u8; 16],
     body: BucketBody,
 }
@@ -43,14 +47,15 @@ pub struct PutRequestBody {
 ///   and the value is a vector of bytes representing the data stored in that slot.
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
-#[variant_by = "bucket_type"]
 #[no_discriminator]
 pub enum BucketBody {
+    #[toggled_by = "!binary_keys"]
     Numeric(
         #[val_dyn_length]
         #[serde_as(as = "HashMap<DisplayFromStr, Base64<UrlSafe, Unpadded>>")]
         HashMap<u16, Vec<u8>>,
     ),
+    #[toggled_by = "binary_keys"]
     Binary(
         #[val_dyn_length]
         #[key_dyn_length]
@@ -68,10 +73,12 @@ pub enum BucketBody {
 /// - `Binary`: A tuple containing two optional `String` values representing optionally
 ///  the start and/or end of the binary range.
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
-#[variant_by = "bucket_type"]
 #[no_discriminator]
 pub enum BucketRange {
+    #[toggled_by = "!binary_keys"]
     Numeric(Option<u16>, Option<u16>),
+
+    #[toggled_by = "binary_keys"]
     Binary(#[dyn_length] Option<String>, Option<String>),
 }
 

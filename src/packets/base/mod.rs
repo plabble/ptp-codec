@@ -62,7 +62,7 @@ pub struct PlabblePacketBase {
 
 #[cfg(test)]
 mod tests {
-    use binary_codec::{BinaryDeserializer, BinarySerializer};
+    use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
     use super::*;
 
@@ -75,9 +75,9 @@ mod tests {
         "#;
 
         let packet: PlabblePacketBase = toml::from_str(toml).unwrap();
-        let bytes = packet.to_bytes::<()>(None).unwrap();
+        let bytes = BinarySerializer::<()>::to_bytes(&packet).unwrap();
 
-        let deserialized_packet = PlabblePacketBase::from_bytes::<()>(&bytes, None).unwrap();
+        let deserialized_packet = BinaryDeserializer::<()>::from_bytes(&bytes).unwrap();
         assert_eq!(packet, deserialized_packet);
         assert_eq!(packet.fire_and_forget, true);
         assert_eq!(packet.use_encryption, true);
@@ -98,8 +98,8 @@ mod tests {
         "#;
 
         let packet: PlabblePacketBase = toml::from_str(toml).unwrap();
-        let bytes = packet.to_bytes::<()>(None).unwrap();
-        let deserialized_packet = PlabblePacketBase::from_bytes::<()>(&bytes, None).unwrap();
+        let bytes = BinarySerializer::<()>::to_bytes(&packet).unwrap();
+        let deserialized_packet = BinaryDeserializer::<()>::from_bytes(&bytes).unwrap();
         assert_eq!(packet, deserialized_packet);
 
         assert_eq!(
@@ -127,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn can_serialize_packet_with_full_settings_and_psk() {
+    fn can_serialize_packet_with_full_settings_and_psc() {
         let toml = r#"
         version = 1
         use_encryption = true
@@ -145,9 +145,18 @@ mod tests {
         "#;
 
         let packet: PlabblePacketBase = toml::from_str(toml).unwrap();
-        let bytes = packet.to_bytes::<()>(None).unwrap();
-        let deserialized_packet = PlabblePacketBase::from_bytes::<()>(&bytes, None).unwrap();
+        let mut config = SerializerConfig::<()>::new(None);
+        let bytes = packet.serialize_bytes(Some(&mut config)).unwrap();
+        let deserialized_packet = BinaryDeserializer::<()>::from_bytes(&bytes).unwrap();
         assert_eq!(packet, deserialized_packet);
+
+        assert_eq!(config.get_toggle("fire_and_forget"), Some(false));
+        assert_eq!(config.get_toggle("pre_shared_key"), Some(true));
+        assert_eq!(config.get_toggle("encryption"), Some(true));
+        assert_eq!(config.get_toggle("crypto_settings"), Some(true));
+        assert_eq!(config.get_toggle("dsa44"), Some(true));
+        assert_eq!(config.get_toggle("dsa65"), Some(false));
+
         assert_eq!(
             vec![
                 0b1110_0001,

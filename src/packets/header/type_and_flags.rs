@@ -26,11 +26,16 @@ pub enum RequestPacketType {
     /// - request_salt: Request that the server (also) provides a salt for session key derivation
     Session {
         #[serde(default)]
+        #[toggles("persist_key")]
         persist_key: bool,
+
         #[serde(default)]
         enable_encryption: bool,
+        
         #[serde(default)]
+        #[toggles("client_salt")]
         with_salt: bool,
+
         #[serde(default)]
         request_salt: bool,
     },
@@ -162,8 +167,11 @@ pub enum ResponsePacketType {
     /// - with_salt: Response contains a salt for session key derivation
     Session {
         #[serde(default)]
+        #[toggles("key_persisted")]
         with_psk: bool,
+        
         #[serde(default)]
+        #[toggles("client_salt")]
         with_salt: bool,
     },
     /// Response to a get request.
