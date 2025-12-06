@@ -1,3 +1,4 @@
+use binary_codec::{BinaryDeserializer, FromBytes, SerializerConfig, ToBytes};
 use binary_codec::{BinarySerializer, DeserializationError, SerializationError, utils::slice};
 use serde::{Deserialize, Serialize};
 use serde_with::base64::{Base64, UrlSafe};
@@ -5,8 +6,7 @@ use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
 use crate::packets::base::crypto_keys::CryptoSignature;
-use crate::packets::body::request_body::SerializableRequestBody;
-use crate::packets::body::response_body::SerializableResponseBody;
+use crate::packets::body::RequestSerializationContext;
 use crate::packets::header::type_and_flags::ResponsePacketType;
 use crate::packets::{base::crypto_keys::CryptoKey, header::type_and_flags::RequestPacketType};
 
@@ -23,12 +23,24 @@ pub struct SessionRequestBody {
     pub keys: Vec<CryptoKey>,
 }
 
-impl SerializableRequestBody for SessionRequestBody {
-    fn to_bytes(
+impl<'a> BinarySerializer<RequestSerializationContext<'a>> for SessionRequestBody {
+    fn serialize(
         &self,
-        context: &mut super::RequestSerializationContext,
+        config: Option<&mut SerializerConfig<RequestSerializationContext>>,
     ) -> Result<Vec<u8>, SerializationError> {
-        let mut bytes: Vec<u8> = Vec::new();
+        let mut buffer: Vec<u8> = Vec::new();
+        Self::write_bytes(&self, buffer, config);
+        Ok(buffer)
+    }
+
+    fn write_bytes(
+        &self,
+        buffer: &mut Vec<u8>,
+        config: Option<&mut SerializerConfig<RequestSerializationContext>>,
+    ) -> Result<(), SerializationError> {
+        let config = config.unwrap();
+        let context = config.data.as_ref().unwrap();
+
         if let RequestPacketType::Session {
             persist_key,
             with_salt,
@@ -48,13 +60,13 @@ impl SerializableRequestBody for SessionRequestBody {
             };
 
             if let Some(expiration_bytes) = self.psk_expiration {
-                bytes.extend_from_slice(&expiration_bytes);
-                context.config.pos += expiration_bytes.len();
+                buffer.extend_from_slice(&expiration_bytes);
+                config.pos += expiration_bytes.len();
             }
 
             if let Some(salt_bytes) = self.salt {
-                bytes.extend_from_slice(&salt_bytes);
-                context.config.pos += salt_bytes.len();
+                buffer.extend_from_slice(&salt_bytes);
+                config.pos += salt_bytes.len();
             }
         } else {
             return Err(SerializationError::InvalidData(format!(
@@ -68,19 +80,22 @@ impl SerializableRequestBody for SessionRequestBody {
         CryptoKey::verify_keys(key_types, &self.keys)?;
 
         for key in self.keys.iter() {
-            key.write_bytes(&mut bytes, Some(&mut context.config))?;
+            key.write_bytes(&mut buffer, Some(&mut context.config))?;
         }
-
-        Ok(bytes)
     }
+}
 
-    fn from_bytes(
+impl<'a> BinaryDeserializer<RequestSerializationContext<'a>> for SessionRequestBody {
+    fn deserialize(
         bytes: &[u8],
-        context: &mut super::RequestSerializationContext,
+        config: Option<&mut SerializerConfig<RequestSerializationContext<'a>>>,
     ) -> Result<Self, DeserializationError>
     where
         Self: Sized,
     {
+        let config = config.unwrap();
+        let context = config.data.as_mut().unwrap();
+
         if let RequestPacketType::Session {
             persist_key,
             with_salt,
@@ -127,7 +142,7 @@ impl SerializableRequestBody for SessionRequestBody {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 pub struct SessionResponseBody {
     /// Pre-shared key identifier. Filled if request flag with_psk is set.
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
@@ -137,123 +152,125 @@ pub struct SessionResponseBody {
     salt: Option<[u8; 16]>,
 
     /// Public keys or encapsulated secret for creating a shared secret
+    #[multi_enum]
     keys: Vec<CryptoKey>,
 
     /// Signatures of the request
+    #[multi_enum]
     signatures: Vec<CryptoSignature>,
 }
 
-impl SerializableResponseBody for SessionResponseBody {
-    fn to_bytes(
-        &self,
-        context: &mut super::ResponseSerializationContext,
-    ) -> Result<Vec<u8>, SerializationError> {
-        let mut bytes: Vec<u8> = Vec::new();
-        if let ResponsePacketType::Session {
-            with_psk,
-            with_salt,
-        } = context.header.packet_type
-        {
-            if with_psk && self.psk_id.is_none() {
-                return Err(SerializationError::InvalidData(String::from(
-                    "psk_id should be set if with_psk flag is set",
-                )));
-            }
+// impl SerializableResponseBody for SessionResponseBody {
+//     fn to_bytes(
+//         &self,
+//         context: &mut super::ResponseSerializationContext,
+//     ) -> Result<Vec<u8>, SerializationError> {
+//         let mut bytes: Vec<u8> = Vec::new();
+//         if let ResponsePacketType::Session {
+//             with_psk,
+//             with_salt,
+//         } = context.header.packet_type
+//         {
+//             if with_psk && self.psk_id.is_none() {
+//                 return Err(SerializationError::InvalidData(String::from(
+//                     "psk_id should be set if with_psk flag is set",
+//                 )));
+//             }
 
-            if with_salt && self.salt.is_none() {
-                return Err(SerializationError::InvalidData(String::from(
-                    "salt should be set if with_salt flag is set",
-                )));
-            };
+//             if with_salt && self.salt.is_none() {
+//                 return Err(SerializationError::InvalidData(String::from(
+//                     "salt should be set if with_salt flag is set",
+//                 )));
+//             };
 
-            if let Some(psk_id_bytes) = self.psk_id {
-                bytes.extend_from_slice(&psk_id_bytes);
-                context.config.pos += psk_id_bytes.len();
-            }
+//             if let Some(psk_id_bytes) = self.psk_id {
+//                 bytes.extend_from_slice(&psk_id_bytes);
+//                 context.config.pos += psk_id_bytes.len();
+//             }
 
-            if let Some(salt_bytes) = self.salt {
-                bytes.extend_from_slice(&salt_bytes);
-                context.config.pos += salt_bytes.len();
-            }
-        } else {
-            return Err(SerializationError::InvalidData(String::from(
-                "Header type did not match body",
-            )));
-        }
+//             if let Some(salt_bytes) = self.salt {
+//                 bytes.extend_from_slice(&salt_bytes);
+//                 context.config.pos += salt_bytes.len();
+//             }
+//         } else {
+//             return Err(SerializationError::InvalidData(String::from(
+//                 "Header type did not match body",
+//             )));
+//         }
 
-        let crypto_settings = context.packet.crypto_settings.clone().unwrap_or_default();
+//         let crypto_settings = context.packet.crypto_settings.clone().unwrap_or_default();
 
-        // Check if key and signature types match the crypto settings
-        let key_types = CryptoKey::get_key_exchange_key_types(&crypto_settings, false);
-        CryptoKey::verify_keys(key_types, &self.keys)?;
-        let signature_types = CryptoKey::get_signature_types(&crypto_settings);
-        CryptoKey::verify_signatures(signature_types, &self.signatures)?;
+//         // Check if key and signature types match the crypto settings
+//         let key_types = CryptoKey::get_key_exchange_key_types(&crypto_settings, false);
+//         CryptoKey::verify_keys(key_types, &self.keys)?;
+//         let signature_types = CryptoKey::get_signature_types(&crypto_settings);
+//         CryptoKey::verify_signatures(signature_types, &self.signatures)?;
 
-        for key in self.keys.iter() {
-            key.write_bytes(&mut bytes, Some(&mut context.config))?;
-        }
+//         for key in self.keys.iter() {
+//             key.write_bytes(&mut bytes, Some(&mut context.config))?;
+//         }
 
-        for signature in self.signatures.iter() {
-            signature.write_bytes(&mut bytes, Some(&mut context.config))?;
-        }
+//         for signature in self.signatures.iter() {
+//             signature.write_bytes(&mut bytes, Some(&mut context.config))?;
+//         }
 
-        Ok(bytes)
-    }
+//         Ok(bytes)
+//     }
 
-    fn from_bytes(
-        bytes: &[u8],
-        context: &mut super::ResponseSerializationContext,
-    ) -> Result<Self, DeserializationError>
-    where
-        Self: Sized,
-    {
-        if let ResponsePacketType::Session {
-            with_psk,
-            with_salt,
-        } = context.header.packet_type
-        {
-            let psk_id = if with_psk {
-                Some(
-                    slice(&mut context.config, bytes, 12, true)?
-                        .try_into()
-                        .unwrap(),
-                )
-            } else {
-                None
-            };
+//     fn from_bytes(
+//         bytes: &[u8],
+//         context: &mut super::ResponseSerializationContext,
+//     ) -> Result<Self, DeserializationError>
+//     where
+//         Self: Sized,
+//     {
+//         if let ResponsePacketType::Session {
+//             with_psk,
+//             with_salt,
+//         } = context.header.packet_type
+//         {
+//             let psk_id = if with_psk {
+//                 Some(
+//                     slice(&mut context.config, bytes, 12, true)?
+//                         .try_into()
+//                         .unwrap(),
+//                 )
+//             } else {
+//                 None
+//             };
 
-            let salt = if with_salt {
-                Some(
-                    slice(&mut context.config, bytes, 16, true)?
-                        .try_into()
-                        .unwrap(),
-                )
-            } else {
-                None
-            };
+//             let salt = if with_salt {
+//                 Some(
+//                     slice(&mut context.config, bytes, 16, true)?
+//                         .try_into()
+//                         .unwrap(),
+//                 )
+//             } else {
+//                 None
+//             };
 
-            // TODO: get_crypto_settings method
-            let crypto_settings = context.packet.crypto_settings.clone().unwrap_or_default();
-            let key_types = CryptoKey::get_key_exchange_key_types(&crypto_settings, false);
-            let signature_types = CryptoKey::get_signature_types(&crypto_settings);
+//             // TODO: get_crypto_settings method
+//             let crypto_settings = context.packet.crypto_settings.clone().unwrap_or_default();
+//             let key_types = CryptoKey::get_key_exchange_key_types(&crypto_settings, false);
+//             let signature_types = CryptoKey::get_signature_types(&crypto_settings);
 
-            let keys = CryptoKey::read_keys(bytes, key_types, &mut context.config)?;
-            let signatures =
-                CryptoKey::read_signatures(bytes, signature_types, &mut context.config)?;
+//             let keys = CryptoKey::read_keys(bytes, key_types, &mut context.config)?;
+//             let signatures =
+//                 CryptoKey::read_signatures(bytes, signature_types, &mut context.config)?;
 
-            Ok(Self {
-                psk_id,
-                salt,
-                keys,
-                signatures,
-            })
-        } else {
-            Err(DeserializationError::InvalidData(String::from(
-                "Header type did not match body",
-            )))
-        }
-    }
-}
+//             Ok(Self {
+//                 psk_id,
+//                 salt,
+//                 keys,
+//                 signatures,
+//             })
+//         } else {
+//             Err(DeserializationError::InvalidData(String::from(
+//                 "Header type did not match body",
+//             )))
+//         }
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

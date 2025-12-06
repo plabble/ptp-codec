@@ -5,26 +5,6 @@ use crate::packets::body::{
     ResponseSerializationContext, bucket::BucketBody, session::SessionResponseBody,
 };
 
-/// A trait for serializing and deserializing response bodies.
-/// Implementors of this trait can convert their data to and from byte arrays
-/// using the provided serialization context.
-///
-/// # Methods
-/// - `to_bytes`: Serializes the response body into a byte vector.
-/// - `from_bytes`: Deserializes a byte slice into the response body.
-pub trait SerializableResponseBody {
-    fn to_bytes(
-        &self,
-        context: &mut ResponseSerializationContext,
-    ) -> Result<Vec<u8>, SerializationError>;
-    fn from_bytes(
-        bytes: &[u8],
-        context: &mut ResponseSerializationContext,
-    ) -> Result<Self, DeserializationError>
-    where
-        Self: Sized;
-}
-
 /// An enumeration representing the different types of response bodies
 /// that can be sent in a Plabble response.
 /// Each variant corresponds to a specific response type and may contain

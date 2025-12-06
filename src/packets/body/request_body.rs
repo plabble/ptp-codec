@@ -1,4 +1,7 @@
-use binary_codec::{BinarySerializer, DeserializationError, SerializationError};
+use binary_codec::{
+    BinaryDeserializer, BinarySerializer, DeserializationError, SerializationError,
+    SerializerConfig,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::{
@@ -9,26 +12,6 @@ use crate::packets::{
     },
     header::type_and_flags::RequestPacketType,
 };
-
-/// A trait for serializing and deserializing request bodies.
-/// Implementors of this trait can convert their data to and from byte arrays
-/// using the provided serialization context.
-///
-/// # Methods
-/// - `to_bytes`: Serializes the request body into a byte vector.
-/// - `from_bytes`: Deserializes a byte slice into the request body.
-pub trait SerializableRequestBody {
-    fn to_bytes(
-        &self,
-        context: &mut RequestSerializationContext,
-    ) -> Result<Vec<u8>, SerializationError>;
-    fn from_bytes(
-        bytes: &[u8],
-        context: &mut RequestSerializationContext,
-    ) -> Result<Self, DeserializationError>
-    where
-        Self: Sized;
-}
 
 /// An enumeration representing the different types of request bodies
 /// that can be sent in a Plabble request.
@@ -69,20 +52,31 @@ pub enum PlabbleRequestBody {
     Opcode,
 }
 
-impl SerializableRequestBody for PlabbleRequestBody {
-    fn to_bytes(
+impl<'a> BinarySerializer<RequestSerializationContext<'a>> for PlabbleRequestBody {
+    fn serialize(
         &self,
-        context: &mut RequestSerializationContext,
+        config: Option<&mut SerializerConfig<RequestSerializationContext<'a>>>,
     ) -> Result<Vec<u8>, SerializationError> {
+        let mut bytes = Vec::new();
+        Self::write_bytes(self, &mut bytes, config)?;
+        Ok(bytes);
+    }
+
+    fn write_bytes(
+        &self,
+        buffer: &mut Vec<u8>,
+        config: Option<&mut SerializerConfig<RequestSerializationContext<'a>>>,
+    ) -> Result<(), SerializationError> {
+        let context = config.as_ref().unwrap().data.as_ref().unwrap();
         match self {
             PlabbleRequestBody::Certificate => todo!(),
-            PlabbleRequestBody::Session(body) => body.to_bytes(context),
+            PlabbleRequestBody::Session(body) => body.serialize(config),
             PlabbleRequestBody::Get(body) => {
                 if let RequestPacketType::Get { binary_keys, .. } = context.header.packet_type {
                     context
                         .config
                         .set_variant("bucket_type", if binary_keys { 1 } else { 0 });
-                    body.to_bytes(Some(&mut context.config))
+                    body.serialize(Some(&mut context.config))
                 } else {
                     return Err(SerializationError::InvalidData(format!(
                         "Header type {:?} did not match body (Get)",
@@ -98,7 +92,7 @@ impl SerializableRequestBody for PlabbleRequestBody {
                     context
                         .config
                         .set_variant("bucket_type", if binary_keys { 1 } else { 0 });
-                    body.to_bytes(Some(&mut context.config))
+                    body.serialize(Some(&mut context.config))
                 } else {
                     return Err(SerializationError::InvalidData(format!(
                         "Header type {:?} did not match body (Put)",
@@ -111,7 +105,7 @@ impl SerializableRequestBody for PlabbleRequestBody {
                     context
                         .config
                         .set_variant("bucket_type", if binary_keys { 1 } else { 0 });
-                    body.to_bytes(Some(&mut context.config))
+                    body.serialize(Some(&mut context.config))
                 } else {
                     return Err(SerializationError::InvalidData(format!(
                         "Header type {:?} did not match body (Delete)",
@@ -125,7 +119,7 @@ impl SerializableRequestBody for PlabbleRequestBody {
                     context
                         .config
                         .set_variant("bucket_type", if binary_keys { 1 } else { 0 });
-                    body.to_bytes(Some(&mut context.config))
+                    body.serialize(Some(&mut context.config))
                 } else {
                     return Err(SerializationError::InvalidData(format!(
                         "Header type {:?} did not match body (Subscribe)",
@@ -140,7 +134,7 @@ impl SerializableRequestBody for PlabbleRequestBody {
                     context
                         .config
                         .set_variant("bucket_type", if binary_keys { 1 } else { 0 });
-                    body.to_bytes(Some(&mut context.config))
+                    body.serialize(Some(&mut context.config))
                 } else {
                     return Err(SerializationError::InvalidData(format!(
                         "Header type {:?} did not match body (Unsubscribe)",
@@ -154,14 +148,14 @@ impl SerializableRequestBody for PlabbleRequestBody {
             PlabbleRequestBody::Opcode => todo!(),
         }
     }
+}
 
-    fn from_bytes(
+impl<'a> BinaryDeserializer<RequestSerializationContext<'a>> for PlabbleRequestBody {
+    fn deserialize(
         bytes: &[u8],
-        context: &mut RequestSerializationContext,
-    ) -> Result<Self, DeserializationError>
-    where
-        Self: Sized,
-    {
+        config: Option<&mut SerializerConfig<RequestSerializationContext<'a>>>,
+    ) -> Result<Self, DeserializationError> {
+        let context = config.as_ref().unwrap().data.as_ref().unwrap();
         match context.header.packet_type {
             RequestPacketType::Certificate {
                 full_chain,

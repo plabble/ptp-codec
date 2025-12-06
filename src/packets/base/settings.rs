@@ -24,10 +24,12 @@ pub struct CryptoSettings {
 
     /// Sign with Ed25519 (default), 32 B keys, signature 64 B.
     #[serde(default = "default_true")]
+    #[toggles("ed25519")]
     pub sign_ed25519: bool,
 
     /// Key exchange with X25519 (default), 32 B keys.
     #[serde(default = "default_true")]
+    #[toggles("x25519")]
     pub key_exchange_x25519: bool,
 
     /// Reserved for future use

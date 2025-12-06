@@ -1,5 +1,3 @@
-use binary_codec::SerializerConfig;
-
 use crate::packets::{
     base::PlabblePacketBase,
     header::{request_header::PlabbleRequestHeader, response_header::PlabbleResponseHeader},
@@ -20,8 +18,7 @@ pub mod session;
 #[derive(Clone)]
 pub struct RequestSerializationContext<'a> {
     pub header: &'a PlabbleRequestHeader,
-    pub packet: &'a PlabblePacketBase,
-    pub config: SerializerConfig,
+    pub packet: &'a PlabblePacketBase
 }
 
 /// Context information required for serializing response packets.
@@ -34,6 +31,5 @@ pub struct RequestSerializationContext<'a> {
 #[derive(Clone)]
 pub struct ResponseSerializationContext<'a> {
     pub header: &'a PlabbleResponseHeader,
-    pub packet: &'a PlabblePacketBase,
-    pub config: SerializerConfig,
+    pub packet: &'a PlabblePacketBase
 }
