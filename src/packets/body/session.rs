@@ -280,7 +280,7 @@ mod tests {
         let mut context = RequestSerializationContext {
             header: &header,
             packet: &base,
-            config: SerializerConfig::new(),
+            config: SerializerConfig::new(None),
         };
 
         // [body]
@@ -350,7 +350,7 @@ mod tests {
         let mut context = RequestSerializationContext {
             header: &header,
             packet: &base,
-            config: SerializerConfig::new(),
+            config: SerializerConfig::new(None),
         };
 
         let deserialized = SessionRequestBody::from_bytes(&bytes, &mut context).unwrap();
@@ -372,7 +372,7 @@ mod tests {
         let mut context = RequestSerializationContext {
             header: &header,
             packet: &base,
-            config: SerializerConfig::new(),
+            config: SerializerConfig::new(None),
         };
 
         // [body]
@@ -430,7 +430,7 @@ mod tests {
         let mut context = RequestSerializationContext {
             header: &header,
             packet: &base,
-            config: SerializerConfig::new(),
+            config: SerializerConfig::new(None),
         };
 
         let deserialized = SessionRequestBody::from_bytes(&bytes, &mut context).unwrap();
@@ -470,7 +470,7 @@ mod tests {
         let mut context = ResponseSerializationContext {
             header: &header,
             packet: &base,
-            config: SerializerConfig::new(),
+            config: SerializerConfig::new(None),
         };
 
         let bytes = body.to_bytes(&mut context).unwrap();
@@ -518,7 +518,7 @@ mod tests {
         let mut context = ResponseSerializationContext {
             header: &header,
             packet: &base,
-            config: SerializerConfig::new(),
+            config: SerializerConfig::new(None),
         };
 
         let deserialized = SessionResponseBody::from_bytes(&bytes, &mut context).unwrap();
@@ -568,7 +568,7 @@ mod tests {
         let mut context = ResponseSerializationContext {
             header: &header,
             packet: &base,
-            config: SerializerConfig::new(),
+            config: SerializerConfig::new(None),
         };
 
         let bytes = body.to_bytes(&mut context).unwrap();
@@ -577,7 +577,7 @@ mod tests {
         let mut context = ResponseSerializationContext {
             header: &header,
             packet: &base,
-            config: SerializerConfig::new(),
+            config: SerializerConfig::new(None),
         };
 
         let deserialized = SessionResponseBody::from_bytes(&bytes, &mut context).unwrap();

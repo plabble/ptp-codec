@@ -782,7 +782,7 @@ mod tests {
     fn read_keys_single_key() {
         let key_data = [1u8; 32];
         let algos = vec![Algorithm::X25519];
-        let mut config = SerializerConfig::new();
+        let mut config = SerializerConfig::new(None);
 
         let keys = CryptoKey::read_keys(&key_data, algos, &mut config).unwrap();
         assert_eq!(keys.len(), 1);
@@ -797,7 +797,7 @@ mod tests {
         buffer.extend_from_slice(&[2u8; 32]); // Ed25519
 
         let algos = vec![Algorithm::X25519, Algorithm::Ed25519];
-        let mut config = SerializerConfig::new();
+        let mut config = SerializerConfig::new(None);
 
         let keys = CryptoKey::read_keys(&buffer, algos, &mut config).unwrap();
         assert_eq!(keys.len(), 2);
@@ -809,7 +809,7 @@ mod tests {
     fn read_signatures_single_signature() {
         let sig_data = [1u8; 64];
         let algos = vec![Algorithm::Ed25519];
-        let mut config = SerializerConfig::new();
+        let mut config = SerializerConfig::new(None);
 
         let sigs = CryptoKey::read_signatures(&sig_data, algos, &mut config).unwrap();
         assert_eq!(sigs.len(), 1);
@@ -824,7 +824,7 @@ mod tests {
         buffer.extend_from_slice(&[2u8; 2420]); // Dsa44
 
         let algos = vec![Algorithm::Ed25519, Algorithm::Dsa44];
-        let mut config = SerializerConfig::new();
+        let mut config = SerializerConfig::new(None);
 
         let sigs = CryptoKey::read_signatures(&buffer, algos, &mut config).unwrap();
         assert_eq!(sigs.len(), 2);
@@ -836,7 +836,7 @@ mod tests {
     fn read_signatures_invalid_algorithm_fails() {
         let sig_data = [1u8; 64];
         let algos = vec![Algorithm::X25519]; // Not a signature algorithm
-        let mut config = SerializerConfig::new();
+        let mut config = SerializerConfig::new(None);
 
         assert!(CryptoKey::read_signatures(&sig_data, algos, &mut config).is_err());
     }
