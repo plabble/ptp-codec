@@ -222,10 +222,10 @@ salt = "..."
 X25519 = "..."
 
 [[body.keys]]
-Kem512Cipher = "..." # The KEM keys are named differently, because it aren't public keys but encapsulated secrets
+Kem512 = "..." # The KEM keys aren't public keys but encapsulated secrets
 
 [[body.keys]]
-Kem768Cipher = "..."
+Kem768 = "..."
 
 [[body.signatures]]
 Ed25519 = "..."

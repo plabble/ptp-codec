@@ -1,5 +1,5 @@
 use crate::default_true;
-use binary_codec::{FromBytes, ToBytes};
+use binary_codec::{FromBytes, SerializerConfig, ToBytes};
 use serde::{Deserialize, Serialize};
 
 /// Cryptography settings for a session, request or response
@@ -92,6 +92,19 @@ pub struct PostQuantumSettings {
     /// Reserved for future use
     #[serde(default)]
     pub flag_128: bool,
+}
+
+impl CryptoSettings {
+    pub fn apply_defaults(config: &mut SerializerConfig) {
+        let defaults = Self::default();
+        if defaults.sign_ed25519 {
+            config.set_toggle("ed25519", true);
+        }
+
+        if defaults.key_exchange_x25519 {
+            config.set_toggle("x25519", true);
+        }
+    }
 }
 
 impl Default for CryptoSettings {

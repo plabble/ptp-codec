@@ -54,7 +54,7 @@ mod tests {
 
 
     #[test]
-    fn can_serialize_session_request() {
+    fn can_serialize_and_deserialize_simple_session_request() {
         let packet: PlabbleRequestPacket = toml::from_str(r#"
         version = 1
         mac = "AAAAAAAAAAAAAAAAAAAAAA"
@@ -67,10 +67,37 @@ mod tests {
         "#).unwrap();
 
         let bytes = packet.to_bytes().unwrap();
-        // type 0001, flags 0000. Packet type 0000, packet flags 0000. 16-byte zero-Mac. 32-byte x25519 key.
-        assert_eq!(vec![0b0000_0001, 0b0000_0000, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 141, 110, 209, 30, 241, 41, 60, 237, 39, 100, 110, 41, 9, 130, 52, 128, 102, 117, 48, 246, 16, 25, 11, 184, 188, 186, 169, 177, 169, 2, 180, 199], bytes);
+        // type 0001, flags 0000. 16-byte zero-Mac. Packet type 0001, packet flags 0000. 32-byte x25519 key.
+        assert_eq!(vec![0b0000_0001, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0b0000_0001, 141, 110, 209, 30, 241, 41, 60, 237, 39, 100, 110, 41, 9, 130, 52, 128, 102, 117, 48, 246, 16, 25, 11, 184, 188, 186, 169, 177, 169, 2, 180, 199], bytes);
         
         let deserialized = PlabbleRequestPacket::from_bytes(&bytes).unwrap();
         assert_eq!(packet, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_session_request_with_salt_and_psk() {
+        let packet: PlabbleRequestPacket = toml::from_str(r#"
+        version = 1
+        use_encryption = true
+
+        [header]
+        packet_type = "Session"
+        with_salt = true
+        persist_key = true
+
+        [body]
+        psk_expiration = "Kk7HXQ"
+        salt = "R6Bt7xEAskTkgzk_YmGxpw"
+
+        [[body.keys]]
+        X25519 = "jW7RHvEpPO0nZG4pCYI0gGZ1MPYQGQu4vLqpsakCtMc"
+        "#).unwrap();
+
+        println!("{:?}", packet);
+
+        let bytes = packet.to_bytes().unwrap();
+
+        // Type 0001, flags 0100. Packet type 0001, packet flags 0101. PSK expiration 42, 78, 199, 93. salt 16 bytes, 32-byte x25519 key
+        assert_eq!(vec![0b0100_0001, 0b0101_0001, 42, 78, 199, 93, 71, 160, 109, 239, 17, 0, 178, 68, 228, 131, 57, 63, 98, 97, 177, 167, 141, 110, 209, 30, 241, 41, 60, 237, 39, 100, 110, 41, 9, 130, 52, 128, 102, 117, 48, 246, 16, 25, 11, 184, 188, 186, 169, 177, 169, 2, 180, 199], bytes);
     }
 }

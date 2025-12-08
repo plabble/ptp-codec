@@ -2,7 +2,7 @@ use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::{
-    base::PlabblePacketBase,
+    base::{PlabblePacketBase, settings::CryptoSettings},
     body::request_body::PlabbleRequestBody,
     header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
 };
@@ -39,6 +39,7 @@ impl BinarySerializer for PlabbleRequestPacket {
         self.base.write_bytes(buffer, Some(config))?;
 
         // TODO: header encryption
+        self.header.preprocess();
         self.header.write_bytes(buffer, Some(config))?;
 
         // TODO: body decryption
@@ -54,10 +55,12 @@ impl BinaryDeserializer for PlabbleRequestPacket {
         let config = config.unwrap_or(&mut new_config);
 
         let base = PlabblePacketBase::deserialize_bytes(bytes, Some(config))?;
+        if base.crypto_settings.is_none() {
+            CryptoSettings::apply_defaults(config);
+        }
 
         // TODO: header encryption
         let header = PlabbleRequestHeader::deserialize_bytes(bytes, Some(config))?;
-
         config.discriminator = Some(header.packet_type.get_discriminator());
 
         // TODO: body encryption
@@ -82,10 +85,12 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             base: PlabblePacketBase,
             header: PlabbleRequestHeader,
             // We'll temporarily store the body as untyped data
-            body: serde_value::Value, // or `Vec<u8>` if it’s binary
+            body: serde_value::Value,
         }
 
         let raw = RawPacket::deserialize(deserializer)?;
+        raw.header.preprocess();
+
         let body = match raw.header.packet_type {
             RequestPacketType::Certificate { .. } => todo!(),
             RequestPacketType::Session { .. } => {
