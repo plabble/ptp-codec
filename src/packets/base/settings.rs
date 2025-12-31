@@ -165,9 +165,9 @@ mod tests {
 
         let settings: CryptoSettings = toml::from_str(toml).unwrap();
         let mut config = SerializerConfig::<()>::new(None);
-        let bytes = settings.serialize_bytes(Some(&mut config)).unwrap();
+        let bytes = settings.to_bytes(Some(&mut config)).unwrap();
 
-        let deserialized_settings = BinaryDeserializer::<()>::from_bytes(&bytes).unwrap();
+        let deserialized_settings = BinaryDeserializer::<()>::from_bytes(&bytes, None).unwrap();
         assert_eq!(settings, deserialized_settings);
         assert_eq!(vec![0b1011_0101, 0b0001_0101], bytes);
 
@@ -196,9 +196,9 @@ mod tests {
         "#;
 
         let settings: CryptoSettings = toml::from_str(toml).unwrap();
-        let bytes = BinarySerializer::<()>::to_bytes(&settings).unwrap();
+        let bytes = BinarySerializer::<()>::to_bytes(&settings, None).unwrap();
 
-        let deserialized_settings = BinaryDeserializer::<()>::from_bytes(&bytes).unwrap();
+        let deserialized_settings = BinaryDeserializer::<()>::from_bytes(&bytes, None).unwrap();
         assert_eq!(settings, deserialized_settings);
         assert_eq!(settings.encrypt_with_cha_cha20, true);
         assert_eq!(settings.sign_ed25519, true);

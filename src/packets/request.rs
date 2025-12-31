@@ -1,4 +1,4 @@
-use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+use binary_codec::{BinaryDeserializer, BinarySerializer, BitStreamWriter, SerializerConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::{
@@ -26,51 +26,52 @@ pub struct PlabbleRequestPacket {
 }
 
 impl BinarySerializer for PlabbleRequestPacket {
-    fn serialize_bytes(&self, config: Option<&mut binary_codec::SerializerConfig<()>>) -> Result<Vec<u8>, binary_codec::SerializationError> {
-        let mut buffer = Vec::new();
-        Self::write_bytes(&self, &mut buffer, config)?;
-        Ok(buffer)
-    }
-
-    fn write_bytes(&self, buffer: &mut Vec<u8>, config: Option<&mut binary_codec::SerializerConfig<()>>) -> Result<(), binary_codec::SerializationError> {
+    fn write_bytes(
+        &self,
+        stream: &mut BitStreamWriter,
+        config: Option<&mut binary_codec::SerializerConfig<()>>,
+    ) -> Result<(), binary_codec::SerializationError> {
+        self.header.preprocess();
+        
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
 
-        self.base.write_bytes(buffer, Some(config))?;
+        self.base.write_bytes(stream, Some(config))?;
+
+        // println!("{:?} {:?}", stream, config);
 
         // TODO: header encryption
-        self.header.preprocess();
-        self.header.write_bytes(buffer, Some(config))?;
+        self.header.write_bytes(stream, Some(config))?;
 
         // TODO: body decryption
-        self.body.write_bytes(buffer, Some(config))?;
+        self.body.write_bytes(stream, Some(config))?;
 
         Ok(())
     }
 }
 
 impl BinaryDeserializer for PlabbleRequestPacket {
-    fn deserialize_bytes(bytes: &[u8], config: Option<&mut SerializerConfig<()>>) -> Result<Self, binary_codec::DeserializationError> {
+    fn read_bytes(
+            stream: &mut binary_codec::BitStreamReader,
+            config: Option<&mut SerializerConfig<()>>,
+        ) -> Result<Self, binary_codec::DeserializationError> {
+
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
 
-        let base = PlabblePacketBase::deserialize_bytes(bytes, Some(config))?;
+        let base = PlabblePacketBase::read_bytes(stream, Some(config))?;
         if base.crypto_settings.is_none() {
             CryptoSettings::apply_defaults(config);
         }
 
         // TODO: header encryption
-        let header = PlabbleRequestHeader::deserialize_bytes(bytes, Some(config))?;
+        let header = PlabbleRequestHeader::read_bytes(stream, Some(config))?;
         config.discriminator = Some(header.packet_type.get_discriminator());
 
         // TODO: body encryption
-        let body = PlabbleRequestBody::deserialize_bytes(bytes, Some(config))?;
+        let body = PlabbleRequestBody::read_bytes(stream, Some(config))?;
 
-        Ok(Self {
-            base,
-            header,
-            body
-        })
+        Ok(Self { base, header, body })
     }
 }
 

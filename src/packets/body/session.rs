@@ -66,11 +66,12 @@ mod tests {
         X25519 = "jW7RHvEpPO0nZG4pCYI0gGZ1MPYQGQu4vLqpsakCtMc"
         "#).unwrap();
 
-        let bytes = packet.to_bytes().unwrap();
+        let bytes = packet.to_bytes(None).unwrap();
+
         // type 0001, flags 0000. 16-byte zero-Mac. Packet type 0001, packet flags 0000. 32-byte x25519 key.
         assert_eq!(vec![0b0000_0001, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0b0000_0001, 141, 110, 209, 30, 241, 41, 60, 237, 39, 100, 110, 41, 9, 130, 52, 128, 102, 117, 48, 246, 16, 25, 11, 184, 188, 186, 169, 177, 169, 2, 180, 199], bytes);
         
-        let deserialized = PlabbleRequestPacket::from_bytes(&bytes).unwrap();
+        let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized);
     }
 
@@ -95,7 +96,7 @@ mod tests {
 
         println!("{:?}", packet);
 
-        let bytes = packet.to_bytes().unwrap();
+        let bytes = packet.to_bytes(None).unwrap();
 
         // Type 0001, flags 0100. Packet type 0001, packet flags 0101. PSK expiration 42, 78, 199, 93. salt 16 bytes, 32-byte x25519 key
         assert_eq!(vec![0b0100_0001, 0b0101_0001, 42, 78, 199, 93, 71, 160, 109, 239, 17, 0, 178, 68, 228, 131, 57, 63, 98, 97, 177, 167, 141, 110, 209, 30, 241, 41, 60, 237, 39, 100, 110, 41, 9, 130, 52, 128, 102, 117, 48, 246, 16, 25, 11, 184, 188, 186, 169, 177, 169, 2, 180, 199], bytes);
