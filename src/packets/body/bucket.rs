@@ -47,6 +47,7 @@ pub struct PutRequestBody {
 ///   and the value is a vector of bytes representing the data stored in that slot.
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
 #[no_discriminator]
 pub enum BucketBody {
     #[toggled_by = "!binary_keys"]
@@ -59,6 +60,7 @@ pub enum BucketBody {
     Binary(
         #[val_dyn_length]
         #[key_dyn_length]
+        #[serde_as(as = "HashMap<_, Base64<UrlSafe, Unpadded>>")]
         HashMap<String, Vec<u8>>,
     ),
 }
@@ -73,6 +75,7 @@ pub enum BucketBody {
 /// - `Binary`: A tuple containing two optional `String` values representing optionally
 ///  the start and/or end of the binary range.
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
 #[no_discriminator]
 pub enum BucketRange {
     #[toggled_by = "!binary_keys"]
@@ -83,4 +86,11 @@ pub enum BucketRange {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::{collections::HashMap, vec};
+
+    use crate::packets::body::bucket::{BucketBody, PutRequestBody};
+
+    #[test]
+    fn can_serialize_and_deserialize_bucket_query() {}
+}

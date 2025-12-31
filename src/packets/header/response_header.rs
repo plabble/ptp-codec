@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +12,7 @@ pub struct PlabbleResponseHeader {
     #[serde(skip_serializing, skip_deserializing)]
     #[bits = 4]
     #[variant_for("packet_type")]
-    _type: u8,
+    _type: RefCell<u8>,
 
     /// Packet type (derived from `_type`)
     #[variant_by = "packet_type"]
@@ -20,4 +22,19 @@ pub struct PlabbleResponseHeader {
     /// Counter of request to reply to, if in session
     #[toggled_by = "!fire_and_forget"]
     pub request_counter: Option<u16>,
+}
+
+impl PlabbleResponseHeader {
+    /// Create new packet header for specific response packet type
+    pub fn new(packet_type: ResponsePacketType, counter: Option<u16>) -> Self {
+        Self {
+            _type: RefCell::new(packet_type.get_discriminator()),
+            packet_type,
+            request_counter: counter,
+        }
+    }
+
+    pub fn preprocess(&self) {
+        self._type.replace(self.packet_type.get_discriminator());
+    }
 }

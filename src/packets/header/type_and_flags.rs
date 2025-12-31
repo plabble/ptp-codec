@@ -31,7 +31,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         enable_encryption: bool,
-        
+
         #[serde(default)]
         #[toggles("client_salt")]
         with_salt: bool,
@@ -45,6 +45,7 @@ pub enum RequestPacketType {
     /// - range_mode_until: Use range mode until a specified key/index
     Get {
         #[serde(default)]
+        #[toggles("binary_keys")]
         binary_keys: bool,
         #[serde(default)]
         subscribe: bool,
@@ -58,6 +59,7 @@ pub enum RequestPacketType {
     /// - stream_append: Write/append mode instead of read mode
     Stream {
         #[serde(default)]
+        #[toggles("binary_keys")]
         binary_keys: bool,
         #[serde(default)]
         subscribe: bool,
@@ -73,6 +75,7 @@ pub enum RequestPacketType {
     /// - do_not_persist: Indicate that the bucket should not be persisted to disk (RAM bucket)
     Post {
         #[serde(default)]
+        #[toggles("binary_keys")]
         binary_keys: bool,
         #[serde(default)]
         subscribe: bool,
@@ -90,6 +93,7 @@ pub enum RequestPacketType {
     /// - append: Use append mode to add new entries to the bucket (without keys)
     Put {
         #[serde(default)]
+        #[toggles("binary_keys")]
         binary_keys: bool,
         #[serde(default)]
         subscribe: bool,
@@ -103,6 +107,7 @@ pub enum RequestPacketType {
     /// - range_mode_until: Use range mode until a specified key/index
     Delete {
         #[serde(default)]
+        #[toggles("binary_keys")]
         binary_keys: bool,
         #[serde(default)]
         range_mode_until: bool,
@@ -112,6 +117,7 @@ pub enum RequestPacketType {
     /// - range_mode_until: Use range mode until a specified key/index
     Subscribe {
         #[serde(default)]
+        #[toggles("binary_keys")]
         binary_keys: bool,
         #[serde(default)]
         range_mode_until: bool,
@@ -121,6 +127,7 @@ pub enum RequestPacketType {
     /// - range_mode_until: Use range mode until a specified key/index
     Unsubscribe {
         #[serde(default)]
+        #[toggles("binary_keys")]
         binary_keys: bool,
         #[serde(default)]
         range_mode_until: bool,
@@ -169,7 +176,7 @@ pub enum ResponsePacketType {
         #[serde(default)]
         #[toggles("key_persisted")]
         with_psk: bool,
-        
+
         #[serde(default)]
         #[toggles("client_salt")]
         with_salt: bool,
@@ -178,6 +185,7 @@ pub enum ResponsePacketType {
     /// - binary_keys: Keys in the response are in binary format.
     Get {
         #[serde(default)]
+        #[toggles("binary_keys")]
         binary_keys: bool,
     },
     /// Response to a stream request.

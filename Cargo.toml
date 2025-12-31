@@ -13,9 +13,10 @@ crate-type = ["rlib"]
 
 [dependencies]
 base64 = "0.22.1"
-binary-codec = "0.3.7"
+binary-codec = "0.3.9"
 serde = { version = "1.0.225", features = ["derive"] }
 serde-value = "0.7.0"
+serde_json = "1.0.148"
 serde_with = { version = "3.14.0", features = ["base64"] }
 
 [dev-dependencies]

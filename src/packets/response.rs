@@ -3,29 +3,29 @@ use serde::{Deserialize, Serialize};
 
 use crate::packets::{
     base::{PlabblePacketBase, settings::CryptoSettings},
-    body::request_body::PlabbleRequestBody,
-    header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
+    body::response_body::PlabbleResponseBody,
+    header::{response_header::PlabbleResponseHeader, type_and_flags::ResponsePacketType},
 };
 
-/// A Plabble request packet, consisting of a base, header, and body.
+/// A Plabble response packet, consisting of a base, header, and body.
 /// The body type is determined by the packet type in the header.
 ///
 /// # Members
 /// - `base`: The base packet information common to all Plabble packets (both requests and responses).
 /// - `header`: The request-specific header containing metadata.
-/// - `body`: The request-specific body, whose structure depends on the packet type.
+/// - `body`: The response-specific body, whose structure depends on the packet type.
 #[derive(Serialize, Debug, PartialEq)]
-pub struct PlabbleRequestPacket {
+pub struct PlabbleResponsePacket {
     /// The base packet information common to all Plabble packets.
     #[serde(flatten)]
     pub base: PlabblePacketBase,
 
-    pub header: PlabbleRequestHeader,
+    pub header: PlabbleResponseHeader,
 
-    pub body: PlabbleRequestBody,
+    pub body: PlabbleResponseBody,
 }
 
-impl BinarySerializer for PlabbleRequestPacket {
+impl BinarySerializer for PlabbleResponsePacket {
     fn write_bytes(
         &self,
         stream: &mut BitStreamWriter,
@@ -50,7 +50,7 @@ impl BinarySerializer for PlabbleRequestPacket {
     }
 }
 
-impl BinaryDeserializer for PlabbleRequestPacket {
+impl BinaryDeserializer for PlabbleResponsePacket {
     fn read_bytes(
         stream: &mut binary_codec::BitStreamReader,
         config: Option<&mut SerializerConfig<()>>,
@@ -64,17 +64,17 @@ impl BinaryDeserializer for PlabbleRequestPacket {
         }
 
         // TODO: header encryption
-        let header = PlabbleRequestHeader::read_bytes(stream, Some(config))?;
+        let header = PlabbleResponseHeader::read_bytes(stream, Some(config))?;
         config.discriminator = Some(header.packet_type.get_discriminator());
 
         // TODO: body encryption
-        let body = PlabbleRequestBody::read_bytes(stream, Some(config))?;
+        let body = PlabbleResponseBody::read_bytes(stream, Some(config))?;
 
         Ok(Self { base, header, body })
     }
 }
 
-impl<'de> Deserialize<'de> for PlabbleRequestPacket {
+impl<'de> Deserialize<'de> for PlabbleResponsePacket {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -83,7 +83,7 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
         struct RawPacket {
             #[serde(flatten)]
             base: PlabblePacketBase,
-            header: PlabbleRequestHeader,
+            header: PlabbleResponseHeader,
             // We'll temporarily store the body as untyped data
             body: serde_value::Value,
         }
@@ -92,27 +92,29 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
         raw.header.preprocess();
 
         let body = match raw.header.packet_type {
-            RequestPacketType::Certificate { .. } => todo!(),
-            RequestPacketType::Session { .. } => {
-                PlabbleRequestBody::Session(raw.body.deserialize_into().unwrap())
+            ResponsePacketType::Certificate => todo!(),
+            ResponsePacketType::Session { .. } => {
+                PlabbleResponseBody::Session(raw.body.deserialize_into().unwrap())
             }
-            RequestPacketType::Get { .. } => todo!(),
-            RequestPacketType::Stream { .. } => todo!(),
-            RequestPacketType::Post { .. } => todo!(),
-            RequestPacketType::Patch => todo!(),
-            RequestPacketType::Put { .. } => todo!(),
-            RequestPacketType::Delete { .. } => todo!(),
-            RequestPacketType::Subscribe { .. } => todo!(),
-            RequestPacketType::Unsubscribe { .. } => todo!(),
-            RequestPacketType::Register => todo!(),
-            RequestPacketType::Identify => todo!(),
-            RequestPacketType::Proxy { .. } => todo!(),
-            RequestPacketType::_Reserved13 => todo!(),
-            RequestPacketType::Opcode { .. } => todo!(),
-            RequestPacketType::_Reserved15 => todo!(),
+            ResponsePacketType::Get { binary_keys } => todo!(),
+            ResponsePacketType::Stream => todo!(),
+            ResponsePacketType::Post => todo!(),
+            ResponsePacketType::Patch => todo!(),
+            ResponsePacketType::Put => todo!(),
+            ResponsePacketType::Delete => todo!(),
+            ResponsePacketType::Subscribe => todo!(),
+            ResponsePacketType::Unsubscribe => todo!(),
+            ResponsePacketType::Register => todo!(),
+            ResponsePacketType::Identify => todo!(),
+            ResponsePacketType::Proxy { include_hop_info } => todo!(),
+            ResponsePacketType::_Reserved13 => todo!(),
+            ResponsePacketType::Opcode => todo!(),
+            ResponsePacketType::Error => {
+                PlabbleResponseBody::Error(raw.body.deserialize_into().unwrap())
+            }
         };
 
-        Ok(PlabbleRequestPacket {
+        Ok(PlabbleResponsePacket {
             base: raw.base,
             header: raw.header,
             body,

@@ -1,9 +1,7 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
-use crate::packets::body::{
-    bucket::BucketBody, session::SessionResponseBody,
-};
+use crate::packets::body::{bucket::BucketBody, error::PlabbleError, session::SessionResponseBody};
 
 /// An enumeration representing the different types of response bodies
 /// that can be sent in a Plabble response.
@@ -44,5 +42,5 @@ pub enum PlabbleResponseBody {
     Identity,
     Proxy,
     Opcode,
-    Error,
+    Error(PlabbleError),
 }

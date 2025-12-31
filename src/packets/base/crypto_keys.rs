@@ -5,7 +5,7 @@ use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
 /// Cryptographic keys used for key exchange request
-/// 
+///
 /// # Variants
 /// - X25519: 32 bytes public key for X25519 key exchange
 /// - Kem512: 800 bytes public key for KEM-512 post-quantum key exchange
@@ -25,7 +25,7 @@ pub enum KeyExhangeRequest {
 }
 
 /// Cryptographic keys used for key exchange request
-/// 
+///
 /// # Variants
 /// - X25519: 32 bytes public key for X25519 key exchange
 /// - Kem512: 768 bytes encapsulated secret for KEM-512 post-quantum key exchange

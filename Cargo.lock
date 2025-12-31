@@ -25,18 +25,18 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "binary-codec"
-version = "0.3.7"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69a76b417ddeec5e50ffb8c2f2add7eb0b3dc8420c18c6fa51047992b1eeb65c"
+checksum = "5f269942318d2c8d8b955958f1372fd05d5e22858efe5e4ac673d7f14773bb8d"
 dependencies = [
  "binary-codec-derive",
 ]
 
 [[package]]
 name = "binary-codec-derive"
-version = "0.3.7"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "beed300f7f6b99a445b35f9926b641d4ec55247e939fdf1f826d0d0aefaf3944"
+checksum = "3d40bf5eb9981832eb0cb603f87475baae31273845ccf75244b70bb00f800c88"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -295,6 +295,7 @@ dependencies = [
  "binary-codec",
  "serde",
  "serde-value",
+ "serde_json",
  "serde_with",
  "toml",
 ]
@@ -348,12 +349,6 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
-
-[[package]]
-name = "ryu"
-version = "1.0.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "schemars"
@@ -421,15 +416,15 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.145"
+version = "1.0.148"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "402a6f66d8c709116cf22f558eab210f5a50187f702eb4d7e5ef38d9a7f1c79c"
+checksum = "3084b546a1dd6289475996f182a22aba973866ea8e8b02c51d9f46b1336a22da"
 dependencies = [
  "itoa",
  "memchr",
- "ryu",
  "serde",
  "serde_core",
+ "zmij",
 ]
 
 [[package]]
@@ -694,3 +689,9 @@ name = "winnow"
 version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21a0236b59786fed61e2a80582dd500fe61f18b5dca67a4a067d0bc9039339cf"
+
+[[package]]
+name = "zmij"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3280a1b827474fcd5dbef4b35a674deb52ba5c312363aef9135317df179d81b"
