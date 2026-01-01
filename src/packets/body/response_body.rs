@@ -41,6 +41,7 @@ pub enum PlabbleResponseBody {
     Register,
     Identity,
     Proxy,
+    _Reserved13,
     Opcode,
     Error(PlabbleError),
 }

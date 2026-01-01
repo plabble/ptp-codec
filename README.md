@@ -237,6 +237,12 @@ Ed25519 = "..."
 - **Goal**: _request_ data from one or more slots inside a [bucket](#buckets) on the server.
 
 
+## Errors
+0. **UnsupportedVersion**: Requested Plabble protocol version not supported by server. Body: `min_version` (min supported version by server), `max_version` (max supported version by server). _Occurence_: every request Plabble packet.
+1. **UnsupportedAlgorithm**: Requested algotithm (in cryptography settings) is not supported by the server. Body: `name` The name of the algorithm(s) that is not supported, UTF-8 [dynint](#plabble-dynamic-int) length encoded. _Occurence_: any packet, but especially [Session](#session), [Certificate](#certificate) and other packets that use cryptography settings. 
+
+
+
 ## Concepts
 
 ### Buckets

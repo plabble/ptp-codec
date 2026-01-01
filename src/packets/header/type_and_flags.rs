@@ -14,8 +14,10 @@ pub enum RequestPacketType {
     Certificate {
         #[serde(default)]
         full_chain: bool,
+
         #[serde(default)]
         challenge: bool,
+
         #[serde(default)]
         query_mode: bool,
     },
@@ -47,8 +49,10 @@ pub enum RequestPacketType {
         #[serde(default)]
         #[toggles("binary_keys")]
         binary_keys: bool,
+
         #[serde(default)]
         subscribe: bool,
+
         #[serde(default)]
         range_mode_until: bool,
     },
@@ -61,10 +65,13 @@ pub enum RequestPacketType {
         #[serde(default)]
         #[toggles("binary_keys")]
         binary_keys: bool,
+
         #[serde(default)]
         subscribe: bool,
+
         #[serde(default)]
         range_mode_until: bool,
+
         #[serde(default)]
         stream_append: bool,
     },
@@ -77,10 +84,13 @@ pub enum RequestPacketType {
         #[serde(default)]
         #[toggles("binary_keys")]
         binary_keys: bool,
+
         #[serde(default)]
         subscribe: bool,
+
         #[serde(default)]
         range_mode_until: bool,
+
         #[serde(default)]
         do_not_persist: bool,
     },
@@ -95,10 +105,13 @@ pub enum RequestPacketType {
         #[serde(default)]
         #[toggles("binary_keys")]
         binary_keys: bool,
+
         #[serde(default)]
         subscribe: bool,
+
         #[serde(default)]
         assert_keys: bool,
+
         #[serde(default)]
         append: bool,
     },
@@ -109,6 +122,7 @@ pub enum RequestPacketType {
         #[serde(default)]
         #[toggles("binary_keys")]
         binary_keys: bool,
+
         #[serde(default)]
         range_mode_until: bool,
     },
@@ -119,6 +133,7 @@ pub enum RequestPacketType {
         #[serde(default)]
         #[toggles("binary_keys")]
         binary_keys: bool,
+
         #[serde(default)]
         range_mode_until: bool,
     },
@@ -129,6 +144,7 @@ pub enum RequestPacketType {
         #[serde(default)]
         #[toggles("binary_keys")]
         binary_keys: bool,
+
         #[serde(default)]
         range_mode_until: bool,
     },
@@ -143,8 +159,10 @@ pub enum RequestPacketType {
     Proxy {
         #[serde(default)]
         init_session: bool,
+
         #[serde(default)]
         keep_connection: bool,
+
         #[serde(default)]
         select_random_hops: bool,
     },
@@ -155,6 +173,7 @@ pub enum RequestPacketType {
     Opcode {
         #[serde(default)]
         allow_bucket_operations: bool,
+
         #[serde(default)]
         allow_eval: bool,
     },

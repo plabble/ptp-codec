@@ -4,7 +4,7 @@ use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
-use crate::packets::base::crypto_keys::{CryptoSignature, KeyExhangeRequest, KeyExhangeResponse};
+use crate::packets::base::algorithm::{CryptoSignature, KeyExhangeRequest, KeyExhangeResponse};
 
 /// Session request body
 #[serde_as]
@@ -247,7 +247,7 @@ mod tests {
         .unwrap();
 
         let bytes = packet.to_bytes(None).unwrap();
-        // Type 0001, flags 0100. Packet type 0001, packet flags 0001. Request counter 2. PSK ID 12 bytes. 32-byte x25519 key. 64-byte ed25519 signature.
+        // Version 0001, flags 0100. Packet type 0001, packet flags 0001. Request counter 2. PSK ID 12 bytes. 32-byte x25519 key. 64-byte ed25519 signature.
         assert_eq!(
             vec![
                 0b0100_0001,

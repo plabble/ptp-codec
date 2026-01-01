@@ -43,5 +43,7 @@ pub enum PlabbleRequestBody {
     Register,
     Identify,
     Proxy,
+    _Reserved13,
     Opcode,
+    _Reserved15,
 }

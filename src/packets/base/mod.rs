@@ -6,7 +6,7 @@ use serde_with::serde_as;
 
 use settings::CryptoSettings;
 
-pub mod crypto_keys;
+pub mod algorithm;
 pub mod opcode;
 pub mod settings;
 
