@@ -163,6 +163,48 @@ pub enum Opcode {
 
 */
 
+#[derive(Debug, Clone)]
+pub struct ScriptSettings {
+    pub memory_limit: usize,
+    pub opcode_limit: usize,
+    pub cursor_limit: usize,
+    pub max_slice_size: usize,
+    pub max_stack_items: usize,
+    pub max_script_len: usize,
+    pub max_depth: usize,
+
+    pub allow_clear: bool,
+    pub allow_control_flow: bool,
+    pub allow_loop: bool,
+    pub allow_jump: bool,
+    pub allow_non_push: bool,
+    pub allow_eval: bool,
+    pub allow_sandboxed_eval: bool,
+    pub allow_plabble: bool
+}
+
+impl Default for ScriptSettings {
+    fn default() -> Self {
+        Self {
+            memory_limit: 10_000,
+            opcode_limit: 1000,
+            cursor_limit: 1000,
+            max_slice_size: 8000, // 8 kB
+            max_stack_items: 100,
+            max_script_len: 20_000,
+            max_depth: 10,
+            allow_clear: true,
+            allow_loop: true,
+            allow_jump: true,
+            allow_control_flow: true,
+            allow_non_push: true,
+            allow_eval: true,
+            allow_sandboxed_eval: true,
+            allow_plabble: true
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, ToBytes, FromBytes)]
 pub struct OpcodeScript {
     pub instructions: Vec<Opcode>,
