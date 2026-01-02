@@ -182,7 +182,7 @@ flags = [true, true, false, false]
 # flags[1] = enable_encryption
 
 [body]
-psk_expiration = 2025-05-27T07:32:00Z
+psk_expiration = "2025-05-27T07:32:00Z"
 keys = ["<public key base64>"]
 ```
 

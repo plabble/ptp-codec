@@ -1,3 +1,5 @@
+use binary_codec::{FromBytes, ToBytes};
+
 /**
  * The script engine uses Opcodes as the scripting language
  * The stack uses 4 data types: bytes, numbers, booleans and byte.
@@ -6,18 +8,41 @@
  * If a number is expected but bytes are provided, the engine will try to read a dynint.
  */
 #[repr(u8)]
+#[derive(Debug, Clone, PartialEq, ToBytes, FromBytes)]
 pub enum Opcode {
     FALSE = 0, // Push 0x00 to the stack
     TRUE = 1,  // Push 0x01 to the stack
 
-    PUSH1 = 2, // Push next byte to the stack
-    PUSH2 = 3, // Push next 2 bytes to the stack
-    PUSH4 = 4, // Push next 4 bytes to the stack
+    PUSH1(u8) = 2, // Push next byte to the stack
+    PUSH2([u8; 2]) = 3, // Push next 2 bytes to the stack
+    PUSH4([u8; 4]) = 4, // Push next 4 bytes to the stack
 
-    PUSHL1 = 5, // Push n bytes to the stack, where n is u8 value directly following the operator
-    PUSHL2 = 6, // Push n bytes to the stack, where n is u16 value directly following the operator
-    PUSHL4 = 7, // Push n bytes to the stack, where n is u32 value directly following the operator
-    PUSHINT = 8, // Push dynamic int to the stack
+    // Push n bytes to the stack, where n is u8 value directly following the operator
+    PUSHL1 {
+        #[length_for = "l1"]
+        len: u8,
+        #[length_by("l1")]
+        data: Vec<u8>
+    } = 5, 
+
+    // Push n bytes to the stack, where n is u16 value directly following the operator
+    PUSHL2 {
+        #[length_for = "l2"]
+        len: u16,
+        #[length_by("l2")]
+        data: Vec<u8>
+    } = 6, 
+
+    // Push n bytes to the stack, where n is u32 value directly following the operator
+    PUSHL4 {
+        #[length_for = "l4"]
+        len: u32,
+        #[length_by("l4")]
+        data: Vec<u8>
+    } = 7, 
+
+    // Push dynamic int to the stack
+    PUSHINT(#[dyn_int] i128) = 8, 
 
     // Numeric operations - all numbers are signed Plabble dynints
     ADD = 9,  // Pop two numbers from the stack and sum them
@@ -60,13 +85,14 @@ pub enum Opcode {
 
     // Control flow
     NOP = 41,    // Do nothing
-    IF = 42,     // If statement (takes boolean)
+    IF = 42,     // If statement (takes boolean from stack)
     ELSE = 43,   // Else statement
-    ENDIF = 44,  // End if
-    BREAK = 45,  // Break if (skip to next ENDIF, or POOL)
+    FI = 44,  // End if
+    BREAK = 45,  // Break loop (skip to next POOL)
     LOOP = 46,   // Start loop
     POOL = 47,   // End of loop
-    JMP = 48,    // Jump to address (takes unsigned dynint as address)
+    JMP = 48,    // Jump to address (takes unsigned dynint as address from stack)
+
     ASSERT = 49, // Crash if top is not true
     RETURN = 50, // Stop execution, return stack as result
 
@@ -75,13 +101,17 @@ pub enum Opcode {
     DUP2 = 52,     // Duplicate top two items of stack
     DUP3 = 53,     // Duplicate top three items of stack
     DUP4 = 54,     // Duplicate top four items of stack
-    DUPN = 55,     // Duplicate top item of stack N times (takes dynint for count)
+
+    // Duplicate top item of stack N times (takes byte for count from script)
+    DUPN(u8) = 55, 
+
     SWAP = 56,     // Swap top two items of stack
     ROT = 57,      // Rotate top three items of stack
     POP = 58,      // Take one item from stack
-    COPY = 59,     // Take the item at index n (takes unsigned dynint as address) and copy it to top
-    BUBBLE = 60,   // Take the item at index n (takes unsigned dynint as address) and move it to top
-    SINK = 61,     // Take the top item and move it to index n (replace)
+    COPY = 59,     // Take the item at index n (takes unsigned dynint as address from stack) and copy it to top
+    BUBBLE = 60,   // Take the item at index n (takes unsigned dynint as address from stack) and move it to top
+    SINK = 61,     // Take the item at index n (takes unsigned dynint as address from stack) and move it to bottom
+
     TOALT = 62,    // Move top item to alt (other) stack
     FROMALT = 63,  // Move top item from alt (other) stack back
     SNAPSHOT = 64, // Store a snapshot of the current stack
@@ -104,15 +134,18 @@ pub enum Opcode {
     // Slice operations
     LEN = 91,     // Push length of top item to the stack
     REVERSE = 92, // Reverse bytes of top item
+    SLICE = 93, // Slice bytes from existing byte array (copy). Takes 2 numbers, one for offset, one for length.
+    SPLICE = 94, // Splice bytes from existing byte array (modifies). Takes 2 numbers, one for range offset, one for range length, then bytes to put, then bytes to splice into
 
     // Crypto operations
-    HASH = 101, // Take byte from stack for algorithm, hashes bytes and put them back on stack
-    SIGN = 102, // Take byte from stack for algorithm, signature, data to sign and puts signature back on stack
-    VERIFY = 103, // Takes byte from stack for algorithm, public key, signature, data and puts boolean back
-    ENCRYPT = 104, // Takes byte from stack for algorithm, key, data and puts encrypted data back
-    DECRYPT = 105, // Takes byte from stack for algorithm, key, ciphertext and puts plain data back
+    HASH = 101, // Take byte for algorithm, hashes bytes and put them back on stack
+    SIGN = 102, // Take byte for algorithm, signature, data to sign and puts signature back on stack
+    VERIFY = 103, // Takes byte for algorithm, public key, signature, data and puts boolean back
+    ENCRYPT = 104, // Takes byte for algorithm, key, data and puts encrypted data back
+    DECRYPT = 105, // Takes byte for algorithm, key, ciphertext and puts plain data back
 
-    EVAL = 255, // Evaluate stack bytes as if it is a script
+    EVALSUB = 254, // Evaluate top stack item as if it is a script in a child process and push the result back
+    EVAL = 255, // Evaluate stack bytes as if it is a script against the current stack (dangerous)
 }
 
 /* Example script
@@ -125,3 +158,30 @@ pub enum Opcode {
 []              ASSERT
 
 */
+
+#[derive(Debug, Clone, PartialEq, ToBytes, FromBytes)]
+pub struct OpcodeScript {
+    pub instructions: Vec<Opcode>
+}
+
+impl OpcodeScript {
+    pub fn new(instructions: Vec<Opcode>) -> Self {
+        Self { instructions }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use binary_codec::{BinaryDeserializer, SerializerConfig};
+
+    use crate::scripting::opcode::{Opcode, OpcodeScript};
+
+    #[test]
+    fn can_deserialize_simple_script() {
+        let bytes = vec![0x01, 0x02, 1, 32];
+        let config: Option<&mut SerializerConfig> = None;
+        let script = OpcodeScript::from_bytes(&bytes, config).unwrap();
+
+        assert_eq!(script.instructions, vec![Opcode::TRUE, Opcode::PUSH1(1), Opcode::EQ]);
+    }
+}

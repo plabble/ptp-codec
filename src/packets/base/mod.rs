@@ -7,7 +7,6 @@ use serde_with::serde_as;
 use settings::CryptoSettings;
 
 pub mod algorithm;
-pub mod opcode;
 pub mod settings;
 pub mod datetime;
 

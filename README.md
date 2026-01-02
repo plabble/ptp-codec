@@ -273,5 +273,8 @@ This is how to create a session key:
 ### Encrypted client-server communication
 
 ### Plabble Timestamp
+A Plabble Timestamp is a _uint32-big endian encoded_ **seconds** since the Plabble epoch, which is `2025-01-01T00:00:00Z` (the minimum datetime). The maximum datetime of the Plabble Timestamp is `2161-02-07T06:28:15.000Z` in RFC 3339 format.
+The precision of a Plabble Timestamp is thus limited to 1 second which is sufficient for most things.
+The advantage of the Plabble Timestamp is that it is thus very small, only taking 4 bytes.
 
 ### Plabble dynamic int
