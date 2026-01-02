@@ -1,7 +1,7 @@
 /**
  * The script engine uses Opcodes as the scripting language
  * The stack uses 4 data types: bytes, numbers, booleans and byte.
- * If a boolean is expected but a number provided, 0 and 1 will work. 2+ will crash.
+ * If a boolean is expected but a number provided, 0 and 1 will work. 2+ will fail.
  * If a boolean is expected but bytes are provided, the first byte will tried as 0x00 or 0x01.
  * If a number is expected but bytes are provided, the engine will try to read a dynint.
  */

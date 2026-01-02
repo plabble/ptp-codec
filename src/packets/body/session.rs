@@ -5,6 +5,7 @@ use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
 use crate::packets::base::algorithm::{CryptoSignature, KeyExhangeRequest, KeyExhangeResponse};
+use crate::packets::base::datetime::PlabbleDateTime;
 
 /// Session request body
 #[serde_as]
@@ -12,8 +13,7 @@ use crate::packets::base::algorithm::{CryptoSignature, KeyExhangeRequest, KeyExh
 pub struct SessionRequestBody {
     /// PSK expiration Plabble timestamp. Filled if request flag persist_key is set.
     #[toggled_by = "persist_key"]
-    #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
-    pub psk_expiration: Option<[u8; 4]>,
+    pub psk_expiration: Option<PlabbleDateTime>,
 
     /// Client-generated salt for key derivation. Filled if request flag with_salt is set.
     #[toggled_by = "client_salt"]
@@ -144,7 +144,7 @@ mod tests {
         persist_key = true
 
         [body]
-        psk_expiration = "Kk7HXQ"
+        psk_expiration = "2025-05-25T12:30:00Z"
         salt = "R6Bt7xEAskTkgzk_YmGxpw"
 
         [[body.keys]]
@@ -157,15 +157,15 @@ mod tests {
 
         let bytes = packet.to_bytes(None).unwrap();
 
-        // Type 0001, flags 0100. Packet type 0001, packet flags 0101. PSK expiration 42, 78, 199, 93. salt 16 bytes, 32-byte x25519 key
+        // Type 0001, flags 0100. Packet type 0001, packet flags 0101. PSK expiration 0, 190, 135, 200. salt 16 bytes, 32-byte x25519 key
         assert_eq!(
             vec![
                 0b0100_0001,
                 0b0101_0001,
-                42,
-                78,
-                199,
-                93,
+                0,
+                190,
+                135,
+                200,
                 71,
                 160,
                 109,
