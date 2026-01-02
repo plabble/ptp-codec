@@ -44,6 +44,7 @@ pub enum Opcode {
     // Push dynamic int to the stack
     PUSHINT(#[dyn_int] i128) = 8,
 
+    /* END OF PUSH-ONLY OPCODES */
     // Numeric operations - all numbers are signed Plabble dynints
     ADD = 9,  // Pop two numbers from the stack and sum them
     SUB = 10, // Pop two numbers from the stack and substract them
@@ -145,6 +146,8 @@ pub enum Opcode {
     DECRYPT = 105, // Takes byte for algorithm, key, ciphertext and puts plain data back
 
     // Special: 200+
+    TIME = 200, // Push the current time as a Plabble numeric timestamp to the stack
+
     EVALSUB = 254, // Evaluate top stack item as if it is a script in a child process and push the result back
     EVAL = 255, // Evaluate stack bytes as if it is a script against the current stack (dangerous)
 }
@@ -169,6 +172,13 @@ impl OpcodeScript {
     pub fn new(instructions: Vec<Opcode>) -> Self {
         Self { instructions }
     }
+
+    /// If we want a locking/unlocking script experience like Bitcoin,
+    /// we don't want the unlocker to use any control statement or whatever.
+    /// The unlocker script should only contain push statements and be put BEFORE the locking script
+    pub fn is_push_only(&self) -> bool {
+        self.instructions.iter().all(|i| i.get_discriminator() <= 8)
+    }
 }
 
 #[cfg(test)]
@@ -187,5 +197,19 @@ pub mod tests {
             script.instructions,
             vec![Opcode::TRUE, Opcode::PUSH1(1), Opcode::EQ]
         );
+    }
+
+    #[test]
+    fn can_determine_if_script_is_push_only() {
+        let mut script = OpcodeScript::new(vec![
+            Opcode::FALSE,
+            Opcode::TRUE,
+            Opcode::PUSHINT(5),
+            Opcode::PUSHINT(7),
+        ]);
+
+        assert_eq!(script.is_push_only(), true);
+        script.instructions.push(Opcode::ADD);
+        assert_eq!(script.is_push_only(), false);
     }
 }

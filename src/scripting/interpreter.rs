@@ -1,8 +1,9 @@
 use std::cmp;
 
 use binary_codec::BinaryDeserializer;
+use chrono::Utc;
 
-use crate::scripting::opcode::{Opcode, OpcodeScript};
+use crate::{packets::base::datetime::PlabbleDateTime, scripting::opcode::{Opcode, OpcodeScript}};
 
 use super::stack::StackData;
 
@@ -179,8 +180,6 @@ impl ScriptInterpreter {
             Opcode::PUSHL2 { len: _, data } => self.push(StackData::Buffer(data)),
             Opcode::PUSHL4 { len: _, data } => self.push(StackData::Buffer(data)),
             Opcode::PUSHINT(val) => self.push(StackData::Number(val)),
-
-            /* Numeric / math */
             Opcode::ADD => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
@@ -305,8 +304,6 @@ impl ScriptInterpreter {
                 let c = !a;
                 self.push(StackData::Number(c));
             }
-
-            /* Boolean / logic */
             Opcode::NOT => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_boolean()?;
@@ -338,8 +335,6 @@ impl ScriptInterpreter {
                 let eq = self.check_equality()?;
                 self.push(StackData::Boolean(!eq));
             }
-
-            /* Advanced math */
             Opcode::POW => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
@@ -359,10 +354,7 @@ impl ScriptInterpreter {
                 let c = (a as f64).sqrt() as i128;
                 self.push(StackData::Number(c));
             }
-
             Opcode::NOP => { /* NOP = do nothing */ }
-
-            /* Control flow */
             Opcode::IF => {
                 self.ensure_stack_size(1)?;
                 let condition = self.pop_boolean()?;
@@ -539,7 +531,6 @@ impl ScriptInterpreter {
                     return Err(ScriptError::InvalidScript);
                 }
             }
-
             Opcode::JMP => {
                 self.ensure_stack_size(1)?;
                 let address = self.pop_number()?;
@@ -551,7 +542,6 @@ impl ScriptInterpreter {
                 self.cursor = address as usize;
                 return Ok(None); // Skip the cursor increment at the end
             }
-
             Opcode::ASSERT => {
                 self.ensure_stack_size(1)?;
                 let condition = self.pop_boolean()?;
@@ -567,8 +557,6 @@ impl ScriptInterpreter {
                 }
                 return Ok(Some(stack_data));
             }
-
-            /* Stack manipulation */
             Opcode::DUP => {
                 self.ensure_stack_size(1)?;
                 let top = self.stack().last().unwrap().clone();
@@ -656,7 +644,6 @@ impl ScriptInterpreter {
                 let item = self.stack().remove(n as usize);
                 self.stack().insert(0, item);
             }
-
             Opcode::TOALT => {
                 if self.stack().is_empty() {
                     return Err(ScriptError::StackUnderflow(1));
@@ -713,14 +700,12 @@ impl ScriptInterpreter {
                 let length = self.stack().len() as i128;
                 self.push(StackData::Number(length));
             }
-
             Opcode::SERVER => todo!(),
             Opcode::SELECT => todo!(),
             Opcode::READ => todo!(),
             Opcode::WRITE => todo!(),
             Opcode::APPEND => todo!(),
             Opcode::DELETE => todo!(),
-
             Opcode::LEN => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
@@ -770,11 +755,18 @@ impl ScriptInterpreter {
                 self.push(StackData::Buffer(bytes));
             }
 
+            /* Crypto operations */
             Opcode::HASH => todo!(),
             Opcode::SIGN => todo!(),
             Opcode::VERIFY => todo!(),
             Opcode::ENCRYPT => todo!(),
             Opcode::DECRYPT => todo!(),
+
+            /* Special opcodes */
+            Opcode::TIME => {
+                let now = PlabbleDateTime(Utc::now());
+                self.push(StackData::Number(now.timestamp() as i128));
+            },
             Opcode::EVALSUB => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
@@ -2113,5 +2105,19 @@ mod tests {
         assert_eq!(i.memory_peak, 12);
         assert_eq!(i.cpu, 14);
         assert_eq!(i.cursor_cpu, 0);
+    }
+
+    #[test]
+    fn time_opcode_works() {
+        // Hard to test, we just verify if it pushes a number to the stack because that's what it should do
+        let script = OpcodeScript::new(vec![
+            Opcode::TIME
+        ]);
+
+        let mut i = ScriptInterpreter::new(script);
+        i.exec().unwrap();
+        
+        let res = &i.main_stack[0];
+        assert!(matches!(res, &StackData::Number(_)));
     }
 }

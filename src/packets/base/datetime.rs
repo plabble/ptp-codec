@@ -5,10 +5,20 @@ use serde::{Deserialize, Serialize};
 /// Plabble DateTime since epoch (01-01-2025T00:00:00Z)
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct PlabbleDateTime(DateTime<Utc>);
+pub struct PlabbleDateTime(pub DateTime<Utc>);
 
 fn epoch() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap()
+}
+
+impl PlabbleDateTime {
+    pub fn timestamp(&self) -> i64 {
+        (self.0 - epoch()).num_seconds()
+    }
+
+    pub fn new(timestamp: i64) -> Self {
+        Self(epoch() + Duration::seconds(timestamp))
+    }
 }
 
 impl<T: Clone> BinarySerializer<T> for PlabbleDateTime {
@@ -17,8 +27,7 @@ impl<T: Clone> BinarySerializer<T> for PlabbleDateTime {
         stream: &mut binary_codec::BitStreamWriter,
         _: Option<&mut binary_codec::SerializerConfig<T>>,
     ) -> Result<(), binary_codec::SerializationError> {
-        let seconds = (self.0 - epoch()).num_seconds() as u32;
-        stream.write_fixed_int(seconds);
+        stream.write_fixed_int(self.timestamp() as u32);
         Ok(())
     }
 }
@@ -29,8 +38,7 @@ impl<T: Clone> BinaryDeserializer<T> for PlabbleDateTime {
         _: Option<&mut binary_codec::SerializerConfig<T>>,
     ) -> Result<Self, binary_codec::DeserializationError> {
         let seconds: u32 = stream.read_fixed_int()?;
-        let dt = epoch() + Duration::seconds(seconds as i64);
-        Ok(PlabbleDateTime(dt))
+        Ok(PlabbleDateTime::new(seconds as i64))
     }
 }
 
