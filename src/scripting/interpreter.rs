@@ -11,11 +11,15 @@ pub struct ScriptInterpreter {
     main_stack: Vec<StackData>,
     alt_stack: Vec<StackData>,
     snapshot: Vec<StackData>,
-    
+    snapshot_memory: usize,
+
     script: OpcodeScript,
     cursor: usize,
     use_alt_stack: bool,
     cpu: usize,
+    cursor_cpu: usize,
+    memory: usize,
+    memory_peak: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -48,12 +52,20 @@ impl ScriptInterpreter {
             main_stack: Vec::new(),
             alt_stack: Vec::new(),
             snapshot: Vec::new(),
-            
+            snapshot_memory: 0,
+
             cursor: 0,
             script,
             use_alt_stack: false,
             cpu: 0,
+            cursor_cpu: 0,
+            memory: 0,
+            memory_peak: 0,
         }
+    }
+
+    fn calculate_memory(&mut self) -> usize {
+        self.stack().iter().map(|i| i.memory()).sum()
     }
 
     fn stack(&mut self) -> &mut Vec<StackData> {
@@ -79,24 +91,40 @@ impl ScriptInterpreter {
         Ok(())
     }
 
+    fn pop(&mut self) -> Option<StackData> {
+        let item = self.stack().pop();
+        if item.is_none() {
+            return None;
+        }
+
+        let item = item.unwrap();
+        self.memory -= item.memory();
+
+        Some(item)
+    }
+
+    fn push(&mut self, item: StackData) {
+        self.memory += item.memory();
+        self.memory_peak = cmp::max(self.memory, self.memory_peak);
+        self.stack().push(item);
+    }
+
     fn pop_number(&mut self) -> Result<i128, ScriptError> {
-        self.stack()
-            .pop()
+        self.pop()
             .and_then(|n| n.as_number())
             .ok_or(ScriptError::NotANumber)
     }
 
     fn pop_boolean(&mut self) -> Result<bool, ScriptError> {
-        self.stack()
-            .pop()
+        self.pop()
             .and_then(|b| b.as_boolean())
             .ok_or(ScriptError::NotABoolean)
     }
 
     fn check_equality(&mut self) -> Result<bool, ScriptError> {
         self.ensure_stack_size(2)?;
-        let a = self.stack().pop().unwrap();
-        let b = self.stack().pop().unwrap();
+        let a = self.pop().unwrap();
+        let b = self.pop().unwrap();
 
         match (a, b) {
             (StackData::Boolean(a), StackData::Boolean(b)) => return Ok(a == b),
@@ -142,15 +170,15 @@ impl ScriptInterpreter {
         println!("Executing opcode: {:?}", opcode);
 
         match opcode {
-            Opcode::FALSE => self.stack().push(StackData::Boolean(false)),
-            Opcode::TRUE => self.stack().push(StackData::Boolean(true)),
-            Opcode::PUSH1(data) => self.stack().push(StackData::Buffer(vec![data])),
-            Opcode::PUSH2(data) => self.stack().push(StackData::Buffer(data.to_vec())),
-            Opcode::PUSH4(data) => self.stack().push(StackData::Buffer(data.to_vec())),
-            Opcode::PUSHL1 { len: _, data } => self.stack().push(StackData::Buffer(data)),
-            Opcode::PUSHL2 { len: _, data } => self.stack().push(StackData::Buffer(data)),
-            Opcode::PUSHL4 { len: _, data } => self.stack().push(StackData::Buffer(data)),
-            Opcode::PUSHINT(val) => self.stack().push(StackData::Number(val)),
+            Opcode::FALSE => self.push(StackData::Boolean(false)),
+            Opcode::TRUE => self.push(StackData::Boolean(true)),
+            Opcode::PUSH1(data) => self.push(StackData::Buffer(vec![data])),
+            Opcode::PUSH2(data) => self.push(StackData::Buffer(data.to_vec())),
+            Opcode::PUSH4(data) => self.push(StackData::Buffer(data.to_vec())),
+            Opcode::PUSHL1 { len: _, data } => self.push(StackData::Buffer(data)),
+            Opcode::PUSHL2 { len: _, data } => self.push(StackData::Buffer(data)),
+            Opcode::PUSHL4 { len: _, data } => self.push(StackData::Buffer(data)),
+            Opcode::PUSHINT(val) => self.push(StackData::Number(val)),
 
             /* Numeric / math */
             Opcode::ADD => {
@@ -158,157 +186,157 @@ impl ScriptInterpreter {
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_add(b).ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::SUB => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_sub(b).ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::MUL => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_mul(b).ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::DIV => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_div(b).ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::MOD => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_rem(b).ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::NEG => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_number()?;
                 let c = a.checked_neg().ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::ABS => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_number()?;
                 let c = a.checked_abs().ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::LT => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.stack().push(StackData::Boolean(b < a));
+                self.push(StackData::Boolean(b < a));
             }
             Opcode::GT => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.stack().push(StackData::Boolean(b > a));
+                self.push(StackData::Boolean(b > a));
             }
             Opcode::LTE => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.stack().push(StackData::Boolean(b <= a));
+                self.push(StackData::Boolean(b <= a));
             }
             Opcode::GTE => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.stack().push(StackData::Boolean(b >= a));
+                self.push(StackData::Boolean(b >= a));
             }
             Opcode::MIN => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.stack().push(StackData::Number(cmp::min(a, b)));
+                self.push(StackData::Number(cmp::min(a, b)));
             }
             Opcode::MAX => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.stack().push(StackData::Number(cmp::max(a, b)));
+                self.push(StackData::Number(cmp::max(a, b)));
             }
             Opcode::BAND => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a & b;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::BOR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a | b;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::BXOR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a ^ b;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::BSHL => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_shl(b as u32).ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::BSHR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_shr(b as u32).ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::BNOT => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_number()?;
                 let c = !a;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
 
             /* Boolean / logic */
             Opcode::NOT => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_boolean()?;
-                self.stack().push(StackData::Boolean(!a));
+                self.push(StackData::Boolean(!a));
             }
             Opcode::AND => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_boolean()?;
                 let a = self.pop_boolean()?;
-                self.stack().push(StackData::Boolean(a && b));
+                self.push(StackData::Boolean(a && b));
             }
             Opcode::OR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_boolean()?;
                 let a = self.pop_boolean()?;
-                self.stack().push(StackData::Boolean(a || b));
+                self.push(StackData::Boolean(a || b));
             }
             Opcode::XOR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_boolean()?;
                 let a = self.pop_boolean()?;
-                self.stack().push(StackData::Boolean(a ^ b));
+                self.push(StackData::Boolean(a ^ b));
             }
             Opcode::EQ => {
                 let eq = self.check_equality()?;
-                self.stack().push(StackData::Boolean(eq));
+                self.push(StackData::Boolean(eq));
             }
             Opcode::NEQ => {
                 let eq = self.check_equality()?;
-                self.stack().push(StackData::Boolean(!eq));
+                self.push(StackData::Boolean(!eq));
             }
 
             /* Advanced math */
@@ -320,7 +348,7 @@ impl ScriptInterpreter {
                     .try_into()
                     .map_err(|_| ScriptError::MathError)?;
                 let c = a.checked_pow(b).ok_or(ScriptError::MathError)?;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
             Opcode::SQRT => {
                 self.ensure_stack_size(1)?;
@@ -329,11 +357,12 @@ impl ScriptInterpreter {
                     return Err(ScriptError::MathError);
                 }
                 let c = (a as f64).sqrt() as i128;
-                self.stack().push(StackData::Number(c));
+                self.push(StackData::Number(c));
             }
 
             Opcode::NOP => { /* NOP = do nothing */ }
 
+            /* Control flow */
             Opcode::IF => {
                 self.ensure_stack_size(1)?;
                 let condition = self.pop_boolean()?;
@@ -342,6 +371,7 @@ impl ScriptInterpreter {
                     let mut depth = 1;
                     while depth > 0 {
                         self.cursor += 1;
+                        self.cursor_cpu += 1;
                         if self.cursor >= self.script.instructions.len() {
                             return Err(ScriptError::InvalidScript);
                         }
@@ -380,6 +410,7 @@ impl ScriptInterpreter {
                         _ => {}
                     }
                     j -= 1;
+                    self.cursor_cpu += 1;
                 }
                 if !found_if {
                     return Err(ScriptError::InvalidScript);
@@ -389,6 +420,8 @@ impl ScriptInterpreter {
                 let mut depth = 1;
                 while depth > 0 {
                     self.cursor += 1;
+                    self.cursor_cpu += 1;
+
                     if self.cursor >= self.script.instructions.len() {
                         return Err(ScriptError::InvalidScript);
                     }
@@ -421,6 +454,7 @@ impl ScriptInterpreter {
                         _ => {}
                     }
                     j -= 1;
+                    self.cursor_cpu += 1;
                 }
                 if !found_if {
                     return Err(ScriptError::InvalidScript);
@@ -448,6 +482,7 @@ impl ScriptInterpreter {
                         _ => {}
                     }
                     i -= 1;
+                    self.cursor_cpu += 1;
                 }
                 if !found_loop {
                     return Err(ScriptError::InvalidScript);
@@ -468,7 +503,9 @@ impl ScriptInterpreter {
                         }
                         _ => {}
                     }
+
                     self.cursor += 1;
+                    self.cursor_cpu += 1;
                 }
                 if self.cursor >= self.script.instructions.len() {
                     return Err(ScriptError::InvalidScript);
@@ -492,8 +529,11 @@ impl ScriptInterpreter {
                         }
                         _ => {}
                     }
-                    if self.cursor == 0 { break; }
+                    if self.cursor == 0 {
+                        break;
+                    }
                     self.cursor -= 1;
+                    self.cursor_cpu += 1;
                 }
                 if self.script.instructions.get(self.cursor) != Some(&Opcode::LOOP) {
                     return Err(ScriptError::InvalidScript);
@@ -506,6 +546,8 @@ impl ScriptInterpreter {
                 if address < 0 || (address as usize) >= self.script.instructions.len() {
                     return Err(ScriptError::OutOfBounds);
                 }
+
+                self.cursor_cpu += address.abs_diff(self.cursor as i128) as usize;
                 self.cursor = address as usize;
                 return Ok(None); // Skip the cursor increment at the end
             }
@@ -530,15 +572,15 @@ impl ScriptInterpreter {
             Opcode::DUP => {
                 self.ensure_stack_size(1)?;
                 let top = self.stack().last().unwrap().clone();
-                self.stack().push(top);
+                self.push(top);
             }
             Opcode::DUP2 => {
                 self.ensure_stack_size(2)?;
                 let len = self.stack().len();
                 let first = self.stack()[len - 2].clone();
                 let second = self.stack()[len - 1].clone();
-                self.stack().push(first);
-                self.stack().push(second);
+                self.push(first);
+                self.push(second);
             }
             Opcode::DUP3 => {
                 self.ensure_stack_size(3)?;
@@ -546,9 +588,9 @@ impl ScriptInterpreter {
                 let first = self.stack()[len - 3].clone();
                 let second = self.stack()[len - 2].clone();
                 let third = self.stack()[len - 1].clone();
-                self.stack().push(first);
-                self.stack().push(second);
-                self.stack().push(third);
+                self.push(first);
+                self.push(second);
+                self.push(third);
             }
             Opcode::DUP4 => {
                 self.ensure_stack_size(4)?;
@@ -557,16 +599,16 @@ impl ScriptInterpreter {
                 let second = self.stack()[len - 3].clone();
                 let third = self.stack()[len - 2].clone();
                 let fourth = self.stack()[len - 1].clone();
-                self.stack().push(first);
-                self.stack().push(second);
-                self.stack().push(third);
-                self.stack().push(fourth);
+                self.push(first);
+                self.push(second);
+                self.push(third);
+                self.push(fourth);
             }
             Opcode::DUPN(n) => {
                 self.ensure_stack_size(1)?;
                 let top = self.stack().last().unwrap().clone();
                 for _ in 0..n {
-                    self.stack().push(top.clone());
+                    self.push(top.clone());
                 }
             }
             Opcode::SWAP => {
@@ -581,7 +623,7 @@ impl ScriptInterpreter {
             }
             Opcode::POP => {
                 self.ensure_stack_size(1)?;
-                self.stack().pop();
+                self.pop();
             }
             Opcode::COPY => {
                 self.ensure_stack_size(1)?;
@@ -591,7 +633,7 @@ impl ScriptInterpreter {
                 }
 
                 let item = self.stack()[n as usize].clone();
-                self.stack().push(item);
+                self.push(item);
             }
             Opcode::BUBBLE => {
                 self.ensure_stack_size(1)?;
@@ -601,6 +643,7 @@ impl ScriptInterpreter {
                 }
 
                 let item = self.stack().remove(n as usize);
+                // Bubble moves, so we don't use self.push because we don't want to increment memory
                 self.stack().push(item);
             }
             Opcode::SINK => {
@@ -618,6 +661,8 @@ impl ScriptInterpreter {
                 if self.stack().is_empty() {
                     return Err(ScriptError::StackUnderflow(1));
                 }
+
+                // To alt stack is a move operation, so we don't use self.pop() because we don't want to increment/decrement memory
                 let item = self.stack().pop().unwrap();
                 self.alt_stack().push(item);
             }
@@ -625,20 +670,27 @@ impl ScriptInterpreter {
                 if self.alt_stack().is_empty() {
                     return Err(ScriptError::StackUnderflow(1));
                 }
+
+                // From alt stack is a move operation, so we don't use self.pop() because we don't want to increment/decrement memory
                 let item = self.alt_stack().pop().unwrap();
                 self.stack().push(item);
             }
             Opcode::SNAPSHOT => {
+                self.snapshot_memory = self.memory;
                 self.snapshot = self.stack().clone();
             }
             Opcode::RESTORE => {
                 let snapshot = self.snapshot.clone();
                 self.snapshot.clear();
+                self.memory = self.snapshot_memory;
+                self.snapshot_memory = 0;
+
                 // Restore into the currently active stack (allow restoring alt snapshot into main and vice-versa)
                 self.stack().clear();
                 self.stack().extend_from_slice(&snapshot);
             }
             Opcode::CLEAR => {
+                self.memory -= self.calculate_memory();
                 self.stack().clear();
             }
             Opcode::SWITCH => {
@@ -646,8 +698,8 @@ impl ScriptInterpreter {
             }
             Opcode::CONCAT => {
                 self.ensure_stack_size(2)?;
-                let b = self.stack().pop().unwrap();
-                let a = self.stack().pop().unwrap();
+                let b = self.pop().unwrap();
+                let a = self.pop().unwrap();
 
                 let a_bytes = a.as_buffer().expect("Failed to convert to buffer");
                 let b_bytes = b.as_buffer().expect("Failed to convert to buffer");
@@ -655,11 +707,11 @@ impl ScriptInterpreter {
                 let mut combined = a_bytes;
                 combined.extend_from_slice(&b_bytes);
 
-                self.stack().push(StackData::Buffer(combined));
+                self.push(StackData::Buffer(combined));
             }
             Opcode::COUNT => {
                 let length = self.stack().len() as i128;
-                self.stack().push(StackData::Number(length));
+                self.push(StackData::Number(length));
             }
 
             Opcode::SERVER => todo!(),
@@ -671,23 +723,23 @@ impl ScriptInterpreter {
 
             Opcode::LEN => {
                 self.ensure_stack_size(1)?;
-                let item = self.stack().pop().unwrap();
+                let item = self.pop().unwrap();
                 let bytes = item.as_buffer().expect("Failed to convert to buffer");
                 let length = bytes.len() as i128;
-                self.stack().push(StackData::Number(length));
+                self.push(StackData::Number(length));
             }
             Opcode::REVERSE => {
                 self.ensure_stack_size(1)?;
-                let item = self.stack().pop().unwrap();
+                let item = self.pop().unwrap();
                 let mut bytes = item.as_buffer().expect("Failed to convert to buffer");
                 bytes.reverse();
-                self.stack().push(StackData::Buffer(bytes));
+                self.push(StackData::Buffer(bytes));
             }
             Opcode::SLICE => {
                 self.ensure_stack_size(3)?;
                 let length = self.pop_number()?;
                 let offset = self.pop_number()?;
-                let item = self.stack().pop().unwrap();
+                let item = self.pop().unwrap();
                 let bytes = item.as_buffer().expect("Failed to convert to buffer");
 
                 if offset < 0 || length < 0 || (offset as usize) + (length as usize) > bytes.len() {
@@ -699,15 +751,15 @@ impl ScriptInterpreter {
                     .unwrap()
                     .to_vec();
 
-                self.stack().push(StackData::Buffer(slice));
+                self.push(StackData::Buffer(slice));
             }
             Opcode::SPLICE => {
                 self.ensure_stack_size(3)?;
                 let offset = self.pop_number()?;
                 let length = self.pop_number()?;
-                let item = self.stack().pop().unwrap();
+                let item = self.pop().unwrap();
                 let splice_data = item.as_buffer().expect("Failed to convert to buffer");
-                let item = self.stack().pop().unwrap();
+                let item = self.pop().unwrap();
                 let mut bytes = item.as_buffer().expect("Failed to convert to buffer");
 
                 if offset < 0 || length < 0 || (offset as usize) + (length as usize) > bytes.len() {
@@ -715,7 +767,7 @@ impl ScriptInterpreter {
                 }
 
                 bytes.splice((offset as usize)..((offset + length) as usize), splice_data);
-                self.stack().push(StackData::Buffer(bytes));
+                self.push(StackData::Buffer(bytes));
             }
 
             Opcode::HASH => todo!(),
@@ -725,7 +777,7 @@ impl ScriptInterpreter {
             Opcode::DECRYPT => todo!(),
             Opcode::EVALSUB => {
                 self.ensure_stack_size(1)?;
-                let item = self.stack().pop().unwrap();
+                let item = self.pop().unwrap();
                 let bytes = item.as_buffer().expect("Failed to convert to buffer");
 
                 let config: Option<&mut binary_codec::SerializerConfig> = None;
@@ -736,14 +788,14 @@ impl ScriptInterpreter {
                 let result = sub_interpreter.exec()?;
 
                 if let Some(result_bytes) = result {
-                    self.stack().push(StackData::Buffer(result_bytes));
+                    self.push(StackData::Buffer(result_bytes));
                 }
 
                 self.cpu += sub_interpreter.cpu; // Add sub-interpreter CPU usage to parent
             }
             Opcode::EVAL => {
                 self.ensure_stack_size(1)?;
-                let item = self.stack().pop().unwrap();
+                let item = self.pop().unwrap();
                 let bytes = item.as_buffer().expect("Failed to convert to buffer");
 
                 let config: Option<&mut binary_codec::SerializerConfig> = None;
@@ -774,26 +826,30 @@ mod tests {
 
     #[test]
     fn can_create_and_break_a_loop() {
-        // Generate [1,2,3,4,5,6,7,8,9,10]
+        // Generate [1,2,3]
         let script = OpcodeScript::new(vec![
-            Opcode::LOOP,
-            Opcode::COUNT,
-            Opcode::PUSHINT(9),
-            Opcode::EQ,
-            Opcode::IF,
-            Opcode::BREAK,
-            Opcode::FI,
-            Opcode::COUNT,
-            Opcode::PUSHINT(1),
-            Opcode::ADD,
-            Opcode::POOL,
-            Opcode::PUSHINT(10),
+            //                      CPU         | Cursor CPU  | Memory
+            Opcode::LOOP,       // 1
+            Opcode::COUNT,      // 2 10 18         12 22 32    +2
+            Opcode::PUSHINT(2), // 3 11 19         11 21 31    +2
+            Opcode::EQ,         // 4 12 20         10 20 30    -4, +1
+            Opcode::IF,         // 5 13 21         9  19 29    -1
+            Opcode::BREAK,      //      22       1 8  18 28
+            Opcode::FI,         //               2 7  17 27
+            Opcode::COUNT,      // 6 14            6  16 26    +2
+            Opcode::PUSHINT(1), // 7 15            5  15 25    +2
+            Opcode::ADD,        // 8 16            4  14 24    -4, +2
+            Opcode::POOL,       // 9 17          3    13 23
+            Opcode::PUSHINT(3), //      23                     +2
         ]);
 
         let mut interpreter = ScriptInterpreter::new(script);
         interpreter.exec().unwrap();
 
-        println!("{:?}", interpreter);
+        assert_eq!(23, interpreter.cpu);
+        assert_eq!(32, interpreter.cursor_cpu);
+        assert_eq!(6, interpreter.memory);
+        assert_eq!(8, interpreter.memory_peak);
     }
 
     #[test]
@@ -879,7 +935,6 @@ mod tests {
             Opcode::PUSHINT(20),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // 7 % 3 == 1
             Opcode::PUSHINT(7),
             Opcode::PUSHINT(3),
@@ -887,20 +942,17 @@ mod tests {
             Opcode::PUSHINT(1),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // neg / abs
             Opcode::PUSHINT(-5),
             Opcode::NEG,
             Opcode::PUSHINT(5),
             Opcode::EQ,
             Opcode::ASSERT,
-
             Opcode::PUSHINT(-3),
             Opcode::ABS,
             Opcode::PUSHINT(3),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // bitwise: 6 & 3 == 2, 6 | 3 == 7, 6 ^ 3 == 5
             Opcode::PUSHINT(6),
             Opcode::PUSHINT(3),
@@ -908,14 +960,12 @@ mod tests {
             Opcode::PUSHINT(2),
             Opcode::EQ,
             Opcode::ASSERT,
-
             Opcode::PUSHINT(6),
             Opcode::PUSHINT(3),
             Opcode::BOR,
             Opcode::PUSHINT(7),
             Opcode::EQ,
             Opcode::ASSERT,
-
             Opcode::PUSHINT(6),
             Opcode::PUSHINT(3),
             Opcode::BXOR,
@@ -937,16 +987,20 @@ mod tests {
             Opcode::FALSE,
             Opcode::XOR,
             Opcode::ASSERT,
-
             // number vs byte equality
             Opcode::PUSHINT(1),
             Opcode::PUSH1(1),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // buffer equality
-            Opcode::PUSHL1 { len: 0, data: vec![1, 2, 3] },
-            Opcode::PUSHL1 { len: 0, data: vec![1, 2, 3] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3],
+            },
             Opcode::EQ,
             Opcode::ASSERT,
         ]);
@@ -962,8 +1016,8 @@ mod tests {
             Opcode::PUSHINT(1),
             Opcode::PUSHINT(2),
             Opcode::PUSHINT(3),
-            Opcode::DUP,    // -> 1,2,3,3
-            Opcode::DUP2,   // -> 1,2,3,3,3,3? (duplicates the two topmost: 3,3)
+            Opcode::DUP,  // -> 1,2,3,3
+            Opcode::DUP2, // -> 1,2,3,3,3,3? (duplicates the two topmost: 3,3)
             Opcode::POP,
             Opcode::POP,
         ]);
@@ -991,7 +1045,10 @@ mod tests {
             Opcode::PUSHINT(3),
             Opcode::JMP,
             Opcode::NOP,
-            Opcode::PUSHL1 { len: 0, data: vec![9] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![9],
+            },
             Opcode::RETURN,
         ]);
 
@@ -1006,44 +1063,73 @@ mod tests {
     fn buffer_length_reverse_slice_splice_concat() {
         let script = OpcodeScript::new(vec![
             // LEN
-            Opcode::PUSHL1 { len: 0, data: vec![1, 2, 3] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3],
+            },
             Opcode::LEN,
             Opcode::PUSHINT(3),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // REVERSE: verify reversing [4,5,6] -> [6,5,4]
-            Opcode::PUSHL1 { len: 0, data: vec![4, 5, 6] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![4, 5, 6],
+            },
             Opcode::DUP,
             Opcode::REVERSE,
-            Opcode::PUSHL1 { len: 0, data: vec![6, 5, 4] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![6, 5, 4],
+            },
             Opcode::EQ,
             Opcode::ASSERT,
-
             // SLICE: take [1,2,3,7,8,9] slice offset 3 length 3 -> [7,8,9]
-            Opcode::PUSHL1 { len: 0, data: vec![1, 2, 3, 7, 8, 9] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3, 7, 8, 9],
+            },
             Opcode::PUSHINT(3), // offset
             Opcode::PUSHINT(3), // length
             Opcode::SLICE,
-            Opcode::PUSHL1 { len: 0, data: vec![7, 8, 9] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![7, 8, 9],
+            },
             Opcode::EQ,
             Opcode::ASSERT,
-
             // SPLICE: replace bytes at offset 3 length 3 in [1,2,3,7,8,9] with [4,5,6]
-            Opcode::PUSHL1 { len: 0, data: vec![1, 2, 3, 7, 8, 9] },
-            Opcode::PUSHL1 { len: 0, data: vec![4, 5, 6] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3, 7, 8, 9],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![4, 5, 6],
+            },
             Opcode::PUSHINT(3), // length
             Opcode::PUSHINT(3), // offset
             Opcode::SPLICE,
-            Opcode::PUSHL1 { len: 0, data: vec![1, 2, 3, 4, 5, 6] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3, 4, 5, 6],
+            },
             Opcode::EQ,
             Opcode::ASSERT,
-
             // CONCAT: combine [1,2,3] and [4,5,6] -> [1,2,3,4,5,6]
-            Opcode::PUSHL1 { len: 0, data: vec![1, 2, 3] },
-            Opcode::PUSHL1 { len: 0, data: vec![4, 5, 6] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![4, 5, 6],
+            },
             Opcode::CONCAT,
-            Opcode::PUSHL1 { len: 0, data: vec![1,2,3,4,5,6] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3, 4, 5, 6],
+            },
             Opcode::EQ,
             Opcode::ASSERT,
         ]);
@@ -1052,7 +1138,7 @@ mod tests {
         let r2 = i2.exec();
         assert_eq!(r2, Ok(None));
         // final stack only contains [4,5,6] because of the DUP before REVERSE
-        assert_eq!(StackData::Buffer(vec![4,5,6]), i2.main_stack[0]);
+        assert_eq!(StackData::Buffer(vec![4, 5, 6]), i2.main_stack[0]);
     }
 
     #[test]
@@ -1063,13 +1149,11 @@ mod tests {
             Opcode::PUSHINT(3),
             Opcode::LT,
             Opcode::ASSERT,
-
             // GT: 3 > 2
             Opcode::PUSHINT(3),
             Opcode::PUSHINT(2),
             Opcode::GT,
             Opcode::ASSERT,
-
             // LTE / GTE equal case
             Opcode::PUSHINT(3),
             Opcode::PUSHINT(3),
@@ -1079,7 +1163,6 @@ mod tests {
             Opcode::PUSHINT(3),
             Opcode::GTE,
             Opcode::ASSERT,
-
             // MIN / MAX
             Opcode::PUSHINT(5),
             Opcode::PUSHINT(7),
@@ -1087,14 +1170,12 @@ mod tests {
             Opcode::PUSHINT(5),
             Opcode::EQ,
             Opcode::ASSERT,
-
             Opcode::PUSHINT(5),
             Opcode::PUSHINT(7),
             Opcode::MAX,
             Opcode::PUSHINT(7),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // NEQ
             Opcode::PUSHINT(1),
             Opcode::PUSHINT(2),
@@ -1116,7 +1197,6 @@ mod tests {
             Opcode::PUSHINT(8),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // BSHR: 8 >> 3 == 1
             Opcode::PUSHINT(8),
             Opcode::PUSHINT(3),
@@ -1124,7 +1204,6 @@ mod tests {
             Opcode::PUSHINT(1),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // BNOT twice returns original
             Opcode::PUSHINT(1),
             Opcode::BNOT,
@@ -1132,7 +1211,6 @@ mod tests {
             Opcode::PUSHINT(1),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // POW: 2^3 = 8 (push exponent then base per implementation)
             Opcode::PUSHINT(3),
             Opcode::PUSHINT(2),
@@ -1140,7 +1218,6 @@ mod tests {
             Opcode::PUSHINT(8),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // SQRT: sqrt(9) == 3
             Opcode::PUSHINT(9),
             Opcode::SQRT,
@@ -1161,16 +1238,13 @@ mod tests {
             Opcode::TRUE,
             Opcode::AND,
             Opcode::ASSERT,
-
             Opcode::TRUE,
             Opcode::FALSE,
             Opcode::OR,
             Opcode::ASSERT,
-
             Opcode::FALSE,
             Opcode::NOT,
             Opcode::ASSERT,
-
             // DUPN: duplicate top value 2 times -> top becomes three copies
             Opcode::PUSHINT(7),
             Opcode::DUPN(2),
@@ -1180,7 +1254,6 @@ mod tests {
             Opcode::PUSHINT(7),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // SWAP
             Opcode::PUSHINT(1),
             Opcode::PUSHINT(2),
@@ -1188,7 +1261,6 @@ mod tests {
             Opcode::PUSHINT(1),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // ROT: rotate [a,b,c] -> [b,c,a]
             Opcode::PUSHINT(10),
             Opcode::PUSHINT(11),
@@ -1216,7 +1288,6 @@ mod tests {
             Opcode::PUSHINT(1),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // BUBBLE: clear then [1,2,3,4], bubble index 1 -> moves 2 to top
             Opcode::CLEAR,
             Opcode::PUSHINT(1),
@@ -1229,7 +1300,6 @@ mod tests {
             Opcode::PUSHINT(2),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // SINK: clear then [1,2,3,4], sink index 1 -> moves 2 to bottom
             Opcode::CLEAR,
             Opcode::PUSHINT(1),
@@ -1243,7 +1313,6 @@ mod tests {
             Opcode::PUSHINT(4),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // TOALT/FROMALT
             Opcode::PUSHINT(42),
             Opcode::TOALT,
@@ -1253,7 +1322,6 @@ mod tests {
             Opcode::PUSHINT(43),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // SNAPSHOT / RESTORE (operate on a fresh stack)
             Opcode::CLEAR,
             Opcode::PUSHINT(5),
@@ -1267,7 +1335,6 @@ mod tests {
             Opcode::PUSHINT(2),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // CLEAR then COUNT == 0
             Opcode::PUSHINT(1),
             Opcode::PUSHINT(2),
@@ -1291,25 +1358,27 @@ mod tests {
             Opcode::PUSHINT(2),
             Opcode::EQ,
             Opcode::ASSERT,
-
             Opcode::PUSH4([1, 2, 3, 4]),
             Opcode::LEN,
             Opcode::PUSHINT(4),
             Opcode::EQ,
             Opcode::ASSERT,
-
-            Opcode::PUSHL2 { len: 0, data: vec![9, 8, 7] },
+            Opcode::PUSHL2 {
+                len: 0,
+                data: vec![9, 8, 7],
+            },
             Opcode::LEN,
             Opcode::PUSHINT(3),
             Opcode::EQ,
             Opcode::ASSERT,
-
-            Opcode::PUSHL4 { len: 0, data: vec![6, 5, 4, 3, 2] },
+            Opcode::PUSHL4 {
+                len: 0,
+                data: vec![6, 5, 4, 3, 2],
+            },
             Opcode::LEN,
             Opcode::PUSHINT(5),
             Opcode::EQ,
             Opcode::ASSERT,
-
             // DUP3 / DUP4
             Opcode::PUSHINT(1),
             Opcode::PUSHINT(2),
@@ -1319,7 +1388,6 @@ mod tests {
             Opcode::PUSHINT(6),
             Opcode::EQ,
             Opcode::ASSERT,
-
             Opcode::PUSHINT(4),
             Opcode::DUP4,
             Opcode::COUNT,
@@ -1354,7 +1422,10 @@ mod tests {
         let child_bytes = vec![0x02, 9, 0x32]; // PUSH1, 9, RETURN
 
         let script = OpcodeScript::new(vec![
-            Opcode::PUSHL1 { len: 0, data: child_bytes },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: child_bytes,
+            },
             Opcode::EVALSUB,
         ]);
 
@@ -1388,9 +1459,15 @@ mod tests {
         let script = OpcodeScript::new(vec![
             Opcode::FALSE,
             Opcode::IF,
-            Opcode::PUSHL1 { len: 0, data: vec![1] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1],
+            },
             Opcode::ELSE,
-            Opcode::PUSHL1 { len: 0, data: vec![9] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![9],
+            },
             Opcode::FI,
             Opcode::RETURN,
         ]);
@@ -1439,17 +1516,22 @@ mod tests {
 
         let mut i = ScriptInterpreter::new(script);
         assert_eq!(i.exec(), Ok(None));
-        assert_eq!(i.main_stack, vec![StackData::Number(1), StackData::Number(3)]);
+        assert_eq!(
+            i.main_stack,
+            vec![StackData::Number(1), StackData::Number(3)]
+        );
         assert_eq!(i.alt_stack, vec![StackData::Number(2)]);
     }
 
     #[test]
     fn jmp_invalid_addresses_error() {
-        let mut i = ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSHINT(-1), Opcode::JMP]));
+        let mut i =
+            ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSHINT(-1), Opcode::JMP]));
         let err = i.exec().unwrap_err();
         assert_eq!(err, ScriptError::OutOfBounds);
 
-        let mut i2 = ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSHINT(9999), Opcode::JMP]));
+        let mut i2 =
+            ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSHINT(9999), Opcode::JMP]));
         let err2 = i2.exec().unwrap_err();
         assert_eq!(err2, ScriptError::OutOfBounds);
     }
@@ -1504,12 +1586,18 @@ mod tests {
         let script = OpcodeScript::new(vec![
             Opcode::TRUE,
             Opcode::IF,
-              Opcode::FALSE,
-              Opcode::IF,
-                Opcode::PUSHL1 { len: 0, data: vec![1] },
-              Opcode::ELSE,
-                Opcode::PUSHL1 { len: 0, data: vec![2] },
-              Opcode::FI,
+            Opcode::FALSE,
+            Opcode::IF,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1],
+            },
+            Opcode::ELSE,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![2],
+            },
+            Opcode::FI,
             Opcode::FI,
             Opcode::RETURN,
         ]);
@@ -1537,12 +1625,15 @@ mod tests {
     fn if_inside_loop_and_break_in_nested_if() {
         let script = OpcodeScript::new(vec![
             Opcode::LOOP,
-              Opcode::TRUE,
-              Opcode::IF,
-                Opcode::BREAK,
-              Opcode::FI,
+            Opcode::TRUE,
+            Opcode::IF,
+            Opcode::BREAK,
+            Opcode::FI,
             Opcode::POOL,
-            Opcode::PUSHL1 { len: 0, data: vec![99] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![99],
+            },
             Opcode::RETURN,
         ]);
 
@@ -1559,7 +1650,10 @@ mod tests {
             Opcode::JMP,
             Opcode::NOP,
             Opcode::IF,
-            Opcode::PUSHL1 { len: 0, data: vec![1] },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1],
+            },
             Opcode::FI,
         ]);
 
@@ -1581,7 +1675,13 @@ mod tests {
     fn evalsub_child_assert_failure_propagates() {
         // child: FALSE, ASSERT -> ASSERT will fail
         let child_bytes = vec![0u8, 49u8]; // FALSE = 0, ASSERT = 49
-        let script = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: child_bytes }, Opcode::EVALSUB]);
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: child_bytes,
+            },
+            Opcode::EVALSUB,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         let err = i.exec().unwrap_err();
         assert_eq!(err, ScriptError::AssertionFailed);
@@ -1590,7 +1690,14 @@ mod tests {
     #[test]
     fn evalsub_child_without_return_pushes_nothing() {
         let child_bytes = vec![0x02u8, 5u8]; // PUSH1 5 (no RETURN)
-        let script = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: child_bytes }, Opcode::EVALSUB, Opcode::COUNT]);
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: child_bytes,
+            },
+            Opcode::EVALSUB,
+            Opcode::COUNT,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         assert_eq!(i.exec(), Ok(None));
         // COUNT should be 0 because sub pushed nothing
@@ -1599,7 +1706,14 @@ mod tests {
 
     #[test]
     fn eq_buffer_vs_number_does_not_panic() {
-        let script = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: vec![1] }, Opcode::PUSHINT(1), Opcode::EQ]);
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1],
+            },
+            Opcode::PUSHINT(1),
+            Opcode::EQ,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         // should not panic and should produce a boolean
         assert_eq!(i.exec(), Ok(None));
@@ -1611,7 +1725,14 @@ mod tests {
 
     #[test]
     fn nop_does_nothing_and_counts_cpu() {
-        let script = OpcodeScript::new(vec![Opcode::NOP, Opcode::PUSHL1 { len: 0, data: vec![7] }, Opcode::RETURN]);
+        let script = OpcodeScript::new(vec![
+            Opcode::NOP,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![7],
+            },
+            Opcode::RETURN,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         let r = i.exec();
         assert_eq!(r, Ok(Some(vec![7])));
@@ -1640,7 +1761,12 @@ mod tests {
 
     #[test]
     fn count_after_restore_with_empty_snapshot() {
-        let script = OpcodeScript::new(vec![Opcode::SNAPSHOT, Opcode::PUSHINT(1), Opcode::RESTORE, Opcode::COUNT]);
+        let script = OpcodeScript::new(vec![
+            Opcode::SNAPSHOT,
+            Opcode::PUSHINT(1),
+            Opcode::RESTORE,
+            Opcode::COUNT,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         assert_eq!(i.exec(), Ok(None));
         // snapshot was empty, restore yields empty stack, COUNT pushed 0
@@ -1649,11 +1775,19 @@ mod tests {
 
     #[test]
     fn div_mod_by_zero_errors() {
-        let mut i = ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::PUSHINT(0), Opcode::DIV]));
+        let mut i = ScriptInterpreter::new(OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::PUSHINT(0),
+            Opcode::DIV,
+        ]));
         let err = i.exec().unwrap_err();
         assert_eq!(err, ScriptError::MathError);
 
-        let mut i2 = ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::PUSHINT(0), Opcode::MOD]));
+        let mut i2 = ScriptInterpreter::new(OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::PUSHINT(0),
+            Opcode::MOD,
+        ]));
         let err2 = i2.exec().unwrap_err();
         assert_eq!(err2, ScriptError::MathError);
     }
@@ -1661,7 +1795,11 @@ mod tests {
     #[test]
     fn boolean_ops_with_non_boolean_error() {
         // use PUSHINT(2) which is not a valid boolean (only 0/1 allowed)
-        let mut i = ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSHINT(2), Opcode::TRUE, Opcode::AND]));
+        let mut i = ScriptInterpreter::new(OpcodeScript::new(vec![
+            Opcode::PUSHINT(2),
+            Opcode::TRUE,
+            Opcode::AND,
+        ]));
         let err = i.exec().unwrap_err();
         assert_eq!(err, ScriptError::NotABoolean);
     }
@@ -1674,7 +1812,14 @@ mod tests {
         assert_eq!(r, Some(vec![]));
 
         // return on alt stack
-        let script = OpcodeScript::new(vec![Opcode::SWITCH, Opcode::PUSHL1 { len: 0, data: vec![9] }, Opcode::RETURN]);
+        let script = OpcodeScript::new(vec![
+            Opcode::SWITCH,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![9],
+            },
+            Opcode::RETURN,
+        ]);
         let mut i2 = ScriptInterpreter::new(script);
         let r2 = i2.exec().unwrap();
         assert_eq!(r2, Some(vec![9]));
@@ -1682,7 +1827,13 @@ mod tests {
 
     #[test]
     fn dupn_on_alt_stack_duplicates_top() {
-        let script = OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::SWITCH, Opcode::PUSHINT(2), Opcode::DUPN(3), Opcode::COUNT]);
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::SWITCH,
+            Opcode::PUSHINT(2),
+            Opcode::DUPN(3),
+            Opcode::COUNT,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         assert_eq!(i.exec(), Ok(None));
         // alt stack should have 1 original + 3 duplicates = 4 items, plus COUNT value -> 5
@@ -1694,31 +1845,61 @@ mod tests {
     #[test]
     fn copy_bubble_sink_oob_and_alt_stack() {
         // COPY out of bounds (index == len)
-        let script = OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::PUSHINT(2), Opcode::PUSHINT(3), Opcode::PUSHINT(3), Opcode::COPY]);
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::PUSHINT(2),
+            Opcode::PUSHINT(3),
+            Opcode::PUSHINT(3),
+            Opcode::COPY,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         let err = i.exec().unwrap_err();
         assert_eq!(err, ScriptError::OutOfBounds);
 
         // COPY negative index
-        let script2 = OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::PUSHINT(2), Opcode::PUSHINT(-1), Opcode::COPY]);
+        let script2 = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::PUSHINT(2),
+            Opcode::PUSHINT(-1),
+            Opcode::COPY,
+        ]);
         let mut i2 = ScriptInterpreter::new(script2);
         let err2 = i2.exec().unwrap_err();
         assert_eq!(err2, ScriptError::OutOfBounds);
 
         // COPY on alt stack
-        let script3 = OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::SWITCH, Opcode::PUSHINT(2), Opcode::PUSHINT(0), Opcode::COPY]);
+        let script3 = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::SWITCH,
+            Opcode::PUSHINT(2),
+            Opcode::PUSHINT(0),
+            Opcode::COPY,
+        ]);
         let mut i3 = ScriptInterpreter::new(script3);
         assert_eq!(i3.exec(), Ok(None));
-        assert_eq!(i3.alt_stack, vec![StackData::Number(2), StackData::Number(2)]);
+        assert_eq!(
+            i3.alt_stack,
+            vec![StackData::Number(2), StackData::Number(2)]
+        );
 
         // BUBBLE out of bounds
-        let script4 = OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::PUSHINT(2), Opcode::PUSHINT(5), Opcode::BUBBLE]);
+        let script4 = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::PUSHINT(2),
+            Opcode::PUSHINT(5),
+            Opcode::BUBBLE,
+        ]);
         let mut i4 = ScriptInterpreter::new(script4);
         let err4 = i4.exec().unwrap_err();
         assert_eq!(err4, ScriptError::OutOfBounds);
 
         // SINK negative index
-        let script5 = OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::PUSHINT(2), Opcode::PUSHINT(-1), Opcode::SINK]);
+        let script5 = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::PUSHINT(2),
+            Opcode::PUSHINT(-1),
+            Opcode::SINK,
+        ]);
         let mut i5 = ScriptInterpreter::new(script5);
         let err5 = i5.exec().unwrap_err();
         assert_eq!(err5, ScriptError::OutOfBounds);
@@ -1727,48 +1908,123 @@ mod tests {
     #[test]
     fn slice_splice_zero_length_and_alt_stack() {
         // zero-length slice -> returns empty buffer
-        let script = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: vec![1,2,3] }, Opcode::PUSHINT(0), Opcode::PUSHINT(0), Opcode::SLICE]);
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3],
+            },
+            Opcode::PUSHINT(0),
+            Opcode::PUSHINT(0),
+            Opcode::SLICE,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         assert_eq!(i.exec(), Ok(None));
         assert_eq!(i.main_stack.last(), Some(&StackData::Buffer(vec![])));
 
         // splice insert (length=0) to insert [9] at offset 1 -> [1,9,2,3]
-        let script2 = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: vec![1,2,3] }, Opcode::PUSHL1 { len: 0, data: vec![9] }, Opcode::PUSHINT(0), Opcode::PUSHINT(1), Opcode::SPLICE]);
+        let script2 = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![9],
+            },
+            Opcode::PUSHINT(0),
+            Opcode::PUSHINT(1),
+            Opcode::SPLICE,
+        ]);
         let mut i2 = ScriptInterpreter::new(script2);
         assert_eq!(i2.exec(), Ok(None));
-        assert_eq!(i2.main_stack.last(), Some(&StackData::Buffer(vec![1,9,2,3])));
+        assert_eq!(
+            i2.main_stack.last(),
+            Some(&StackData::Buffer(vec![1, 9, 2, 3]))
+        );
 
         // splice with empty replacement (remove range)
         // Note: SPLICE pops `offset` then `length`, so push `length` then `offset`.
-        let script3 = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: vec![1,2,3,4] }, Opcode::PUSHL1 { len: 0, data: vec![] }, Opcode::PUSHINT(1), Opcode::PUSHINT(2), Opcode::SPLICE]);
+        let script3 = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2, 3, 4],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![],
+            },
+            Opcode::PUSHINT(1),
+            Opcode::PUSHINT(2),
+            Opcode::SPLICE,
+        ]);
         let mut i3 = ScriptInterpreter::new(script3);
         assert_eq!(i3.exec(), Ok(None));
-        assert_eq!(i3.main_stack.last(), Some(&StackData::Buffer(vec![1,2,4])));
+        assert_eq!(
+            i3.main_stack.last(),
+            Some(&StackData::Buffer(vec![1, 2, 4]))
+        );
 
         // SLICE on alt stack
-        let script4 = OpcodeScript::new(vec![Opcode::SWITCH, Opcode::PUSHL1 { len: 0, data: vec![7,8,9] }, Opcode::PUSHINT(0), Opcode::PUSHINT(2), Opcode::SLICE]);
+        let script4 = OpcodeScript::new(vec![
+            Opcode::SWITCH,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![7, 8, 9],
+            },
+            Opcode::PUSHINT(0),
+            Opcode::PUSHINT(2),
+            Opcode::SLICE,
+        ]);
         let mut i4 = ScriptInterpreter::new(script4);
         assert_eq!(i4.exec(), Ok(None));
-        assert_eq!(i4.alt_stack.last(), Some(&StackData::Buffer(vec![7,8])));
+        assert_eq!(i4.alt_stack.last(), Some(&StackData::Buffer(vec![7, 8])));
     }
 
     #[test]
     fn concat_edge_cases_and_nonbuffer_panic() {
         // concat with empty buffer
-        let script = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: vec![] }, Opcode::PUSHL1 { len: 0, data: vec![1,2] }, Opcode::CONCAT]);
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 2],
+            },
+            Opcode::CONCAT,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         assert_eq!(i.exec(), Ok(None));
-        assert_eq!(i.main_stack.last(), Some(&StackData::Buffer(vec![1,2])));
+        assert_eq!(i.main_stack.last(), Some(&StackData::Buffer(vec![1, 2])));
 
         // concat on alt stack
-        let script2 = OpcodeScript::new(vec![Opcode::SWITCH, Opcode::PUSHL1 { len: 0, data: vec![3] }, Opcode::PUSHL1 { len: 0, data: vec![4] }, Opcode::CONCAT]);
+        let script2 = OpcodeScript::new(vec![
+            Opcode::SWITCH,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![3],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![4],
+            },
+            Opcode::CONCAT,
+        ]);
         let mut i2 = ScriptInterpreter::new(script2);
         assert_eq!(i2.exec(), Ok(None));
-        assert_eq!(i2.alt_stack.last(), Some(&StackData::Buffer(vec![3,4])));
+        assert_eq!(i2.alt_stack.last(), Some(&StackData::Buffer(vec![3, 4])));
 
         // non-buffer concat coerces non-buffers to buffers; resulting buffer should end with the
         // second operand's bytes (here: 2)
-        let script3 = OpcodeScript::new(vec![Opcode::PUSHINT(1), Opcode::PUSHL1 { len: 0, data: vec![2] }, Opcode::CONCAT]);
+        let script3 = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1),
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![2],
+            },
+            Opcode::CONCAT,
+        ]);
         let mut it = ScriptInterpreter::new(script3);
         assert_eq!(it.exec(), Ok(None));
         match it.main_stack.last() {
@@ -1780,21 +2036,82 @@ mod tests {
     #[test]
     fn eq_boolean_vs_buffer_and_return_after_snapshot_restore() {
         // Boolean vs Buffer equality
-        let script = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: vec![1] }, Opcode::TRUE, Opcode::EQ]);
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1],
+            },
+            Opcode::TRUE,
+            Opcode::EQ,
+        ]);
         let mut i = ScriptInterpreter::new(script);
         assert_eq!(i.exec(), Ok(None));
         assert_eq!(i.main_stack.last(), Some(&StackData::Boolean(false)));
 
         // RETURN after SWITCH + SNAPSHOT: snapshot taken on alt, restored to main, then RETURN
-        let script2 = OpcodeScript::new(vec![Opcode::PUSHINT(7), Opcode::SWITCH, Opcode::PUSHL1 { len: 0, data: vec![9] }, Opcode::SNAPSHOT, Opcode::SWITCH, Opcode::RESTORE, Opcode::RETURN]);
+        let script2 = OpcodeScript::new(vec![
+            Opcode::PUSHINT(7),
+            Opcode::SWITCH,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![9],
+            },
+            Opcode::SNAPSHOT,
+            Opcode::SWITCH,
+            Opcode::RESTORE,
+            Opcode::RETURN,
+        ]);
         let mut i2 = ScriptInterpreter::new(script2);
         let r2 = i2.exec().unwrap();
         assert_eq!(r2, Some(vec![9]));
 
         // RETURN after RESTORE
-        let script3 = OpcodeScript::new(vec![Opcode::PUSHL1 { len: 0, data: vec![5] }, Opcode::SNAPSHOT, Opcode::CLEAR, Opcode::RESTORE, Opcode::RETURN]);
+        let script3 = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![5],
+            },
+            Opcode::SNAPSHOT,
+            Opcode::CLEAR,
+            Opcode::RESTORE,
+            Opcode::RETURN,
+        ]);
         let mut i3 = ScriptInterpreter::new(script3);
         let r3 = i3.exec().unwrap();
         assert_eq!(r3, Some(vec![5]));
+    }
+
+    #[test]
+    fn can_measure_cpu_and_memory_points() {
+        // CPU point = 1 OPCODE execution
+        // Cursor CPU point = 1 cursor search movement in a IF,FI,LOOP,POOL,JMP
+        // Memory point = 1 (a bit pushed on the stack), 2 (a byte pushed on the stack), 2 (a number pushed on the stack)
+
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1), // 2
+            Opcode::PUSHINT(2), // 4
+            Opcode::PUSHINT(3), // 6
+            Opcode::PUSHINT(4), // 8
+            Opcode::PUSHINT(5), // 10
+            Opcode::PUSHINT(6), // 12
+            Opcode::ADD,        // 10
+            Opcode::ADD,        // 8
+            Opcode::ADD,        // 6
+            Opcode::ADD,        // 4
+            Opcode::ADD,        // 2
+            Opcode::PUSH1(21),  // 4
+            Opcode::EQ,         // 1
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![0, 0, 0, 0, 0],
+            }, // 11
+        ]);
+
+        let mut i = ScriptInterpreter::new(script);
+        i.exec().unwrap();
+        assert_eq!(i.memory, 11);
+        assert_eq!(i.memory_peak, 12);
+        assert_eq!(i.cpu, 14);
+        assert_eq!(i.cursor_cpu, 0);
     }
 }
