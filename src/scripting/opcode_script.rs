@@ -185,7 +185,7 @@ impl OpcodeScript {
 pub mod tests {
     use binary_codec::{BinaryDeserializer, SerializerConfig};
 
-    use crate::scripting::opcode::{Opcode, OpcodeScript};
+    use crate::scripting::opcode_script::{Opcode, OpcodeScript};
 
     #[test]
     fn can_deserialize_simple_script() {

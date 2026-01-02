@@ -3,7 +3,7 @@ use std::cmp;
 use binary_codec::BinaryDeserializer;
 use chrono::Utc;
 
-use crate::{packets::base::datetime::PlabbleDateTime, scripting::opcode::{Opcode, OpcodeScript}};
+use crate::{packets::base::datetime::PlabbleDateTime, scripting::opcode_script::{Opcode, OpcodeScript}};
 
 use super::stack::StackData;
 
@@ -812,7 +812,7 @@ impl ScriptInterpreter {
 mod tests {
     use crate::scripting::{
         interpreter::ScriptInterpreter,
-        opcode::{Opcode, OpcodeScript},
+        opcode_script::{Opcode, OpcodeScript},
         stack::StackData,
     };
 
