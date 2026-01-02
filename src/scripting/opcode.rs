@@ -115,7 +115,7 @@ pub enum Opcode {
     TOALT = 62,    // Move top item to alt (other) stack
     FROMALT = 63,  // Move top item from alt (other) stack back
     SNAPSHOT = 64, // Store a snapshot of the current stack
-    RESTORE = 65,  // Restore the snapshot (pushes items to current stack)
+    RESTORE = 65,  // Restore the snapshot (replaces current stack)
     CLEAR = 66,    // Clear current stack
     SWITCH = 67,   // Switches between current and alt stack
     CONCAT = 68,   // Merge top two items together as bytes
@@ -143,6 +143,8 @@ pub enum Opcode {
     VERIFY = 103, // Takes byte for algorithm, public key, signature, data and puts boolean back
     ENCRYPT = 104, // Takes byte for algorithm, key, data and puts encrypted data back
     DECRYPT = 105, // Takes byte for algorithm, key, ciphertext and puts plain data back
+
+    // Special: 200+
 
     EVALSUB = 254, // Evaluate top stack item as if it is a script in a child process and push the result back
     EVAL = 255, // Evaluate stack bytes as if it is a script against the current stack (dangerous)
