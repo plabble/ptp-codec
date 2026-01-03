@@ -61,6 +61,7 @@ pub enum ScriptError {
     BucketActionsNotAllowed,
     MaxDepthExceeded,
     SearchLimitExceeded,
+    ExecutionLimitExceeded,
     OpcodeLimitExceeded,
     MemoryLimitExceeded,
     SliceLimitExceeded,
@@ -86,12 +87,15 @@ impl ScriptInterpreter {
         }
     }
 
-    pub fn instance(&self, subscript: OpcodeScript, settings: Option<ScriptSettings>) -> Self {
+    /// Create a new instance with a clean stack that uses the same memory, searches & executions count
+    pub fn fork(&self, subscript: OpcodeScript, settings: Option<ScriptSettings>) -> Self {
         let mut instance = self.clone();
         if let Some(settings) = settings {
             instance.settings = settings;
         }
         instance.script = subscript;
+
+        // Reset stacks, cursor, snapshots
         instance.main_stack.clear();
         instance.alt_stack.clear();
         instance.cursor = 0;
@@ -104,6 +108,10 @@ impl ScriptInterpreter {
     pub fn validate_script(&self, script: &OpcodeScript) -> Result<(), ScriptError> {
         if !self.settings.allow_non_push && !script.is_push_only() {
             return Err(ScriptError::NonPushNotAllowed);
+        }
+
+        if script.instructions.len() > self.settings.opcode_limit {
+            return Err(ScriptError::OpcodeLimitExceeded);
         }
 
         for instruction in script.instructions.iter() {
@@ -266,6 +274,8 @@ impl ScriptInterpreter {
     }
 
     pub fn exec(&mut self) -> Result<Option<Vec<u8>>, ScriptError> {
+        self.validate_script(&self.script)?;
+
         while self.cursor < self.script.instructions.len() {
             let res = self.exec_next()?;
             if res.is_some() {
@@ -284,7 +294,7 @@ impl ScriptInterpreter {
         let opcode = self.script.instructions[self.cursor].clone();
         self.executions += 1; // Every opcode execution costs 1 CPU cycle
         if self.executions > self.settings.executions_limit {
-            return Err(ScriptError::OpcodeLimitExceeded);
+            return Err(ScriptError::ExecutionLimitExceeded);
         }
 
         debug!("Executing opcode: {:?}", opcode);
@@ -651,14 +661,15 @@ impl ScriptInterpreter {
                 self.stack().push(item);
             }
             Opcode::SNAPSHOT => {
-                self.snapshot_memory = self.memory;
+                self.snapshot_memory = self.calculate_memory();
                 self.snapshot = self.stack().clone();
             }
             Opcode::RESTORE => {
                 let snapshot = self.snapshot.clone();
-                self.snapshot.clear();
-                self.memory = self.snapshot_memory;
+                self.memory -= self.calculate_memory();
+                self.memory += self.snapshot_memory;
                 self.snapshot_memory = 0;
+                self.snapshot.clear();
 
                 // Restore into the currently active stack (allow restoring alt snapshot into main and vice-versa)
                 self.stack().clear();
@@ -766,6 +777,12 @@ impl ScriptInterpreter {
 
                 self.validate_script(&script)?;
 
+                if script.instructions.len() + self.script.instructions.len()
+                    > self.settings.opcode_limit
+                {
+                    return Err(ScriptError::OpcodeLimitExceeded);
+                }
+
                 let sub_settings = ScriptSettings {
                     allow_eval: false,
                     allow_sandboxed_eval: false,
@@ -773,12 +790,7 @@ impl ScriptInterpreter {
                 };
 
                 // We want a child process, but have the same memory/search/execution limits
-                let mut sub_interpreter = ScriptInterpreter::new(script, Some(sub_settings));
-                sub_interpreter.executions = self.executions;
-                sub_interpreter.searches = self.searches;
-                sub_interpreter.memory = self.memory;
-                sub_interpreter.memory_peak = self.memory_peak;
-
+                let mut sub_interpreter = self.fork(script, Some(sub_settings));
                 let result = sub_interpreter.exec()?;
 
                 if let Some(result_bytes) = result {
@@ -800,6 +812,12 @@ impl ScriptInterpreter {
                     .map_err(|_| ScriptError::InvalidScript)?;
 
                 self.validate_script(&script)?;
+
+                if script.instructions.len() + self.script.instructions.len()
+                    > self.settings.opcode_limit
+                {
+                    return Err(ScriptError::OpcodeLimitExceeded);
+                }
 
                 // Insert new script instructions at current position
                 self.script.instructions.splice(
@@ -896,6 +914,8 @@ impl ScriptInterpreter {
 #[cfg(test)]
 mod tests {
     use std::sync::Once;
+
+    use binary_codec::{BinarySerializer, SerializerConfig};
 
     use crate::scripting::{
         interpreter::ScriptInterpreter,
@@ -2300,22 +2320,22 @@ mod tests {
     }
 
     #[test]
-    fn infitine_loop_should_hit_opcode_limit() {
+    fn infitine_loop_should_hit_execution_limit() {
         // A infinite loop like this runs 1000 times until it hits the limit
         let mut i =
             ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::LOOP, Opcode::POOL]), None);
 
         let res = i.exec();
-        assert_eq!(res, Err(ScriptError::OpcodeLimitExceeded));
+        assert_eq!(res, Err(ScriptError::ExecutionLimitExceeded));
     }
 
     #[test]
-    fn infinite_jump_should_hit_opcode_limit() {
+    fn infinite_jump_should_hit_execution_limit() {
         let mut i =
             ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSH1(0), Opcode::JMP]), None);
 
         let res = i.exec();
-        assert_eq!(res, Err(ScriptError::OpcodeLimitExceeded));
+        assert_eq!(res, Err(ScriptError::ExecutionLimitExceeded));
     }
 
     #[test]
@@ -2384,12 +2404,52 @@ mod tests {
                 Opcode::PUSH1(3),
                 Opcode::LOOP,
                 Opcode::DUP4,
-                Opcode::POOL
+                Opcode::POOL,
             ]),
             None,
         );
         let res = i.exec();
 
         assert_eq!(res, Err(ScriptError::StackHeightLimitExceeded));
+    }
+
+    #[test]
+    fn opcode_limit_enforced_non_eval() {
+        // Script should not exceed 100 instructions
+        let mut instructions = Vec::new();
+        for _ in 0..101 {
+            instructions.push(Opcode::NOP);
+        }
+
+        let mut i = ScriptInterpreter::new(OpcodeScript::new(instructions), None);
+        let res = i.exec();
+        assert_eq!(res, Err(ScriptError::OpcodeLimitExceeded));
+    }
+
+    #[test]
+    fn opcode_limit_enforced_eval() {
+        // Script should not exceed 100 instructions
+        for code in vec![Opcode::EVAL, Opcode::EVALSUB] {
+            let mut instructions = Vec::new();
+            for _ in 0..50 {
+                instructions.push(Opcode::NOP);
+            }
+
+            let eval_instructions = instructions.clone();
+            let config: Option<&mut SerializerConfig> = None;
+            let eval_script = OpcodeScript::new(eval_instructions)
+                .to_bytes(config)
+                .unwrap();
+
+            instructions.push(Opcode::PUSHL1 {
+                len: 0,
+                data: eval_script,
+            });
+            instructions.push(code);
+
+            let mut i = ScriptInterpreter::new(OpcodeScript::new(instructions), None);
+            let res = i.exec();
+            assert_eq!(res, Err(ScriptError::OpcodeLimitExceeded));
+        }
     }
 }

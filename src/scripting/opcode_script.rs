@@ -1,4 +1,8 @@
+use std::collections::HashMap;
+
 use binary_codec::{FromBytes, ToBytes};
+
+use crate::scripting::interpreter::ScriptError;
 
 /**
  * The script engine uses Opcodes as the scripting language
@@ -167,6 +171,7 @@ pub enum Opcode {
 pub struct ScriptSettings {
     pub memory_limit: usize,
     pub executions_limit: usize,
+    pub opcode_limit: usize,
     pub search_limit: usize,
     pub max_slice_size: usize,
     pub max_stack_items: usize,
@@ -189,6 +194,7 @@ impl Default for ScriptSettings {
             memory_limit: 10_000,
             executions_limit: 1000,
             search_limit: 1000,
+            opcode_limit: 100,
             max_slice_size: 8000, // 8 kB
             max_stack_items: 100,
             max_script_len: 20_000,
@@ -220,6 +226,73 @@ impl OpcodeScript {
     /// The unlocker script should only contain push statements and be put BEFORE the locking script
     pub fn is_push_only(&self) -> bool {
         self.instructions.iter().all(|i| i.get_discriminator() <= 8)
+    }
+
+    /// Generate a jump target map for this script
+    pub fn generate_jump_target_map(&self) -> Result<HashMap<usize, usize>, ScriptError> {
+        let mut if_stack = Vec::new();
+        let mut else_stack = Vec::new();
+        let mut loop_stack = Vec::new();
+        let mut break_map = HashMap::new();
+        let mut targets = HashMap::new();
+
+        for (address, opcode) in self.instructions.iter().enumerate() {
+            match opcode {
+                Opcode::IF => {
+                    if_stack.push(address);
+                }
+                Opcode::ELSE => {
+                    // IF jumps to ELSE
+                    let if_pos = if_stack.pop().ok_or(ScriptError::ControlFlowMalformed)?;
+                    targets.insert(if_pos, address);
+                    else_stack.push(address);
+                }
+                Opcode::FI => {
+                    if let Some(else_pos) = else_stack.pop() {
+                        // ELSE jumps to FI
+                        targets.insert(else_pos, address);
+                    } else {
+                        let if_pos = if_stack.pop().ok_or(ScriptError::ControlFlowMalformed)?;
+                        // IF false jumps to FI
+                        targets.insert(if_pos, address);
+                    }
+                }
+                Opcode::LOOP => {
+                    loop_stack.push(address);
+                }
+                Opcode::POOL => {
+                    let loop_pos = loop_stack.pop().ok_or(ScriptError::ControlFlowMalformed)?;
+
+                    // POOL jumps back to LOOP
+                    targets.insert(address, loop_pos);
+
+                    // If BREAK is present, it will jump to POOL
+                    // Resolve all BREAKs for this loop
+                    if let Some(breaks) = break_map.remove(&loop_pos) {
+                        for break_pos in breaks {
+                            targets.insert(break_pos, address);
+                        }
+                    }
+                }
+                Opcode::BREAK => {
+                    let loop_pos = loop_stack.last().ok_or(ScriptError::ControlFlowMalformed)?;
+                    break_map.entry(*loop_pos)
+                        .or_insert_with(Vec::new)
+                        .push(address);                                 
+                }
+                _ => {}
+            }
+        }
+
+        if !if_stack.is_empty()
+            || !else_stack.is_empty()
+            || !loop_stack.is_empty()
+            || !break_map.is_empty()
+        {
+            return Err(ScriptError::ControlFlowMalformed);
+        }
+
+        Ok(targets)
     }
 }
 
