@@ -7,10 +7,11 @@ use crate::{
     packets::base::datetime::PlabbleDateTime,
     scripting::opcode_script::{Opcode, OpcodeScript, ScriptSettings},
 };
+use log::{debug, trace};
 
 use super::stack::StackData;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptInterpreter {
     main_stack: Vec<StackData>,
     alt_stack: Vec<StackData>,
@@ -21,8 +22,8 @@ pub struct ScriptInterpreter {
     script: OpcodeScript,
     cursor: usize,
     use_alt_stack: bool,
-    cpu: usize,
-    cursor_cpu: usize,
+    executions: usize,
+    searches: usize,
     memory: usize,
     memory_peak: usize,
 }
@@ -50,13 +51,20 @@ pub enum ScriptError {
     /// When an assertion fails
     AssertionFailed,
 
+    ControlFlowMalformed,
     ClearNotAllowed,
     ControlFlowNotAllowed,
     JumpNotAllowed,
     LoopNotAllowed,
     NonPushNotAllowed,
     EvalNotAllowed,
-    BucketActionsNotAllowed
+    BucketActionsNotAllowed,
+    MaxDepthExceeded,
+    SearchLimitExceeded,
+    OpcodeLimitExceeded,
+    MemoryLimitExceeded,
+    SliceLimitExceeded,
+    StackHeightLimitExceeded,
 }
 
 impl ScriptInterpreter {
@@ -70,12 +78,27 @@ impl ScriptInterpreter {
             cursor: 0,
             script,
             use_alt_stack: false,
-            cpu: 0,
-            cursor_cpu: 0,
+            executions: 0,
+            searches: 0,
             memory: 0,
             memory_peak: 0,
             settings: settings.unwrap_or_default(),
         }
+    }
+
+    pub fn instance(&self, subscript: OpcodeScript, settings: Option<ScriptSettings>) -> Self {
+        let mut instance = self.clone();
+        if let Some(settings) = settings {
+            instance.settings = settings;
+        }
+        instance.script = subscript;
+        instance.main_stack.clear();
+        instance.alt_stack.clear();
+        instance.cursor = 0;
+        instance.snapshot.clear();
+        instance.snapshot_memory = 0;
+        instance.use_alt_stack = false;
+        instance
     }
 
     pub fn validate_script(&self, script: &OpcodeScript) -> Result<(), ScriptError> {
@@ -107,27 +130,32 @@ impl ScriptInterpreter {
                     if !self.settings.allow_loop || !self.settings.allow_jump {
                         return Err(ScriptError::JumpNotAllowed);
                     }
-                },
+                }
                 Opcode::CLEAR => {
                     if !self.settings.allow_clear {
                         return Err(ScriptError::ClearNotAllowed);
                     }
                 }
-                Opcode::SERVER | Opcode::SELECT | Opcode::READ |  Opcode::WRITE | Opcode::APPEND | Opcode::DELETE  => {
-                    if !self.settings.allow_plabble {
+                Opcode::SERVER
+                | Opcode::SELECT
+                | Opcode::READ
+                | Opcode::WRITE
+                | Opcode::APPEND
+                | Opcode::DELETE => {
+                    if !self.settings.allow_bucket_actions {
                         return Err(ScriptError::BucketActionsNotAllowed);
                     }
-                },
+                }
                 Opcode::EVALSUB => {
                     if !self.settings.allow_sandboxed_eval {
                         return Err(ScriptError::EvalNotAllowed);
                     }
-                },
+                }
                 Opcode::EVAL => {
                     if !self.settings.allow_eval {
                         return Err(ScriptError::EvalNotAllowed);
                     }
-                },
+                }
                 _ => {}
             }
         }
@@ -174,10 +202,27 @@ impl ScriptInterpreter {
         Some(item)
     }
 
-    fn push(&mut self, item: StackData) {
-        self.memory += item.memory();
+    fn push(&mut self, item: StackData) -> Result<(), ScriptError> {
+        let item_memory = item.memory();
+
+        if item_memory > self.settings.max_slice_size {
+            return Err(ScriptError::SliceLimitExceeded);
+        }
+
+        self.memory += item_memory;
         self.memory_peak = cmp::max(self.memory, self.memory_peak);
+
+        if self.memory > self.settings.memory_limit {
+            return Err(ScriptError::MemoryLimitExceeded);
+        }
+
+        if self.stack().len() + 1 > self.settings.max_stack_items {
+            return Err(ScriptError::StackHeightLimitExceeded);
+        }
+
         self.stack().push(item);
+
+        Ok(())
     }
 
     fn pop_number(&mut self) -> Result<i128, ScriptError> {
@@ -237,173 +282,177 @@ impl ScriptInterpreter {
         }
 
         let opcode = self.script.instructions[self.cursor].clone();
-        self.cpu += 1; // Every opcode execution costs 1 CPU cycle
-        println!("Executing opcode: {:?}", opcode);
+        self.executions += 1; // Every opcode execution costs 1 CPU cycle
+        if self.executions > self.settings.executions_limit {
+            return Err(ScriptError::OpcodeLimitExceeded);
+        }
+
+        debug!("Executing opcode: {:?}", opcode);
 
         match opcode {
-            Opcode::FALSE => self.push(StackData::Boolean(false)),
-            Opcode::TRUE => self.push(StackData::Boolean(true)),
-            Opcode::PUSH1(data) => self.push(StackData::Buffer(vec![data])),
-            Opcode::PUSH2(data) => self.push(StackData::Buffer(data.to_vec())),
-            Opcode::PUSH4(data) => self.push(StackData::Buffer(data.to_vec())),
-            Opcode::PUSHL1 { len: _, data } => self.push(StackData::Buffer(data)),
-            Opcode::PUSHL2 { len: _, data } => self.push(StackData::Buffer(data)),
-            Opcode::PUSHL4 { len: _, data } => self.push(StackData::Buffer(data)),
-            Opcode::PUSHINT(val) => self.push(StackData::Number(val)),
+            Opcode::FALSE => self.push(StackData::Boolean(false))?,
+            Opcode::TRUE => self.push(StackData::Boolean(true))?,
+            Opcode::PUSH1(data) => self.push(StackData::Buffer(vec![data]))?,
+            Opcode::PUSH2(data) => self.push(StackData::Buffer(data.to_vec()))?,
+            Opcode::PUSH4(data) => self.push(StackData::Buffer(data.to_vec()))?,
+            Opcode::PUSHL1 { len: _, data } => self.push(StackData::Buffer(data))?,
+            Opcode::PUSHL2 { len: _, data } => self.push(StackData::Buffer(data))?,
+            Opcode::PUSHL4 { len: _, data } => self.push(StackData::Buffer(data))?,
+            Opcode::PUSHINT(val) => self.push(StackData::Number(val))?,
             Opcode::ADD => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_add(b).ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::SUB => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_sub(b).ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::MUL => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_mul(b).ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::DIV => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_div(b).ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::MOD => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_rem(b).ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::NEG => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_number()?;
                 let c = a.checked_neg().ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::ABS => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_number()?;
                 let c = a.checked_abs().ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::LT => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.push(StackData::Boolean(b < a));
+                self.push(StackData::Boolean(b < a))?;
             }
             Opcode::GT => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.push(StackData::Boolean(b > a));
+                self.push(StackData::Boolean(b > a))?;
             }
             Opcode::LTE => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.push(StackData::Boolean(b <= a));
+                self.push(StackData::Boolean(b <= a))?;
             }
             Opcode::GTE => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.push(StackData::Boolean(b >= a));
+                self.push(StackData::Boolean(b >= a))?;
             }
             Opcode::MIN => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.push(StackData::Number(cmp::min(a, b)));
+                self.push(StackData::Number(cmp::min(a, b)))?;
             }
             Opcode::MAX => {
                 self.ensure_stack_size(2)?;
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
-                self.push(StackData::Number(cmp::max(a, b)));
+                self.push(StackData::Number(cmp::max(a, b)))?;
             }
             Opcode::BAND => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a & b;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::BOR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a | b;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::BXOR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a ^ b;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::BSHL => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_shl(b as u32).ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::BSHR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
                 let a = self.pop_number()?;
                 let c = a.checked_shr(b as u32).ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::BNOT => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_number()?;
                 let c = !a;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::NOT => {
                 self.ensure_stack_size(1)?;
                 let a = self.pop_boolean()?;
-                self.push(StackData::Boolean(!a));
+                self.push(StackData::Boolean(!a))?;
             }
             Opcode::AND => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_boolean()?;
                 let a = self.pop_boolean()?;
-                self.push(StackData::Boolean(a && b));
+                self.push(StackData::Boolean(a && b))?;
             }
             Opcode::OR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_boolean()?;
                 let a = self.pop_boolean()?;
-                self.push(StackData::Boolean(a || b));
+                self.push(StackData::Boolean(a || b))?;
             }
             Opcode::XOR => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_boolean()?;
                 let a = self.pop_boolean()?;
-                self.push(StackData::Boolean(a ^ b));
+                self.push(StackData::Boolean(a ^ b))?;
             }
             Opcode::EQ => {
                 let eq = self.check_equality()?;
-                self.push(StackData::Boolean(eq));
+                self.push(StackData::Boolean(eq))?;
             }
             Opcode::NEQ => {
                 let eq = self.check_equality()?;
-                self.push(StackData::Boolean(!eq));
+                self.push(StackData::Boolean(!eq))?;
             }
             Opcode::POW => {
                 self.ensure_stack_size(2)?;
@@ -413,7 +462,7 @@ impl ScriptInterpreter {
                     .try_into()
                     .map_err(|_| ScriptError::MathError)?;
                 let c = a.checked_pow(b).ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::SQRT => {
                 self.ensure_stack_size(1)?;
@@ -422,184 +471,49 @@ impl ScriptInterpreter {
                     return Err(ScriptError::MathError);
                 }
                 let c = (a as f64).sqrt() as i128;
-                self.push(StackData::Number(c));
+                self.push(StackData::Number(c))?;
             }
             Opcode::NOP => { /* NOP = do nothing */ }
+
+            /* Control flow */
             Opcode::IF => {
                 self.ensure_stack_size(1)?;
+
                 let condition = self.pop_boolean()?;
                 if !condition {
-                    // Skip to ELSE or FI
-                    let mut depth = 1;
-                    while depth > 0 {
-                        self.cursor += 1;
-                        self.cursor_cpu += 1;
-                        if self.cursor >= self.script.instructions.len() {
-                            return Err(ScriptError::InvalidScript);
-                        }
-                        match self.script.instructions[self.cursor] {
-                            Opcode::IF => depth += 1,
-                            Opcode::ELSE => {
-                                if depth == 1 {
-                                    break;
-                                }
-                            }
-                            Opcode::FI => depth -= 1,
-                            _ => {}
-                        }
-                    }
+                    // Search a ELSE or FI to skip to
+                    let pos =
+                        self.search(Opcode::IF, Opcode::FI, Some(Opcode::ELSE), None, false)?;
+                    self.cursor = pos;
                 }
             }
             Opcode::ELSE => {
-                // Ensure there is a matching IF before this ELSE
-                let mut rev_depth: isize = 0;
-                let mut found_if = false;
-                if self.cursor == 0 {
-                    return Err(ScriptError::InvalidScript);
-                }
-                let mut j = self.cursor as isize - 1;
-                while j >= 0 {
-                    match self.script.instructions[j as usize] {
-                        Opcode::FI => rev_depth += 1,
-                        Opcode::IF => {
-                            if rev_depth == 0 {
-                                found_if = true;
-                                break;
-                            } else {
-                                rev_depth -= 1;
-                            }
-                        }
-                        _ => {}
-                    }
-                    j -= 1;
-                    self.cursor_cpu += 1;
-                }
-                if !found_if {
-                    return Err(ScriptError::InvalidScript);
-                }
+                // a. Make sure a matching IF exists
+                self.search(Opcode::IF, Opcode::FI, None, None, true)?;
 
                 // Skip to FI
-                let mut depth = 1;
-                while depth > 0 {
-                    self.cursor += 1;
-                    self.cursor_cpu += 1;
-
-                    if self.cursor >= self.script.instructions.len() {
-                        return Err(ScriptError::InvalidScript);
-                    }
-                    match self.script.instructions[self.cursor] {
-                        Opcode::IF => depth += 1,
-                        Opcode::FI => depth -= 1,
-                        _ => {}
-                    }
-                }
+                let pos = self.search(Opcode::IF, Opcode::FI, None, None, false)?;
+                self.cursor = pos;
             }
             Opcode::FI => {
                 // Validate there is a matching IF earlier
-                let mut rev_depth: isize = 0;
-                let mut found_if = false;
-                if self.cursor == 0 {
-                    return Err(ScriptError::InvalidScript);
-                }
-                let mut j = self.cursor as isize - 1;
-                while j >= 0 {
-                    match self.script.instructions[j as usize] {
-                        Opcode::FI => rev_depth += 1,
-                        Opcode::IF => {
-                            if rev_depth == 0 {
-                                found_if = true;
-                                break;
-                            } else {
-                                rev_depth -= 1;
-                            }
-                        }
-                        _ => {}
-                    }
-                    j -= 1;
-                    self.cursor_cpu += 1;
-                }
-                if !found_if {
-                    return Err(ScriptError::InvalidScript);
-                }
+                self.search(Opcode::IF, Opcode::FI, None, None, true)?;
             }
             Opcode::BREAK => {
                 // Ensure there's an enclosing LOOP (search backwards)
-                let mut rev_depth = 0isize;
-                let mut found_loop = false;
-                if self.cursor == 0 {
-                    return Err(ScriptError::InvalidScript);
-                }
-                let mut i = self.cursor as isize - 1;
-                while i >= 0 {
-                    match self.script.instructions[i as usize] {
-                        Opcode::POOL => rev_depth += 1,
-                        Opcode::LOOP => {
-                            if rev_depth == 0 {
-                                found_loop = true;
-                                break;
-                            } else {
-                                rev_depth -= 1;
-                            }
-                        }
-                        _ => {}
-                    }
-                    i -= 1;
-                    self.cursor_cpu += 1;
-                }
-                if !found_loop {
-                    return Err(ScriptError::InvalidScript);
-                }
+                self.search(Opcode::LOOP, Opcode::POOL, None, None, true)?;
 
                 // Skip to next POOL (forward), taking nesting into account
-                let mut depth = 0;
-                self.cursor += 1;
-                while self.cursor < self.script.instructions.len() {
-                    match self.script.instructions[self.cursor] {
-                        Opcode::LOOP => depth += 1,
-                        Opcode::POOL => {
-                            if depth == 0 {
-                                break;
-                            } else {
-                                depth -= 1;
-                            }
-                        }
-                        _ => {}
-                    }
-
-                    self.cursor += 1;
-                    self.cursor_cpu += 1;
-                }
-                if self.cursor >= self.script.instructions.len() {
-                    return Err(ScriptError::InvalidScript);
-                }
+                let pos = self.search(Opcode::LOOP, Opcode::POOL, None, None, false)?;
+                self.cursor = pos;
             }
             Opcode::LOOP => {
                 // Just continue execution
             }
             Opcode::POOL => {
                 // Jump back to the corresponding LOOP
-                let mut depth = 0;
-                while self.cursor > 0 {
-                    match self.script.instructions[self.cursor] {
-                        Opcode::POOL => depth += 1,
-                        Opcode::LOOP => {
-                            if depth == 0 {
-                                break;
-                            } else {
-                                depth -= 1;
-                            }
-                        }
-                        _ => {}
-                    }
-                    if self.cursor == 0 {
-                        break;
-                    }
-                    self.cursor -= 1;
-                    self.cursor_cpu += 1;
-                }
-                if self.script.instructions.get(self.cursor) != Some(&Opcode::LOOP) {
-                    return Err(ScriptError::InvalidScript);
-                }
+                let pos = self.search(Opcode::LOOP, Opcode::POOL, None, None, true)?;
+                self.cursor = pos;
             }
             Opcode::JMP => {
                 self.ensure_stack_size(1)?;
@@ -608,7 +522,11 @@ impl ScriptInterpreter {
                     return Err(ScriptError::OutOfBounds);
                 }
 
-                self.cursor_cpu += address.abs_diff(self.cursor as i128) as usize;
+                self.searches += address.abs_diff(self.cursor as i128) as usize;
+                if self.searches > self.settings.search_limit {
+                    return Err(ScriptError::SearchLimitExceeded);
+                }
+
                 self.cursor = address as usize;
                 return Ok(None); // Skip the cursor increment at the end
             }
@@ -630,15 +548,15 @@ impl ScriptInterpreter {
             Opcode::DUP => {
                 self.ensure_stack_size(1)?;
                 let top = self.stack().last().unwrap().clone();
-                self.push(top);
+                self.push(top)?;
             }
             Opcode::DUP2 => {
                 self.ensure_stack_size(2)?;
                 let len = self.stack().len();
                 let first = self.stack()[len - 2].clone();
                 let second = self.stack()[len - 1].clone();
-                self.push(first);
-                self.push(second);
+                self.push(first)?;
+                self.push(second)?;
             }
             Opcode::DUP3 => {
                 self.ensure_stack_size(3)?;
@@ -646,9 +564,9 @@ impl ScriptInterpreter {
                 let first = self.stack()[len - 3].clone();
                 let second = self.stack()[len - 2].clone();
                 let third = self.stack()[len - 1].clone();
-                self.push(first);
-                self.push(second);
-                self.push(third);
+                self.push(first)?;
+                self.push(second)?;
+                self.push(third)?;
             }
             Opcode::DUP4 => {
                 self.ensure_stack_size(4)?;
@@ -657,16 +575,16 @@ impl ScriptInterpreter {
                 let second = self.stack()[len - 3].clone();
                 let third = self.stack()[len - 2].clone();
                 let fourth = self.stack()[len - 1].clone();
-                self.push(first);
-                self.push(second);
-                self.push(third);
-                self.push(fourth);
+                self.push(first)?;
+                self.push(second)?;
+                self.push(third)?;
+                self.push(fourth)?;
             }
             Opcode::DUPN(n) => {
                 self.ensure_stack_size(1)?;
                 let top = self.stack().last().unwrap().clone();
                 for _ in 0..n {
-                    self.push(top.clone());
+                    self.push(top.clone())?;
                 }
             }
             Opcode::SWAP => {
@@ -691,7 +609,7 @@ impl ScriptInterpreter {
                 }
 
                 let item = self.stack()[n as usize].clone();
-                self.push(item);
+                self.push(item)?;
             }
             Opcode::BUBBLE => {
                 self.ensure_stack_size(1)?;
@@ -764,11 +682,11 @@ impl ScriptInterpreter {
                 let mut combined = a_bytes;
                 combined.extend_from_slice(&b_bytes);
 
-                self.push(StackData::Buffer(combined));
+                self.push(StackData::Buffer(combined))?;
             }
             Opcode::COUNT => {
                 let length = self.stack().len() as i128;
-                self.push(StackData::Number(length));
+                self.push(StackData::Number(length))?;
             }
             Opcode::SERVER => todo!(),
             Opcode::SELECT => todo!(),
@@ -781,14 +699,14 @@ impl ScriptInterpreter {
                 let item = self.pop().unwrap();
                 let bytes = item.as_buffer().expect("Failed to convert to buffer");
                 let length = bytes.len() as i128;
-                self.push(StackData::Number(length));
+                self.push(StackData::Number(length))?;
             }
             Opcode::REVERSE => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
                 let mut bytes = item.as_buffer().expect("Failed to convert to buffer");
                 bytes.reverse();
-                self.push(StackData::Buffer(bytes));
+                self.push(StackData::Buffer(bytes))?;
             }
             Opcode::SLICE => {
                 self.ensure_stack_size(3)?;
@@ -806,7 +724,7 @@ impl ScriptInterpreter {
                     .unwrap()
                     .to_vec();
 
-                self.push(StackData::Buffer(slice));
+                self.push(StackData::Buffer(slice))?;
             }
             Opcode::SPLICE => {
                 self.ensure_stack_size(3)?;
@@ -822,7 +740,7 @@ impl ScriptInterpreter {
                 }
 
                 bytes.splice((offset as usize)..((offset + length) as usize), splice_data);
-                self.push(StackData::Buffer(bytes));
+                self.push(StackData::Buffer(bytes))?;
             }
 
             /* Crypto operations */
@@ -835,7 +753,7 @@ impl ScriptInterpreter {
             /* Special opcodes */
             Opcode::TIME => {
                 let now = PlabbleDateTime(Utc::now());
-                self.push(StackData::Number(now.timestamp() as i128));
+                self.push(StackData::Number(now.timestamp() as i128))?;
             }
             Opcode::EVALSUB => {
                 self.ensure_stack_size(1)?;
@@ -854,14 +772,23 @@ impl ScriptInterpreter {
                     ..self.settings
                 };
 
+                // We want a child process, but have the same memory/search/execution limits
                 let mut sub_interpreter = ScriptInterpreter::new(script, Some(sub_settings));
+                sub_interpreter.executions = self.executions;
+                sub_interpreter.searches = self.searches;
+                sub_interpreter.memory = self.memory;
+                sub_interpreter.memory_peak = self.memory_peak;
+
                 let result = sub_interpreter.exec()?;
 
                 if let Some(result_bytes) = result {
-                    self.push(StackData::Buffer(result_bytes));
+                    self.push(StackData::Buffer(result_bytes))?;
                 }
 
-                self.cpu += sub_interpreter.cpu; // Add sub-interpreter CPU usage to parent
+                self.executions = sub_interpreter.executions;
+                self.searches = sub_interpreter.searches;
+                self.memory = sub_interpreter.memory;
+                self.memory_peak = sub_interpreter.memory_peak;
             }
             Opcode::EVAL => {
                 self.ensure_stack_size(1)?;
@@ -886,40 +813,131 @@ impl ScriptInterpreter {
 
         Ok(None)
     }
+
+    /// Search for a matching opCode and return the cursor difference (negative or positive value)
+    fn search(
+        &mut self,
+        open: Opcode,
+        close: Opcode,
+        or: Option<Opcode>,
+        stop: Option<Opcode>,
+        backwards: bool,
+    ) -> Result<usize, ScriptError> {
+        debug!(
+            "Search for {:?}--{:?} (or: {:?}, stop: {:?}). Reverse: {}",
+            open, close, or, stop, backwards
+        );
+
+        let step: isize = if backwards { -1 } else { 1 };
+
+        trace!(
+            "Start search {} at {:?}",
+            self.cursor, self.script.instructions[self.cursor]
+        );
+
+        let mut cursor = self.cursor as isize + step;
+        self.searches += 1;
+
+        if self.searches > self.settings.search_limit {
+            return Err(ScriptError::SearchLimitExceeded);
+        }
+
+        let mut depth = 0isize;
+
+        let len = self.script.instructions.len() as isize;
+        while cursor >= 0 && cursor < len {
+            let code = &self.script.instructions[cursor as usize];
+            trace!("Search cursor {} at {:?}", cursor, code);
+
+            if *code == open {
+                if backwards {
+                    if depth == 0 {
+                        return Ok(cursor as usize);
+                    } else {
+                        depth -= 1;
+                    }
+                } else {
+                    depth += 1;
+                }
+            } else if *code == close {
+                if backwards {
+                    depth += 1;
+                } else {
+                    if depth == 0 {
+                        return Ok(cursor as usize);
+                    } else {
+                        depth -= 1;
+                    }
+                }
+            } else if let Some(ref or) = or
+                && or == code
+            {
+                if depth == 0 {
+                    return Ok(cursor as usize);
+                }
+            } else if let Some(ref stopcode) = stop
+                && stopcode == code
+            {
+                return Ok(cursor as usize);
+            }
+
+            cursor += step;
+            self.searches += 1;
+
+            if depth.abs() as usize > self.settings.max_nesting_depth {
+                return Err(ScriptError::MaxDepthExceeded);
+            }
+        }
+
+        Err(ScriptError::ControlFlowMalformed)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Once;
+
     use crate::scripting::{
         interpreter::ScriptInterpreter,
         opcode_script::{Opcode, OpcodeScript, ScriptSettings},
         stack::StackData,
     };
 
+    static INIT: Once = Once::new();
+
+    fn init_logger() {
+        INIT.call_once(|| {
+            env_logger::Builder::new()
+                .is_test(true) // important for tests
+                .filter_level(log::LevelFilter::Trace)
+                .init();
+        });
+    }
+
     #[test]
     fn can_create_and_break_a_loop() {
         // Generate [1,2,3]
         let script = OpcodeScript::new(vec![
-            //                      CPU         | Cursor CPU  | Memory
-            Opcode::LOOP,       // 1
-            Opcode::COUNT,      // 2 10 18         12 22 32    +2
-            Opcode::PUSHINT(2), // 3 11 19         11 21 31    +2
-            Opcode::EQ,         // 4 12 20         10 20 30    -4, +1
-            Opcode::IF,         // 5 13 21         9  19 29    -1
-            Opcode::BREAK,      //      22       1 8  18 28
-            Opcode::FI,         //               2 7  17 27
-            Opcode::COUNT,      // 6 14            6  16 26    +2
-            Opcode::PUSHINT(1), // 7 15            5  15 25    +2
-            Opcode::ADD,        // 8 16            4  14 24    -4, +2
-            Opcode::POOL,       // 9 17          3    13 23
-            Opcode::PUSHINT(3), //      23                     +2
+            //                      CPU         | Cursor CPU     | Memory
+            Opcode::LOOP,       // 1               12    24 29
+            Opcode::COUNT,      // 2 10 18         11    23 28     +2
+            Opcode::PUSHINT(2), // 3 11 19         10    22 27     +2
+            Opcode::EQ,         // 4 12 20         9     21 26     -4, +1
+            Opcode::IF,         // 5 13 21       * 8  *  20 25     -1
+            Opcode::BREAK,      //      22       1 7  13 19 *  34
+            Opcode::FI,         //               2 6  14 18    33
+            Opcode::COUNT,      // 6 14            5     17    32  +2
+            Opcode::PUSHINT(1), // 7 15            4     16    31  +2
+            Opcode::ADD,        // 8 16            3     15    30  -4, +2
+            Opcode::POOL,       // 9 17          *       *     *
+            Opcode::PUSHINT(3), //      23                         +2
         ]);
 
         let mut interpreter = ScriptInterpreter::new(script, None);
         interpreter.exec().unwrap();
 
-        assert_eq!(23, interpreter.cpu);
-        assert_eq!(32, interpreter.cursor_cpu);
+        assert_eq!(23, interpreter.executions);
+        assert_eq!(34, interpreter.searches);
         assert_eq!(6, interpreter.memory);
         assert_eq!(8, interpreter.memory_peak);
     }
@@ -945,7 +963,6 @@ mod tests {
         let result = interpreter.exec();
 
         assert_eq!(result, Ok(None));
-        println!("{:?}", interpreter);
     }
 
     #[test]
@@ -1128,7 +1145,7 @@ mod tests {
         let r = i.exec();
         assert_eq!(r, Ok(Some(vec![9])));
         // Make sure NOP is skipped
-        assert_eq!(i.cpu, 4);
+        assert_eq!(i.executions, 4);
     }
 
     #[test]
@@ -1523,7 +1540,7 @@ mod tests {
         let script = OpcodeScript::new(vec![Opcode::FALSE, Opcode::IF]);
         let mut i = ScriptInterpreter::new(script, None);
         let err = i.exec().unwrap_err();
-        assert_eq!(err, ScriptError::InvalidScript);
+        assert_eq!(err, ScriptError::ControlFlowMalformed);
     }
 
     #[test]
@@ -1554,7 +1571,7 @@ mod tests {
         let script = OpcodeScript::new(vec![Opcode::BREAK, Opcode::POOL]);
         let mut i = ScriptInterpreter::new(script, None);
         let err = i.exec().unwrap_err();
-        assert_eq!(err, ScriptError::InvalidScript);
+        assert_eq!(err, ScriptError::ControlFlowMalformed);
     }
 
     #[test]
@@ -1562,7 +1579,7 @@ mod tests {
         let script = OpcodeScript::new(vec![Opcode::POOL]);
         let mut i = ScriptInterpreter::new(script, None);
         let err = i.exec().unwrap_err();
-        assert_eq!(err, ScriptError::InvalidScript);
+        assert_eq!(err, ScriptError::ControlFlowMalformed);
     }
 
     #[test]
@@ -1687,14 +1704,14 @@ mod tests {
     fn else_without_if_is_error() {
         let mut i = ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::ELSE]), None);
         let err = i.exec().unwrap_err();
-        assert_eq!(err, ScriptError::InvalidScript);
+        assert_eq!(err, ScriptError::ControlFlowMalformed);
     }
 
     #[test]
     fn fi_without_if_is_error() {
         let mut i = ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::FI]), None);
         let err = i.exec().unwrap_err();
-        assert_eq!(err, ScriptError::InvalidScript);
+        assert_eq!(err, ScriptError::ControlFlowMalformed);
     }
 
     #[test]
@@ -1813,7 +1830,7 @@ mod tests {
         let r = i.exec();
         assert_eq!(r, Ok(Some(vec![7])));
         // three opcodes executed
-        assert_eq!(i.cpu, 3);
+        assert_eq!(i.executions, 3);
     }
 
     #[test]
@@ -2184,8 +2201,8 @@ mod tests {
         i.exec().unwrap();
         assert_eq!(i.memory, 11);
         assert_eq!(i.memory_peak, 12);
-        assert_eq!(i.cpu, 14);
-        assert_eq!(i.cursor_cpu, 0);
+        assert_eq!(i.executions, 14);
+        assert_eq!(i.searches, 0);
     }
 
     #[test]
@@ -2206,13 +2223,173 @@ mod tests {
         settings.allow_jump = false;
 
         let script = OpcodeScript::new(vec![
-            Opcode::PUSHL1 { len: 0, data: vec![0x00, 0x30] }, // hidden JMP
-            Opcode::EVAL
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![0x00, 0x30],
+            }, // hidden JMP
+            Opcode::EVAL,
         ]);
 
         let mut i = ScriptInterpreter::new(script, Some(settings));
         let res = i.exec();
 
         assert_eq!(res, Err(ScriptError::JumpNotAllowed));
+    }
+
+    // Pseudocode of the script:
+    //
+    // Script opcodes sequence:
+    // PUSHINT(1)    // outer condition true
+    // IF
+    //   LOOP
+    //     PUSHINT(0) // inner condition false
+    //     IF
+    //       PUSHL1([0xAA])   // inner IF branch (not taken)
+    //     ELSE
+    //       BREAK            // breaks out to matching POOL
+    //     FI
+    //     PUSHL1([0xBB])     // executed if loop not broken
+    //   POOL
+    // ELSE
+    //   PUSHL1([0xCC])       // outer ELSE branch (not taken)
+    // FI
+    // PUSHL1([0xDD])         // final push before RETURN
+    //
+    // Execution flow:
+    // outer IF true -> enter LOOP; inner IF false -> ELSE triggers BREAK -> jump to POOL,
+    // then after POOL continue and push 0xBB, then exit outer IF, push 0xDD and RETURN.
+    // Expected returned bytes: [0xDD]
+    #[test]
+    fn complex_nested_if_loop_break() {
+        init_logger();
+
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHINT(1), // outer true
+            Opcode::IF,
+            Opcode::LOOP,
+            Opcode::PUSHINT(0), // inner false
+            Opcode::IF,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![0xAA],
+            },
+            Opcode::ELSE,
+            Opcode::BREAK,
+            Opcode::FI,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![0xBB],
+            },
+            Opcode::POOL,
+            Opcode::ELSE,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![0xCC],
+            },
+            Opcode::FI,
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![0xDD],
+            },
+            Opcode::RETURN,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        let r = i.exec().unwrap();
+        assert_eq!(r, Some(vec![0xDD]));
+    }
+
+    #[test]
+    fn infitine_loop_should_hit_opcode_limit() {
+        // A infinite loop like this runs 1000 times until it hits the limit
+        let mut i =
+            ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::LOOP, Opcode::POOL]), None);
+
+        let res = i.exec();
+        assert_eq!(res, Err(ScriptError::OpcodeLimitExceeded));
+    }
+
+    #[test]
+    fn infinite_jump_should_hit_opcode_limit() {
+        let mut i =
+            ScriptInterpreter::new(OpcodeScript::new(vec![Opcode::PUSH1(0), Opcode::JMP]), None);
+
+        let res = i.exec();
+        assert_eq!(res, Err(ScriptError::OpcodeLimitExceeded));
+    }
+
+    #[test]
+    fn infinite_big_jump_should_hit_search_limit() {
+        let mut i = ScriptInterpreter::new(
+            OpcodeScript::new(vec![
+                Opcode::PUSH1(6),
+                Opcode::JMP,
+                Opcode::FALSE,
+                Opcode::TRUE,
+                Opcode::FALSE,
+                Opcode::TRUE,
+                Opcode::PUSH1(0),
+                Opcode::JMP,
+            ]),
+            None,
+        );
+
+        let res = i.exec();
+        assert_eq!(res, Err(ScriptError::SearchLimitExceeded));
+    }
+
+    #[test]
+    fn big_arrays_should_hit_memory_limit() {
+        let mut i = ScriptInterpreter::new(
+            OpcodeScript::new(vec![
+                Opcode::LOOP,
+                Opcode::PUSHL1 {
+                    len: 0,
+                    data: [0u8; 1000].to_vec(),
+                },
+                Opcode::POOL,
+            ]),
+            None,
+        );
+
+        let res = i.exec();
+        assert_eq!(res, Err(ScriptError::MemoryLimitExceeded));
+
+        // Push runs 10 times, fails the 11th time for memory limit is 10_000 by default
+        // So we expect 12 cpu (LOOP, POOL and 10x PUSHL1)
+        assert_eq!(i.executions, 12);
+    }
+
+    #[test]
+    fn big_slice_should_hit_slice_limit() {
+        let mut i = ScriptInterpreter::new(
+            OpcodeScript::new(vec![Opcode::PUSHL1 {
+                len: 0,
+                data: [0u8; 20_000].to_vec(),
+            }]),
+            None,
+        );
+        let res = i.exec();
+
+        assert_eq!(res, Err(ScriptError::SliceLimitExceeded));
+    }
+
+    #[test]
+    fn grow_stack_should_hit_stack_limit() {
+        let mut i = ScriptInterpreter::new(
+            OpcodeScript::new(vec![
+                Opcode::PUSH1(0),
+                Opcode::PUSH1(1),
+                Opcode::PUSH1(2),
+                Opcode::PUSH1(3),
+                Opcode::LOOP,
+                Opcode::DUP4,
+                Opcode::POOL
+            ]),
+            None,
+        );
+        let res = i.exec();
+
+        assert_eq!(res, Err(ScriptError::StackHeightLimitExceeded));
     }
 }

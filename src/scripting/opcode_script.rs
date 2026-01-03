@@ -166,12 +166,12 @@ pub enum Opcode {
 #[derive(Debug, Clone)]
 pub struct ScriptSettings {
     pub memory_limit: usize,
-    pub opcode_limit: usize,
-    pub cursor_limit: usize,
+    pub executions_limit: usize,
+    pub search_limit: usize,
     pub max_slice_size: usize,
     pub max_stack_items: usize,
     pub max_script_len: usize,
-    pub max_depth: usize,
+    pub max_nesting_depth: usize,
 
     pub allow_clear: bool,
     pub allow_control_flow: bool,
@@ -180,19 +180,19 @@ pub struct ScriptSettings {
     pub allow_non_push: bool,
     pub allow_eval: bool,
     pub allow_sandboxed_eval: bool,
-    pub allow_plabble: bool
+    pub allow_bucket_actions: bool,
 }
 
 impl Default for ScriptSettings {
     fn default() -> Self {
         Self {
             memory_limit: 10_000,
-            opcode_limit: 1000,
-            cursor_limit: 1000,
+            executions_limit: 1000,
+            search_limit: 1000,
             max_slice_size: 8000, // 8 kB
             max_stack_items: 100,
             max_script_len: 20_000,
-            max_depth: 10,
+            max_nesting_depth: 10,
             allow_clear: true,
             allow_loop: true,
             allow_jump: true,
@@ -200,7 +200,7 @@ impl Default for ScriptSettings {
             allow_non_push: true,
             allow_eval: true,
             allow_sandboxed_eval: true,
-            allow_plabble: true
+            allow_bucket_actions: true,
         }
     }
 }
