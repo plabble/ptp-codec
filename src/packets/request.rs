@@ -109,9 +109,7 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Register => todo!(),
             RequestPacketType::Identify => todo!(),
             RequestPacketType::Proxy { .. } => todo!(),
-            RequestPacketType::_Reserved13 => todo!(),
             RequestPacketType::Opcode { .. } => todo!(),
-            RequestPacketType::_Reserved15 => todo!(),
         };
 
         Ok(PlabbleRequestPacket {

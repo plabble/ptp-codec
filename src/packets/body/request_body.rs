@@ -29,21 +29,20 @@ use crate::packets::body::{
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
 #[no_discriminator]
+#[repr(u8)]
 pub enum PlabbleRequestBody {
-    Certificate,
-    Session(SessionRequestBody),
-    Get(BucketQuery),
-    Stream,
-    Post,
-    Patch,
-    Put(PutRequestBody),
-    Delete(BucketQuery),
-    Subscribe(BucketQuery),
-    Unsubscribe(BucketQuery),
-    Register,
-    Identify,
-    Proxy,
-    _Reserved13,
-    Opcode,
-    _Reserved15,
+    Certificate = 0,
+    Session(SessionRequestBody) = 1,
+    Get(BucketQuery) = 2,
+    Stream = 3,
+    Post = 4,
+    Patch = 5,
+    Put(PutRequestBody) = 6,
+    Delete(BucketQuery) = 7,
+    Subscribe(BucketQuery) = 8,
+    Unsubscribe(BucketQuery) = 9,
+    Register = 10,
+    Identify = 11,
+    Proxy = 12,
+    Opcode = 14
 }

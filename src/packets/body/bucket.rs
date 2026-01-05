@@ -51,7 +51,6 @@ pub struct PutRequestBody {
 ///   and the value is a vector of bytes representing the data stored in that slot.
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
 #[no_discriminator]
 pub enum BucketBody {
     Numeric(
@@ -93,7 +92,7 @@ mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer};
 
     use crate::packets::{
-        header::type_and_flags::RequestPacketType, request::PlabbleRequestPacket,
+        header::type_and_flags::RequestPacketType, request::PlabbleRequestPacket, response::PlabbleResponsePacket,
     };
 
     #[test]
@@ -271,5 +270,65 @@ mod tests {
             ],
             serialized
         );
+    }
+
+    // empty numeric, empty binary, single binary (but not necessary in GET, can also be other bucket)
+
+    #[test]
+    fn can_serialize_and_deserialize_get_numeric_response() {
+        let packet: PlabbleResponsePacket = toml::from_str(r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Get"
+            request_counter = 1
+
+            [body.Numeric]
+            5 = "AAAAAA"
+            7 = "AAAAAAAA"
+        "#).unwrap();
+
+        let serialized = packet.to_bytes(None).unwrap();
+
+        // version = 0001, flags = 0100. Packet type = Get (0010), flags: 0000.
+        // request counter: 0,1  nx [ key: X,X (0,5) or (0,7) (we don't know the hashmap order for sure, it really can differ per time...)
+        // length (dynint, in this case 1 byte) then bytes ]
+        let case1 = vec![0b0100_0001, 0b0000_0010, 0, 1, 0, 5, 4, 0, 0, 0, 0, 0, 7, 6, 0, 0, 0, 0, 0, 0];
+        let case2 = vec![0b0100_0001, 0b0000_0010, 0, 1, 0, 7, 6, 0, 0, 0, 0, 0, 0, 0, 5, 4, 0, 0, 0, 0];
+        
+        assert!(serialized == case1 || serialized == case2);
+
+        let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();
+        assert_eq!(packet, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_get_binary_response() {
+        let packet: PlabbleResponsePacket = toml::from_str(r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Get"
+            request_counter = 1
+            binary_keys = true
+
+            [body.Binary]
+            name = "AAAA"
+            alias = "AAAAAA"
+        "#).unwrap();
+
+        let serialized = packet.to_bytes(None).unwrap();
+
+        // version = 0001, flags = 0100. Packet type = Get (0010), flags: 0001.
+        // request counter: 0,1  nx [ key length, key, length (dynint, in this case 1 byte) then bytes ]
+        let case1 = vec![0b0100_0001, 0b0001_0010, 0, 1, 4, b'n', b'a', b'm', b'e', 3, 0, 0, 0, 5, b'a', b'l', b'i', b'a', b's', 4, 0, 0, 0, 0];
+        let case2 = vec![0b0100_0001, 0b0001_0010, 0, 1, 5, b'a', b'l', b'i', b'a', b's', 4, 0, 0, 0, 0, 4, b'n', b'a', b'm', b'e', 3, 0, 0, 0];
+        
+        assert!(serialized == case1 || serialized == case2);
+
+        let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();
+        assert_eq!(packet, deserialized);
     }
 }

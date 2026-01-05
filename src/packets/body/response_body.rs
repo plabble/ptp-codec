@@ -27,21 +27,21 @@ use crate::packets::body::{bucket::BucketBody, error::PlabbleError, session::Ses
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
 #[no_discriminator]
+#[repr(u8)]
 pub enum PlabbleResponseBody {
-    Certificate,
-    Session(SessionResponseBody),
-    Get(BucketBody),
-    Stream,
-    Post,
-    Patch,
-    Put,
-    Delete,
-    Subscribe,
-    Unsubscribe,
-    Register,
-    Identity,
-    Proxy,
-    _Reserved13,
-    Opcode,
-    Error(PlabbleError),
+    Certificate = 0,
+    Session(SessionResponseBody) = 1,
+    Get(#[variant_by = "binary_keys"] BucketBody) = 2,
+    Stream = 3,
+    Post = 4,
+    Patch = 5,
+    Put = 6,
+    Delete = 7,
+    Subscribe = 8,
+    Unsubscribe = 9,
+    Register = 10,
+    Identity = 11,
+    Proxy = 12,
+    Opcode = 14,
+    Error(PlabbleError) = 15,
 }

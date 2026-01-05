@@ -96,7 +96,9 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Session { .. } => {
                 PlabbleResponseBody::Session(raw.body.deserialize_into().unwrap())
             }
-            ResponsePacketType::Get { .. } => todo!(),
+            ResponsePacketType::Get { .. } => {
+                PlabbleResponseBody::Get(raw.body.deserialize_into().unwrap())
+            },
             ResponsePacketType::Stream => todo!(),
             ResponsePacketType::Post => todo!(),
             ResponsePacketType::Patch => todo!(),
@@ -107,7 +109,6 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Register => todo!(),
             ResponsePacketType::Identify => todo!(),
             ResponsePacketType::Proxy { .. } => todo!(),
-            ResponsePacketType::_Reserved13 => todo!(),
             ResponsePacketType::Opcode => todo!(),
             ResponsePacketType::Error => {
                 PlabbleResponseBody::Error(raw.body.deserialize_into().unwrap())

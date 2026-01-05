@@ -20,7 +20,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         query_mode: bool,
-    },
+    } = 0,
     /// Start a new session.
     /// - persist_key: Request that the server persist the session key.
     /// - enable_encryption: Request that the server enable encryption for this session.
@@ -40,7 +40,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         request_salt: bool,
-    },
+    } = 1,
     /// Retrieve values from a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - subscribe: Subscribe to changes on the requested keys.
@@ -55,7 +55,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         range_mode_until: bool,
-    },
+    } = 2,
     /// Start a data stream from or to the server
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - subscribe: Subscribe to changes on the requested keys.
@@ -74,7 +74,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         stream_append: bool,
-    },
+    } = 3,
     /// Create a new bucket
     /// - binary_keys: Indicate that the bucket has binary keys
     /// - subscribe: Subscribe to changes on the bucket
@@ -93,9 +93,9 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         do_not_persist: bool,
-    },
+    } = 4,
     /// Update bucket settings
-    Patch,
+    Patch = 5,
     /// Insert or update values in a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - subscribe: Subscribe to changes on the inserted/updated keys.
@@ -114,7 +114,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         append: bool,
-    },
+    } = 6,
     /// Delete values from a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - range_mode_until: Use range mode until a specified key/index
@@ -125,7 +125,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         range_mode_until: bool,
-    },
+    } = 7,
     /// Subscribe to changes on a bucket, or key(s)/key ranges
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - range_mode_until: Use range mode until a specified key/index
@@ -136,7 +136,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         range_mode_until: bool,
-    },
+    } = 8,
     /// Unsubscribe from changes on a bucket, or key(s)/key ranges
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - range_mode_until: Use range mode until a specified key/index
@@ -147,11 +147,11 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         range_mode_until: bool,
-    },
+    } = 9,
     /// Create a new identity on the server
-    Register,
+    Register = 10,
     /// Prove identity to the server for the current session
-    Identify,
+    Identify = 11,
     /// Setup a proxy connection through the server
     /// - init_session: Indicates that this is a initial proxy session setup request.
     /// - keep_connection: Request that the server keeps the connection alive for forwarding/receiving packets.
@@ -165,8 +165,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         select_random_hops: bool,
-    },
-    _Reserved13,
+    } = 12,
     /// Execute a server-side opcode script
     /// - allow_bucket_operations: Allow the script to perform bucket operations.
     /// - allow_eval: Allow the script to use eval functionality (can be dangerous).
@@ -176,8 +175,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         allow_eval: bool,
-    },
-    _Reserved15,
+    } = 14
 }
 
 /// Plabble request packet types.
@@ -187,7 +185,7 @@ pub enum RequestPacketType {
 #[no_discriminator]
 pub enum ResponsePacketType {
     /// Response to a certificate request.
-    Certificate,
+    Certificate = 0,
     /// Response to a session initiation request.
     /// - with_psk: Response contains a PSK ID the server created
     /// - with_salt: Response contains a salt for session key derivation
@@ -199,41 +197,40 @@ pub enum ResponsePacketType {
         #[serde(default)]
         #[toggles("client_salt")]
         with_salt: bool,
-    },
+    } = 1,
     /// Response to a get request.
     /// - binary_keys: Keys in the response are in binary format.
     Get {
         #[serde(default)]
         #[toggles("binary_keys")]
         binary_keys: bool,
-    },
+    } = 2,
     /// Response to a stream request.
-    Stream,
+    Stream = 3,
     /// Response to a post request.
-    Post,
+    Post = 4,
     /// Response to a patch request.
-    Patch,
+    Patch = 5,
     /// Response to a put request.
-    Put,
+    Put = 6,
     /// Response to a delete request.
-    Delete,
+    Delete = 7,
     /// Response to a subscribe request.
-    Subscribe,
+    Subscribe = 8,
     /// Response to an unsubscribe request.
-    Unsubscribe,
+    Unsubscribe = 9,
     /// Response to a register identity request.
-    Register,
+    Register = 10,
     /// Response to an identify request.
-    Identify,
+    Identify = 11,
     /// Response to a proxy request.
     /// - include_hop_info: Response includes information about the selected hops.
     Proxy {
         #[serde(default)]
         include_hop_info: bool,
-    },
-    _Reserved13,
+    } = 12,
     /// Response to an opcode execution request.
-    Opcode,
+    Opcode = 14,
     /// Error response
-    Error,
+    Error = 15,
 }
