@@ -4,14 +4,18 @@ use serde::{Deserialize, Serialize};
 /// Plabble error code body
 /// The length is prefixed by a u8 in the packet body.
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(tag = "type")]
+#[repr(u8)]
 pub enum PlabbleError {
     /// The requested protocol version is not supported by this implementation.
     /// Contains the min and max version the server supports.
-    UnsupportedVersion { min_version: u8, max_version: u8 },
+    UnsupportedVersion { min_version: u8, max_version: u8 } = 0,
     UnsupportedAlgorithm {
         #[dyn_length]
         name: String,
-    },
+    } = 1,
+
+    BucketNotFound = 10
 }
 
 #[cfg(test)]
@@ -31,7 +35,8 @@ mod tests {
             packet_type = "Error"
             request_counter = 1
 
-            [body.UnsupportedVersion]
+            [body]
+            type = "UnsupportedVersion"
             min_version = 1
             max_version = 3
         "#,
@@ -57,7 +62,8 @@ mod tests {
             packet_type = "Error"
             request_counter = 1
 
-            [body.UnsupportedAlgorithm]
+            [body]
+            type = "UnsupportedAlgorithm"
             name = "Ed25519"
         "#,
         )

@@ -6,6 +6,8 @@ use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::{DisplayFromStr, serde_as};
 
+use crate::core::BucketId;
+
 /// Bucket query structure used for querying bucket data
 /// with a specific ID and range.
 /// The range can be either numeric or binary, depending on the bucket type.
@@ -16,8 +18,7 @@ use serde_with::{DisplayFromStr, serde_as};
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 pub struct BucketQuery {
-    #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
-    id: [u8; 16],
+    id: BucketId,
 
     #[variant_by = "binary_keys"]
     range: BucketRange,
@@ -32,8 +33,7 @@ pub struct BucketQuery {
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 pub struct PutRequestBody {
-    #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
-    id: [u8; 16],
+    id: BucketId,
 
     #[variant_by = "binary_keys"]
     body: BucketBody,

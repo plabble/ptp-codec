@@ -234,14 +234,68 @@ Ed25519 = "..."
 > The client SHOULD validate the signatures and validate if the server returned the algorithms it asked for! Else it should not trust the session and disconnect.
 
 ## Get
-- **Goal**: _request_ data from one or more slots inside a [bucket](#buckets) on the server.
-- Implementation: [bucket.rs](./src/packets/body/bucket.rs)
+- **Goal**: _request_ data from one or more slots inside a `bucket` on the server, optionally subscribe to updates.
+- Implementation: [bucket.rs](src/packets/body/bucket.rs)
+
+### Get flow
+1. The client builds a `Get` request targeting a single bucket (identified by a 16-byte ID) and chooses a range to read.
+2. The server looks up the bucket and returns the requested slots (or an empty result if none match).
+3. If the `subscribe` flag is set, the server may continue to send updates for the requested keys/slots until the subscription is cancelled.
+
+### Get request
+Request header flags:
+- **binary_keys**: keys in the request/response are UTF-8 strings instead of numeric slot indexes.
+- **subscribe**: request a subscription for changes on the requested keys/range.
+- **range_mode_until**: treat a single provided range value as an "until" (end-only) bound.
+
+Request body:
+- **id**: 16-byte bucket identifier (base64/URL-safe when using the TOML representation).
+- **range**: either `Numeric(start?, end?)` or `Binary(start_key?, end_key?)` (both bounds are optional). Numeric ranges use `u16` slots; binary ranges use UTF-8 keys.
+
+Example (numeric range):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Get"
+
+[body]
+id = "AAAAAAAAAAAAAAAAAAAAAA"  # 16-byte id (base64url)
+range.Numeric = [5, 25]
+```
+
+Example (binary range):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Get"
+binary_keys = true
+
+[body]
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+range.Binary = ["key_start", "key_end"]
+```
+
+### Get response
+Response header flags:
+- **binary_keys**: indicates keys in the response are UTF-8 strings (matches the request's `binary_keys`).
+
+Response body:
+- `Get` responses carry a `BucketBody` (see [implementation](./src/packets/body/bucket.rs)). For numeric buckets this is a key-value set with numbers and binary values, for binary it is a key-value set with both binary keys and values.
+
+Notes:
+- Values in the TOML examples are typically encoded as base64 when represented in text (see `BucketBody` in the crate).
+- When `subscribe` is set the server semantics for update delivery are implementation-dependent (push over the current connection or via separate subscription messages) but should follow the protocol's subscription guarantees.
 
 
 
 ## Errors
 0. **UnsupportedVersion**: Requested Plabble protocol version not supported by server. Body: `min_version` (min supported version by server), `max_version` (max supported version by server). _Occurence_: every request Plabble packet.
 1. **UnsupportedAlgorithm**: Requested algotithm (in cryptography settings) is not supported by the server. Body: `name` The name of the algorithm(s) that is not supported, UTF-8 [dynint](#plabble-dynamic-int) length encoded. _Occurence_: any packet, but especially [Session](#session), [Certificate](#certificate) and other packets that use cryptography settings. 
+10. **BucketNotFound**: Requested bucket was not found
 
 ## Concepts
 
