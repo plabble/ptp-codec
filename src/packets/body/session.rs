@@ -4,8 +4,8 @@ use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
-use crate::packets::base::algorithm::{CryptoSignature, KeyExhangeRequest, KeyExhangeResponse};
-use crate::packets::base::datetime::PlabbleDateTime;
+use crate::crypto::algorithm::{CryptoSignature, KeyExhangeRequest, KeyExhangeResponse};
+use crate::core::PlabbleDateTime;
 
 /// Session request body
 #[serde_as]

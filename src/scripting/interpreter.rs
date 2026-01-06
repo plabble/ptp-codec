@@ -4,7 +4,7 @@ use binary_codec::BinaryDeserializer;
 use chrono::Utc;
 
 use crate::{
-    packets::base::datetime::PlabbleDateTime,
+    core::PlabbleDateTime,
     scripting::opcode_script::{Opcode, OpcodeScript, ScriptSettings},
 };
 use log::{debug, trace};

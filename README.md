@@ -249,7 +249,7 @@ Request header flags:
 - **range_mode_until**: treat a single provided range value as an "until" (end-only) bound.
 
 Request body:
-- **id**: 16-byte bucket identifier (base64/URL-safe when using the TOML representation).
+- **id**: 16-byte [bucket identifier](#bucket-id) (base64/URL-safe when using the TOML representation).
 - **range**: either `Numeric(start?, end?)` or `Binary(start_key?, end_key?)` (both bounds are optional). Numeric ranges use `u16` slots; binary ranges use UTF-8 keys.
 
 Example (numeric range):
@@ -300,12 +300,20 @@ Notes:
 ## Concepts
 
 ### Buckets
-The Plabble Protocol is built around the concept of a **bucket**. A bucket is an isolated key-value database collection. A server can host many buckets, but a Plabble request is always targeting one bucket. Every bucket contains **slots** which are the entries inside the buckets. You can modify the binary content of a slot using its **key**. The **value** inside the slot is always binary (in bytes), no other data types are supported using the Plabble protocol. 
+The Plabble Protocol is built around the concept of a **bucket**. A bucket is an isolated key-value database collection. A server can host many buckets, but a Plabble request is always targeting one bucket. Every bucket contains **slots** which are the entries inside the buckets. You can modify the binary content of a slot using its **key**. The **value** inside the slot is always binary (in bytes), no other data types are supported using the Plabble protocol. Every bucket has a [bucket id](#bucket-id) that is unique per server.
 
 #### Bucket key types
 There are two types of keys:
 - **Numeric keys**: A _uint16_ value between 0 and 65535. So numeric buckets have a maximum amount of slots, exactly 65536. The big advantage of numeric slots is that they are very small to send (only 2 bytes) and that they follow a numeric order.
 - **Binary keys**: A _utf-8_ encoded string. This gives the protocol more flexibility when working with buckets. The disadvantages are bigger requests and the dynamic length, so we need to prefix the keys with a [dynint](#plabble-dynamic-int) to encode the length in Plabble packets when using binary keys.
+
+### Bucket ID
+The bucket ID is the 16-byte server-wide unique ID for one bucket. There are 3 ways to notate a bucket ID:
+1. Base64-URL-encoded without padding. For example: `RKiZXdULZlegN6eDkwRTWw`.
+2. UTF-8 with the magic prefix `#`: This can be any valid UTF-8 string, like `#mybucket` or `#😁`. The content following the # will be hashed into a 16-byte ID using `blake2b-128`. This allows the Plabble protocol to use things like usernames, aliases, addresses etc.
+3. UTF-8 with the magic prefix `@`: This is similar to the #, but uses `blake3-128` instead. Not all servers and client are required to support Blake3.
+
+When creating a bucket, you can generate the bucket ID yourself. If it is taken, the server will return an error. TODO: which error?
 
 ### Plabble-over-HTTPS (PoH)
 

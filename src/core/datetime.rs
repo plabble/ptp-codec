@@ -49,7 +49,7 @@ mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer};
     use chrono::{TimeZone, Utc};
 
-    use crate::packets::base::datetime::PlabbleDateTime;
+    use super::PlabbleDateTime;
 
     #[test]
     fn can_convert_to_seconds_from_epoch_and_back() {

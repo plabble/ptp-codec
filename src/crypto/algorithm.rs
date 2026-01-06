@@ -4,6 +4,8 @@ use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
+// Visit https://openquantumsafe.org/liboqs/algorithms
+
 /// Cryptographic keys used for key exchange request
 ///
 /// # Variants
@@ -51,7 +53,7 @@ pub enum KeyExhangeResponse {
 /// - Ed25519: 64 bytes signature for Ed25519 signatures
 /// - Dsa44: 2420 bytes signature for DSA-44 post-quantum signatures
 /// - Dsa65: 3309 bytes signature for DSA-65 post-quantum signatures
-/// - Falcon: 1462 bytes signature for Falcon post-quantum signatures
+/// - Falcon: 1462 bytes signature for Falcon-1024 post-quantum signatures
 /// - SlhDsaSha128s: 7856 bytes signature for SLH-DSA-SHA128s post-quantum signatures
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
@@ -71,4 +73,33 @@ pub enum CryptoSignature {
 
     #[toggled_by = "slh_dsa"]
     SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 7856]),
+}
+
+/// Public verification keys used in various algorithms for verifying a digital signature
+/// The signatures are stored as fixed-size byte arrays, serialized/deserialized using base64 encoding (when using serde)
+///
+/// # Variants:
+/// - Ed25519: 32 bytes key for Ed25519
+/// - Dsa44: 1312 bytes key for DSA-44
+/// - Dsa65: 1952 bytes key for DSA-65
+/// - Falcon: 1793 bytes key for Falcon-1024 which is bigger than the signature :D
+/// - SlhDsaSha128s: 32 bytes key for SLH-DSA-SHA128s
+#[serde_as]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[no_discriminator]
+pub enum VerificationKey {
+    #[toggled_by = "ed25519"]
+    Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+
+    #[toggled_by = "dsa44"]
+    Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1312]),
+
+    #[toggled_by = "dsa65"]
+    Dsa65(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1952]),
+
+    #[toggled_by = "falcon"]
+    Falcon(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1793]),
+
+    #[toggled_by = "slh_dsa"]
+    SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
 }
