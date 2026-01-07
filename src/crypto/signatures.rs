@@ -82,16 +82,7 @@ impl VerificationKey {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::crypto::algorithm::SigningKey;
-
-//     #[test]
-//     fn try_sign_dsa44() {
-        
-//         let key = SigningKey::Dsa44([0u8; 2560]);
-//         let sig = key.sign(&vec![1,2,3,4][..]);
-
-//         println!("{:?}", sig);
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    // TODO
+}
