@@ -61,7 +61,7 @@ pub struct PostQuantumSettings {
     #[serde(default)]
     #[toggles("dsa65")]
     pub sign_pqc_dsa_65: bool,
-
+    
     /// Sign with Falcon-1024, public key size 1793 B, signature 1462 B.
     /// 3x slower than ML-DSA, NIST level 5 security.
     #[serde(default)]

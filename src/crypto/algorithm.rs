@@ -10,8 +10,8 @@ use serde_with::serde_as;
 ///
 /// # Variants
 /// - X25519: 32 bytes public key for X25519 key exchange
-/// - Kem512: 800 bytes public key for KEM-512 post-quantum key exchange
-/// - Kem768: 1184 bytes public key for KEM-768 post-quantum key exchange
+/// - Kem512: 800 bytes public key for ML-KEM-512 post-quantum key exchange
+/// - Kem768: 1184 bytes public key for ML-KEM-768 post-quantum key exchange
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[no_discriminator]
@@ -30,8 +30,8 @@ pub enum KeyExhangeRequest {
 ///
 /// # Variants
 /// - X25519: 32 bytes public key for X25519 key exchange
-/// - Kem512: 768 bytes encapsulated secret for KEM-512 post-quantum key exchange
-/// - Kem768: 1088 bytes encapsulated secret for KEM-768 post-quantum key exchange
+/// - Kem512: 768 bytes encapsulated secret for ML-KEM-512 post-quantum key exchange
+/// - Kem768: 1088 bytes encapsulated secret for ML-KEM-768 post-quantum key exchange
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 #[no_discriminator]
@@ -51,8 +51,8 @@ pub enum KeyExhangeResponse {
 ///
 /// # Variants:
 /// - Ed25519: 64 bytes signature for Ed25519 signatures
-/// - Dsa44: 2420 bytes signature for DSA-44 post-quantum signatures
-/// - Dsa65: 3309 bytes signature for DSA-65 post-quantum signatures
+/// - Dsa44: 2420 bytes signature for ML-DSA-44 post-quantum signatures
+/// - Dsa65: 3309 bytes signature for ML-DSA-65 post-quantum signatures
 /// - Falcon: 1462 bytes signature for Falcon-1024 post-quantum signatures
 /// - SlhDsaSha128s: 7856 bytes signature for SLH-DSA-SHA128s post-quantum signatures
 #[serde_as]
@@ -80,8 +80,8 @@ pub enum CryptoSignature {
 ///
 /// # Variants:
 /// - Ed25519: 32 bytes key for Ed25519
-/// - Dsa44: 1312 bytes key for DSA-44
-/// - Dsa65: 1952 bytes key for DSA-65
+/// - Dsa44: 1312 bytes key for ML-DSA-44
+/// - Dsa65: 1952 bytes key for ML-DSA-65
 /// - Falcon: 1793 bytes key for Falcon-1024 which is bigger than the signature :D
 /// - SlhDsaSha128s: 32 bytes key for SLH-DSA-SHA128s
 #[serde_as]
@@ -110,8 +110,8 @@ pub enum VerificationKey {
 ///
 /// # Variants:
 /// - Ed25519: 32 bytes key for Ed25519
-/// - Dsa44: 2560 bytes key for DSA-44
-/// - Dsa65: 4032 bytes key for DSA-65
+/// - Dsa44: 2560 bytes key for ML-DSA-44
+/// - Dsa65: 4032 bytes key for ML-DSA-65
 /// - Falcon: 2305 bytes key for Falcon-1024
 /// - SlhDsaSha128s: 64 bytes key for SLH-DSA-SHA128s
 #[derive(Debug, PartialEq)]
