@@ -95,6 +95,7 @@ impl KeyExchange {
 
                 Some(KeyExhangeRequest::Kem768(ec.as_bytes().into()))
             }
+            #[cfg(not(feature = "pqc_lite"))]
             _ => None,
         }
     }
@@ -160,6 +161,7 @@ impl KeyExchange {
                     None
                 }
             }
+            #[cfg(not(feature = "pqc_lite"))]
             _ => None,
         }
     }
@@ -221,6 +223,7 @@ impl KeyExchange {
                     None
                 }
             }
+            #[cfg(not(feature = "pqc_lite"))]
             _ => None,
         }
     }

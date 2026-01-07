@@ -74,7 +74,7 @@ pub struct CertificateBody {
 mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
-    use crate::crypto::{algorithm::VerificationKey, certificate::Certificate};
+    use crate::crypto::certificate::Certificate;
 
     #[test]
     fn can_serialize_and_deserialize_certificate() {
