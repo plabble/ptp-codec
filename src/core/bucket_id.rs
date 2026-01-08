@@ -26,16 +26,16 @@ impl BucketId {
             '#' => {
                 let mut hasher = Blake2b16::new();
                 hasher.update(repr[1..].as_bytes());
-                
+
                 Some(Self {
                     data: hasher.finalize().into(),
                 })
             }
             '@' => {
-                #[cfg(not(feature = "blake_3"))]
+                #[cfg(not(feature = "blake-3"))]
                 return None;
 
-                #[cfg(feature = "blake_3")]
+                #[cfg(feature = "blake-3")]
                 {
                     let mut data = [0u8; 16];
 
@@ -47,7 +47,7 @@ impl BucketId {
 
                     Some(Self { data })
                 }
-            },
+            }
             _ => {
                 let decode = BASE64_URL_SAFE_NO_PAD.decode(repr).ok()?;
                 Some(Self {
@@ -77,12 +77,22 @@ mod tests {
     #[test]
     fn can_create_hashed_bucket_id_with_blake2b() {
         let id = BucketId::parse("#test").unwrap();
-        assert_eq!(id.data, BASE64_URL_SAFE_NO_PAD.decode("RKiZXdULZlegN6eDkwRTWw").unwrap()[..])
+        assert_eq!(
+            id.data,
+            BASE64_URL_SAFE_NO_PAD
+                .decode("RKiZXdULZlegN6eDkwRTWw")
+                .unwrap()[..]
+        )
     }
 
     #[test]
     fn can_create_hashed_bucket_id_with_blake3() {
         let id = BucketId::parse("@test").unwrap();
-        assert_eq!(id.data, BASE64_URL_SAFE_NO_PAD.decode("SHjKBCXHOfpCf37aIP6EXw").unwrap()[..])
+        assert_eq!(
+            id.data,
+            BASE64_URL_SAFE_NO_PAD
+                .decode("SHjKBCXHOfpCf37aIP6EXw")
+                .unwrap()[..]
+        )
     }
 }

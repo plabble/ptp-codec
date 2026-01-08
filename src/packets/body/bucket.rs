@@ -92,7 +92,8 @@ mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer};
 
     use crate::packets::{
-        header::type_and_flags::RequestPacketType, request::PlabbleRequestPacket, response::PlabbleResponsePacket,
+        header::type_and_flags::RequestPacketType, request::PlabbleRequestPacket,
+        response::PlabbleResponsePacket,
     };
 
     #[test]
@@ -276,7 +277,8 @@ mod tests {
 
     #[test]
     fn can_serialize_and_deserialize_get_numeric_response() {
-        let packet: PlabbleResponsePacket = toml::from_str(r#"
+        let packet: PlabbleResponsePacket = toml::from_str(
+            r#"
             version = 1
             use_encryption = true
 
@@ -287,16 +289,60 @@ mod tests {
             [body.Numeric]
             5 = "AAAAAA"
             7 = "AAAAAAAA"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let serialized = packet.to_bytes(None).unwrap();
 
         // version = 0001, flags = 0100. Packet type = Get (0010), flags: 0000.
         // request counter: 0,1  nx [ key: X,X (0,5) or (0,7) (we don't know the hashmap order for sure, it really can differ per time...)
         // length (dynint, in this case 1 byte) then bytes ]
-        let case1 = vec![0b0100_0001, 0b0000_0010, 0, 1, 0, 5, 4, 0, 0, 0, 0, 0, 7, 6, 0, 0, 0, 0, 0, 0];
-        let case2 = vec![0b0100_0001, 0b0000_0010, 0, 1, 0, 7, 6, 0, 0, 0, 0, 0, 0, 0, 5, 4, 0, 0, 0, 0];
-        
+        let case1 = vec![
+            0b0100_0001,
+            0b0000_0010,
+            0,
+            1,
+            0,
+            5,
+            4,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7,
+            6,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ];
+        let case2 = vec![
+            0b0100_0001,
+            0b0000_0010,
+            0,
+            1,
+            0,
+            7,
+            6,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            5,
+            4,
+            0,
+            0,
+            0,
+            0,
+        ];
+
         assert!(serialized == case1 || serialized == case2);
 
         let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();
@@ -305,7 +351,8 @@ mod tests {
 
     #[test]
     fn can_serialize_and_deserialize_get_binary_response() {
-        let packet: PlabbleResponsePacket = toml::from_str(r#"
+        let packet: PlabbleResponsePacket = toml::from_str(
+            r#"
             version = 1
             use_encryption = true
 
@@ -317,15 +364,67 @@ mod tests {
             [body.Binary]
             name = "AAAA"
             alias = "AAAAAA"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let serialized = packet.to_bytes(None).unwrap();
 
         // version = 0001, flags = 0100. Packet type = Get (0010), flags: 0001.
         // request counter: 0,1  nx [ key length, key, length (dynint, in this case 1 byte) then bytes ]
-        let case1 = vec![0b0100_0001, 0b0001_0010, 0, 1, 4, b'n', b'a', b'm', b'e', 3, 0, 0, 0, 5, b'a', b'l', b'i', b'a', b's', 4, 0, 0, 0, 0];
-        let case2 = vec![0b0100_0001, 0b0001_0010, 0, 1, 5, b'a', b'l', b'i', b'a', b's', 4, 0, 0, 0, 0, 4, b'n', b'a', b'm', b'e', 3, 0, 0, 0];
-        
+        let case1 = vec![
+            0b0100_0001,
+            0b0001_0010,
+            0,
+            1,
+            4,
+            b'n',
+            b'a',
+            b'm',
+            b'e',
+            3,
+            0,
+            0,
+            0,
+            5,
+            b'a',
+            b'l',
+            b'i',
+            b'a',
+            b's',
+            4,
+            0,
+            0,
+            0,
+            0,
+        ];
+        let case2 = vec![
+            0b0100_0001,
+            0b0001_0010,
+            0,
+            1,
+            5,
+            b'a',
+            b'l',
+            b'i',
+            b'a',
+            b's',
+            4,
+            0,
+            0,
+            0,
+            0,
+            4,
+            b'n',
+            b'a',
+            b'm',
+            b'e',
+            3,
+            0,
+            0,
+            0,
+        ];
+
         assert!(serialized == case1 || serialized == case2);
 
         let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();

@@ -175,7 +175,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         allow_eval: bool,
-    } = 14
+    } = 14,
 }
 
 /// Plabble request packet types.

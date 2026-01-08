@@ -125,7 +125,10 @@ pub enum Opcode {
     SWITCH = 67,   // Switches between current and alt stack
     CONCAT = 68,   // Merge top two items together as bytes
     COUNT = 69,    // Push number of items in stack to stack (excluding itself)
-    // 70 - 80,
+
+    // Casts
+    NUMBER = 70, // Cast current value to number. This is only needed if you for instance want to compare a byte array as a number to a number
+    // 71 - 80,
 
     // Bucket operations
     SERVER = 81, // Connect to other server. Takes address from stack
@@ -276,9 +279,10 @@ impl OpcodeScript {
                 }
                 Opcode::BREAK => {
                     let loop_pos = loop_stack.last().ok_or(ScriptError::ControlFlowMalformed)?;
-                    break_map.entry(*loop_pos)
+                    break_map
+                        .entry(*loop_pos)
                         .or_insert_with(Vec::new)
-                        .push(address);                                 
+                        .push(address);
                 }
                 _ => {}
             }

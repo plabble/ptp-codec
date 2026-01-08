@@ -104,7 +104,6 @@ pub enum VerificationKey {
     SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
 }
 
-
 /// Secret siging keys used in various algorithms for creating a digital signature
 /// The signatures are stored as fixed-size byte arrays, serialized/deserialized using base64 encoding (when using serde)
 ///

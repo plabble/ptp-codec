@@ -9,13 +9,16 @@ use serde::{Deserialize, Serialize};
 pub enum PlabbleError {
     /// The requested protocol version is not supported by this implementation.
     /// Contains the min and max version the server supports.
-    UnsupportedVersion { min_version: u8, max_version: u8 } = 0,
+    UnsupportedVersion {
+        min_version: u8,
+        max_version: u8,
+    } = 0,
     UnsupportedAlgorithm {
         #[dyn_length]
         name: String,
     } = 1,
 
-    BucketNotFound = 10
+    BucketNotFound = 10,
 }
 
 #[cfg(test)]

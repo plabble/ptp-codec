@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             }
             ResponsePacketType::Get { .. } => {
                 PlabbleResponseBody::Get(raw.body.deserialize_into().unwrap())
-            },
+            }
             ResponsePacketType::Stream => todo!(),
             ResponsePacketType::Post => todo!(),
             ResponsePacketType::Patch => todo!(),

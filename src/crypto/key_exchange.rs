@@ -11,7 +11,7 @@
 //!   secret.
 //!
 //! Implementations include X25519 (always available) and optional
-//! post-quantum KEMs gated behind `pqc_lite`.
+//! post-quantum KEMs gated behind `pqc-lite`.
 
 use crate::crypto::algorithm::{KeyExhangeRequest, KeyExhangeResponse};
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
@@ -20,7 +20,7 @@ use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 ///
 /// - `X25519` is the standard Diffie-Hellman over Curve25519.
 /// - `Kem512` / `Kem768` are optional post-quantum KEM algorithms
-///   provided when the `pqc_lite` feature is enabled.
+///   provided when the `pqc-lite` feature is enabled.
 pub enum KeyExchangeAlgorithm {
     X25519,
     Kem512,
@@ -63,7 +63,7 @@ impl KeyExchange {
 
                 Some(KeyExhangeRequest::X25519(public.to_bytes()))
             }
-            #[cfg(feature = "pqc_lite")]
+            #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem512 => {
                 use ml_kem::{
                     EncodedSizeUser, KemCore, MlKem512, MlKem512Params,
@@ -79,7 +79,7 @@ impl KeyExchange {
 
                 Some(KeyExhangeRequest::Kem512(ec.as_bytes().into()))
             }
-            #[cfg(feature = "pqc_lite")]
+            #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem768 => {
                 use ml_kem::{
                     EncodedSizeUser, KemCore, MlKem768, MlKem768Params,
@@ -95,7 +95,7 @@ impl KeyExchange {
 
                 Some(KeyExhangeRequest::Kem768(ec.as_bytes().into()))
             }
-            #[cfg(not(feature = "pqc_lite"))]
+            #[cfg(not(feature = "pqc-lite"))]
             _ => None,
         }
     }
@@ -123,7 +123,7 @@ impl KeyExchange {
                     None
                 }
             }
-            #[cfg(feature = "pqc_lite")]
+            #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem512 => {
                 if let KeyExhangeRequest::Kem512(encap_key) = req {
                     use ml_kem::{
@@ -142,7 +142,7 @@ impl KeyExchange {
                     None
                 }
             }
-            #[cfg(feature = "pqc_lite")]
+            #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem768 => {
                 if let KeyExhangeRequest::Kem768(encap_key) = req {
                     use ml_kem::{
@@ -161,7 +161,7 @@ impl KeyExchange {
                     None
                 }
             }
-            #[cfg(not(feature = "pqc_lite"))]
+            #[cfg(not(feature = "pqc-lite"))]
             _ => None,
         }
     }
@@ -185,7 +185,7 @@ impl KeyExchange {
                     None
                 }
             }
-            #[cfg(feature = "pqc_lite")]
+            #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem512 => {
                 if let KeyExhangeResponse::Kem512(ek) = res {
                     use ml_kem::{
@@ -204,7 +204,7 @@ impl KeyExchange {
                     None
                 }
             }
-            #[cfg(feature = "pqc_lite")]
+            #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem768 => {
                 if let KeyExhangeResponse::Kem768(ek) = res {
                     use ml_kem::{
@@ -223,7 +223,7 @@ impl KeyExchange {
                     None
                 }
             }
-            #[cfg(not(feature = "pqc_lite"))]
+            #[cfg(not(feature = "pqc-lite"))]
             _ => None,
         }
     }

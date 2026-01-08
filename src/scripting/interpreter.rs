@@ -302,7 +302,7 @@ impl ScriptInterpreter {
         match opcode {
             Opcode::FALSE => self.push(StackData::Boolean(false))?,
             Opcode::TRUE => self.push(StackData::Boolean(true))?,
-            Opcode::PUSH1(data) => self.push(StackData::Buffer(vec![data]))?,
+            Opcode::PUSH1(data) => self.push(StackData::Byte(data))?,
             Opcode::PUSH2(data) => self.push(StackData::Buffer(data.to_vec()))?,
             Opcode::PUSH4(data) => self.push(StackData::Buffer(data.to_vec()))?,
             Opcode::PUSHL1 { len: _, data } => self.push(StackData::Buffer(data))?,
@@ -698,6 +698,11 @@ impl ScriptInterpreter {
             Opcode::COUNT => {
                 let length = self.stack().len() as i128;
                 self.push(StackData::Number(length))?;
+            }
+            Opcode::NUMBER => {
+                self.ensure_stack_size(1)?;
+                let num = self.pop_number()?;
+                self.push(StackData::Number(num))?;
             }
             Opcode::SERVER => todo!(),
             Opcode::SELECT => todo!(),
@@ -2451,5 +2456,23 @@ mod tests {
             let res = i.exec();
             assert_eq!(res, Err(ScriptError::OpcodeLimitExceeded));
         }
+    }
+
+    #[test]
+    fn can_concat_two_bytes_into_a_number_using_number_cast() {
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSH1(130),
+            Opcode::PUSH1(130),
+            Opcode::PUSH1(1),
+            Opcode::CONCAT,
+            Opcode::NUMBER,
+            Opcode::EQ,
+            Opcode::ASSERT,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        let res = i.exec();
+
+        assert_eq!(res, Ok(None));
     }
 }

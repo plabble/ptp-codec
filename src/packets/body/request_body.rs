@@ -44,5 +44,5 @@ pub enum PlabbleRequestBody {
     Register = 10,
     Identify = 11,
     Proxy = 12,
-    Opcode = 14
+    Opcode = 14,
 }
