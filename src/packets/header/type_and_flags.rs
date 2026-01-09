@@ -82,7 +82,7 @@ pub enum RequestPacketType {
         stream_append: bool,
     } = 3,
     /// Create a new bucket
-    /// - binary_keys: Indicate that the bucket has binary keys
+    /// - binary_keys: Indicate that the bucket (or at least the subscribe range) has binary keys
     /// - subscribe: Subscribe to changes on the bucket
     /// - range_mode_until: Use range mode until a specified key/index for the subscription
     /// - do_not_persist: Indicate that the bucket should not be persisted to disk (RAM bucket)
@@ -92,6 +92,7 @@ pub enum RequestPacketType {
         binary_keys: bool,
 
         #[serde(default)]
+        #[toggles("subscribe")]
         subscribe: bool,
 
         #[serde(default)]

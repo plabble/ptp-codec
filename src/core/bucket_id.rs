@@ -85,6 +85,7 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "blake-3")]
     #[test]
     fn can_create_hashed_bucket_id_with_blake3() {
         let id = BucketId::parse("@test").unwrap();

@@ -102,7 +102,9 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
                 PlabbleRequestBody::Get(raw.body.deserialize_into().unwrap())
             }
             RequestPacketType::Stream { .. } => todo!(),
-            RequestPacketType::Post { .. } => todo!(),
+            RequestPacketType::Post { .. } => {
+                PlabbleRequestBody::Post(raw.body.deserialize_into().unwrap())
+            },
             RequestPacketType::Patch => todo!(),
             RequestPacketType::Put { .. } => todo!(),
             RequestPacketType::Delete { .. } => todo!(),

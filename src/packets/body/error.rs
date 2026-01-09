@@ -7,18 +7,31 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type")]
 #[repr(u8)]
 pub enum PlabbleError {
+    /* generic errors: 0-10 */
     /// The requested protocol version is not supported by this implementation.
     /// Contains the min and max version the server supports.
     UnsupportedVersion {
         min_version: u8,
         max_version: u8,
     } = 0,
+    /// The requested algorithm in crypto settings is not supported by the server
     UnsupportedAlgorithm {
         #[dyn_length]
         name: String,
     } = 1,
 
+    /* bucket errors: 10-100 */
+    /// Bucket by ID not found (or existence denied)
     BucketNotFound = 10,
+
+    /// Bucket with that ID already exists
+    BucketAlreadyExists = 11,
+
+    /* certificate errors: 110-115 */
+    /// Certificate by ID not found
+    CertificateNotFound = 110,
+    /// Requested certificate is not valid (according to server)
+    CertificateInvalid = 111
 }
 
 #[cfg(test)]
