@@ -8,17 +8,23 @@ use serde::{Deserialize, Serialize};
 #[no_discriminator]
 pub enum RequestPacketType {
     /// Request a certificate from the server.
-    /// - full_chain: Request the full certificate chain.
+    /// - full_chain: Request the full certificate chain, or just a single certificate
+    /// - full_certs: Request full certificates or just summary
     /// - challenge: Provide a challenge that the server must sign.
-    /// - query_mode: Query certificate from server by ID
+    /// - query_mode: Query certificate from server by ID, or the server's main certificate
     Certificate {
         #[serde(default)]
         full_chain: bool,
 
         #[serde(default)]
+        full_certs: bool,
+
+        #[serde(default)]
+        #[toggles("challenge")]
         challenge: bool,
 
         #[serde(default)]
+        #[toggles("query_mode")]
         query_mode: bool,
     } = 0,
     /// Start a new session.

@@ -58,13 +58,13 @@ pub struct CertificateBody {
     #[dyn_length]
     data: String,
 
-    /// The public keys this certificate contains
+    /// The public keys this certificate contains/are issued with this certificate
     #[multi_enum]
     keys: Vec<VerificationKey>,
 
-    /// Signatures for each algorithm in this certificate
+    /// Signatures for each algorithm in this certificate, by the issuer
     /// Every signature contains the following data:
-    /// - The public key for the specific algorithm
+    /// - The public key for the specific algorithm (the issued key)
     /// - Blake2b_128(valid_from, valid_to, issuer_uri, data)
     #[multi_enum]
     signatures: Vec<CryptoSignature>,
@@ -75,6 +75,85 @@ mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
     use crate::crypto::certificate::Certificate;
+
+    #[test]
+    fn can_serialize_and_deserialize_non_full_certificate() {
+        let cert: Certificate = toml::from_str(
+            r#"
+            full_cert = false
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
+            uri = "https://certs.plabble.org/{id}.crt"
+        "#,
+        )
+        .unwrap();
+
+        assert!(cert.body.is_none());
+
+        let mut config = SerializerConfig::<()>::new(None);
+        let bytes = cert.to_bytes(Some(&mut config)).unwrap();
+
+        // 0000_0000, 16x 0, [len = 34], URL
+        assert_eq!(
+            bytes,
+            vec![
+                0x0000_0000,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                34,
+                b'h',
+                b't',
+                b't',
+                b'p',
+                b's',
+                b':',
+                b'/',
+                b'/',
+                b'c',
+                b'e',
+                b'r',
+                b't',
+                b's',
+                b'.',
+                b'p',
+                b'l',
+                b'a',
+                b'b',
+                b'b',
+                b'l',
+                b'e',
+                b'.',
+                b'o',
+                b'r',
+                b'g',
+                b'/',
+                b'{',
+                b'i',
+                b'd',
+                b'}',
+                b'.',
+                b'c',
+                b'r',
+                b't',
+            ]
+        );
+
+        let deserialized = Certificate::from_bytes(&bytes, Some(&mut config)).unwrap();
+        assert_eq!(cert, deserialized);
+    }
 
     #[test]
     fn can_serialize_and_deserialize_certificate() {
@@ -94,6 +173,8 @@ mod tests {
             [[signatures]]
             Ed25519 = "3eOHFAPx5lMev8MJ-gXEPdlRMLBM3IUTnOxRIyvjtcvYhOFv7SUv0byqc5EKy6XWqAbNNYGHoMhWh5vRwlEARA"
         "#).unwrap();
+
+        assert!(cert.body.is_some());
 
         let mut config = SerializerConfig::<()>::new(None);
         config.set_toggle("ed25519", true);

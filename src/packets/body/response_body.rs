@@ -1,7 +1,10 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
-use crate::packets::body::{bucket::BucketBody, error::PlabbleError, session::SessionResponseBody};
+use crate::packets::body::{
+    bucket::BucketBody, certificate::CertificateResponseBody, error::PlabbleError,
+    session::SessionResponseBody,
+};
 
 /// An enumeration representing the different types of response bodies
 /// that can be sent in a Plabble response.
@@ -29,7 +32,7 @@ use crate::packets::body::{bucket::BucketBody, error::PlabbleError, session::Ses
 #[no_discriminator]
 #[repr(u8)]
 pub enum PlabbleResponseBody {
-    Certificate = 0,
+    Certificate(CertificateResponseBody) = 0,
     Session(SessionResponseBody) = 1,
     Get(#[variant_by = "binary_keys"] BucketBody) = 2,
     Stream = 3,

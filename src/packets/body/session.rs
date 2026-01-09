@@ -25,6 +25,7 @@ pub struct SessionRequestBody {
     pub keys: Vec<KeyExhangeRequest>,
 }
 
+/// Session response body
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 pub struct SessionResponseBody {
@@ -70,7 +71,7 @@ mod tests {
 
         let bytes = packet.to_bytes(None).unwrap();
 
-        // type 0001, flags 0000. 16-byte zero-Mac. Packet type 0001, packet flags 0000. 32-byte x25519 key.
+        // Version 0001, flags 0000. 16-byte zero-Mac. Packet type 0001, packet flags 0000. 32-byte x25519 key.
         assert_eq!(
             vec![
                 0b0000_0001,
@@ -157,7 +158,7 @@ mod tests {
 
         let bytes = packet.to_bytes(None).unwrap();
 
-        // Type 0001, flags 0100. Packet type 0001, packet flags 0101. PSK expiration 0, 190, 135, 200. salt 16 bytes, 32-byte x25519 key
+        // Version 0001, flags 0100. Packet type 0001, packet flags 0101. PSK expiration 0, 190, 135, 200. salt 16 bytes, 32-byte x25519 key
         assert_eq!(
             vec![
                 0b0100_0001,

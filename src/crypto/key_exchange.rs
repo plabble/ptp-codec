@@ -1,44 +1,11 @@
-//! Key exchange helpers
-//!
-//! This module provides a small, ergonomic wrapper around supported
-//! key-exchange algorithms used by the Plabble protocol. It exposes a
-//! `KeyExchange` type that can:
-//!
-//! - generate a key-exchange request (public key or encapsulation),
-//! - process an incoming request and produce a response plus the
-//!   responder's shared secret, and
-//! - process a response from a peer to derive the initiator's shared
-//!   secret.
-//!
-//! Implementations include X25519 (always available) and optional
-//! post-quantum KEMs gated behind `pqc-lite`.
-
-use crate::crypto::algorithm::{KeyExhangeRequest, KeyExhangeResponse};
+use crate::crypto::{
+    KeyExchange, KeyExchangeAlgorithm,
+    algorithm::{KeyExhangeRequest, KeyExhangeResponse},
+};
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 
-/// Supported key-exchange algorithms.
-///
-/// - `X25519` is the standard Diffie-Hellman over Curve25519.
-/// - `Kem512` / `Kem768` are optional post-quantum KEM algorithms
-///   provided when the `pqc-lite` feature is enabled.
-pub enum KeyExchangeAlgorithm {
-    X25519,
-    Kem512,
-    Kem768,
-}
-
-/// A small stateful helper to run a key exchange for a chosen algorithm.
-///
-/// The struct stores the selected algorithm and, for initiators, the
-/// secret material generated when creating a request. The secret is kept
-/// as raw bytes so it can be used by the `process_response` method to
-/// compute the final shared secret.
-pub struct KeyExchange {
-    algorithm: KeyExchangeAlgorithm,
-    secret: Option<Vec<u8>>,
-}
-
 impl KeyExchange {
+    /// Create new key exchange session for a specific algorithm
     pub fn new(algorithm: KeyExchangeAlgorithm) -> Self {
         Self {
             algorithm,
@@ -244,6 +211,7 @@ mod tests {
         assert_eq!(ss_alice, ss_bob);
     }
 
+    #[cfg(feature = "pqc-lite")]
     #[test]
     fn can_create_a_shared_secret_with_ml_kem_512() {
         let mut alice = KeyExchange::new(KeyExchangeAlgorithm::Kem512);
@@ -255,6 +223,7 @@ mod tests {
         assert_eq!(ss_alice, ss_bob);
     }
 
+    #[cfg(feature = "pqc-lite")]
     #[test]
     fn can_create_a_shared_secret_with_ml_kem_768() {
         let mut alice = KeyExchange::new(KeyExchangeAlgorithm::Kem768);
@@ -266,6 +235,7 @@ mod tests {
         assert_eq!(ss_alice, ss_bob);
     }
 
+    #[cfg(feature = "pqc-lite")]
     #[test]
     fn cannot_create_a_shared_secret_with_incompatible_algorithms() {
         let mut alice = KeyExchange::new(KeyExchangeAlgorithm::X25519);

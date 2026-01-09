@@ -102,18 +102,18 @@ checksum = "7d809780667f4410e7c41b07f52439b94d2bdf8528eeedc287fa38d3b7f95d82"
 
 [[package]]
 name = "binary-codec"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a1814b37dbd7b75122828445dce47910b4d21b6d78c929a8ec081af5906115e"
+checksum = "ab9530fbd2fc795074894676faacf043cc2756514865826d878e807549f67c18"
 dependencies = [
  "binary-codec-derive",
 ]
 
 [[package]]
 name = "binary-codec-derive"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc3fe263096109b4d7f887e3cc654088704a6b45051c25f39452083b25addd1"
+checksum = "f65ee836e500269166b09b8068cd78e349db6ff6ccb89a94ef57e9b00b6269e2"
 dependencies = [
  "proc-macro2",
  "quote",

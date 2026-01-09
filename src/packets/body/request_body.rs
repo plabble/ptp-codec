@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::packets::body::{
     bucket::{BucketQuery, PutRequestBody},
+    certificate::CertificateRequestBody,
     session::SessionRequestBody,
 };
 
@@ -31,7 +32,7 @@ use crate::packets::body::{
 #[no_discriminator]
 #[repr(u8)]
 pub enum PlabbleRequestBody {
-    Certificate = 0,
+    Certificate(CertificateRequestBody) = 0,
     Session(SessionRequestBody) = 1,
     Get(BucketQuery) = 2,
     Stream = 3,

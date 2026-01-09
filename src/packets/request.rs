@@ -92,7 +92,9 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
         raw.header.preprocess();
 
         let body = match raw.header.packet_type {
-            RequestPacketType::Certificate { .. } => todo!(),
+            RequestPacketType::Certificate { .. } => {
+                PlabbleRequestBody::Certificate(raw.body.deserialize_into().unwrap())
+            }
             RequestPacketType::Session { .. } => {
                 PlabbleRequestBody::Session(raw.body.deserialize_into().unwrap())
             }

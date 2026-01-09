@@ -129,6 +129,80 @@ request_counter = 1     # counter of the request to reply to (the server counts 
 # ... type-specific properties
 ```
 
+## Certificate
+- **Goal**: _Get the server certificate or another certificate by ID, prove server identity_ ...
+- Implementation: [certificate.rs](./src/packets/body/certificate.rs)
+
+### Certificate flow
+1. The client sends the [ID of the certificate](#certificate-id) it wants to request (or no ID if it wants the certificate of the server), a challenge (or no challenge if the client is not interested in proving the servers' identity)
+2. The server retrieves the certificates the client requested, and signs the challenge + certificate(s) bytes
+3. The client verifies if the signature is correct
+4. The client stores the certificates in its certificate store so it doesn't need to request it another time
+
+### Certificate request
+Request header flags:
+- **full_chain**: if set, the server does not only return 1 certificate but all certificates in the certificate chain
+- **full_certs**: if set, the server will return the full certificates of the chain. If not set, the chain certificates (all certificates above the certificate that is requested) are not fully sent, but only in a compact form (without body)
+- **challenge**: if set, the client sends a 16-byte random challenge to the server to sign
+- **query_mode**: if set, the client specifies the certificate to retrieve by its certificate ID
+
+Request body:
+- **id**: the [ID of the certificate](#certificate-id) the client wants to retrieve, 16 bytes, REQUIRED when *query_mode* is set
+- **challenge**: the challenge for the server to sign, 16 bytes, REQUIRED when *challenge* flag is set.
+
+Example:
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Certificate"
+full_chain = true # this is the default
+full_certs = true # this is the default
+challenge = true  # default is false
+query_mode = true # default is false
+
+[body]
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+challenge = "AQEBAQEBAQEBAQEBAQEBAQ"
+```
+
+### Certificate response
+No response flags.
+
+Response body:
+- **signatures**: signatures for each algorithm determined by the crypto settings in the [base](#plabble-packet-base), in order. Each signature consist of challenge + list of certificates (as bytes)
+- **certificates**: list of [Plabble certificates](#certificates) based on the request.
+
+Example:
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Certificate"
+request_counter = 1
+
+    [[body.signatures]]
+    Ed25519 = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ"
+
+    [[body.certificates]]
+    id = "AgICAgICAgICAgICAgICAg"
+    uri = "..."
+    valid_from = "2025-05-15T12:00:00+00:00"
+    valid_until = "2026-01-01T00:00:00+00:00"
+    issuer_uri = "..."
+    data = "CA=plabble"
+
+        [[body.certificates.keys]]
+        Ed25519 = "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM"
+
+        [[body.certificates.signatures]]
+        Ed25519 = "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA"
+```
+
+> The client should only trust a certificate if the chain is verified and the signatures are correct!
+
 ## Session
 - **Goal**: _exchange keys_ with a server, create a [Session Key](#session-key).
 - Implementation: [session.rs](./src/packets/body/session.rs)
@@ -290,8 +364,6 @@ Notes:
 - Values in the TOML examples are typically encoded as base64 when represented in text (see `BucketBody` in the crate).
 - When `subscribe` is set the server semantics for update delivery are implementation-dependent (push over the current connection or via separate subscription messages) but should follow the protocol's subscription guarantees.
 
-
-
 ## Errors
 0. **UnsupportedVersion**: Requested Plabble protocol version not supported by server. Body: `min_version` (min supported version by server), `max_version` (max supported version by server). _Occurence_: every request Plabble packet.
 1. **UnsupportedAlgorithm**: Requested algotithm (in cryptography settings) is not supported by the server. Body: `name` The name of the algorithm(s) that is not supported, UTF-8 [dynint](#plabble-dynamic-int) length encoded. _Occurence_: any packet, but especially [Session](#session), [Certificate](#certificate) and other packets that use cryptography settings. 
@@ -340,3 +412,7 @@ The precision of a Plabble Timestamp is thus limited to 1 second which is suffic
 The advantage of the Plabble Timestamp is that it is thus very small, only taking 4 bytes.
 
 ### Plabble dynamic int
+
+### Certificates
+
+### Certificate ID
