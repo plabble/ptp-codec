@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Cryptography settings for a session, request or response
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct CryptoSettings {
-    /// If true, encrypt with ChaCha20 (Poly1305).
+    /// If true, encrypt with ChaCha20 and ChaCha20-Poly1305
     /// This is the default if no encryption settings are specified.
     #[serde(default = "default_true")]
     pub encrypt_with_cha_cha20: bool,

@@ -20,7 +20,9 @@ pub struct PlabbleRequestHeader {
     pub packet_type: RequestPacketType,
 
     /// ID of the bucket, if needed by the type
-    #[toggled_by_variant = "packet_type=2"]
+    /// The following types require the bucket ID in the header:
+    /// Get, Stream, Patch, Put, Delete, Subscribe, Unsubscribe
+    #[toggled_by_variant = "packet_type=2|3|5|6|7|8|9"]
     pub id: Option<BucketId>,
 }
 

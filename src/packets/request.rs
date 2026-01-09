@@ -67,11 +67,8 @@ impl BinaryDeserializer<PlabbleRequestContext> for PlabbleRequestPacket {
             CryptoSettings::apply_defaults(config);
         }
 
-        if base.use_encryption {
-        } else {
-        }
+        // if use encryption, set the crypto in the bitreader. Choose algorithm(s) based on crypto settings
 
-        // TODO: header encryption
         let header = PlabbleRequestHeader::read_bytes(stream, Some(config))?;
         config.discriminator = Some(header.packet_type.get_discriminator());
 

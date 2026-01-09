@@ -62,7 +62,7 @@ pub enum RequestPacketType {
         #[serde(default)]
         range_mode_until: bool,
     } = 2,
-    /// Start a data stream from or to the server
+    /// Start a data stream from or to a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - subscribe: Subscribe to changes on the requested keys.
     /// - range_mode_until: Use range mode until a specified key/index for the subscription

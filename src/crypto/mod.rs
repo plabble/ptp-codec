@@ -1,5 +1,6 @@
 mod key_exchange;
 mod signatures;
+mod encryption;
 
 /// Supported key-exchange algorithms.
 ///
