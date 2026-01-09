@@ -1,7 +1,7 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
-/// Plabble request packet types.
+/// Plabble request packet type, header flags & optionally other header fields
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "packet_type")]
 #[repr(u8)]
@@ -185,7 +185,7 @@ pub enum RequestPacketType {
     } = 14,
 }
 
-/// Plabble request packet types.
+/// Plabble response packet types, header flags & optionally other header fields
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "packet_type")]
 #[repr(u8)]

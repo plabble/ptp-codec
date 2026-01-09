@@ -25,11 +25,15 @@ pub struct PlabbleResponsePacket {
     pub body: PlabbleResponseBody,
 }
 
-impl BinarySerializer for PlabbleResponsePacket {
+/// Response context for cryptography, session etc.
+#[derive(Clone)]
+pub struct PlabbleResponseContext {}
+
+impl BinarySerializer<PlabbleResponseContext> for PlabbleResponsePacket {
     fn write_bytes(
         &self,
         stream: &mut BitStreamWriter,
-        config: Option<&mut binary_codec::SerializerConfig<()>>,
+        config: Option<&mut binary_codec::SerializerConfig<PlabbleResponseContext>>,
     ) -> Result<(), binary_codec::SerializationError> {
         self.header.preprocess();
 
@@ -50,10 +54,10 @@ impl BinarySerializer for PlabbleResponsePacket {
     }
 }
 
-impl BinaryDeserializer for PlabbleResponsePacket {
+impl BinaryDeserializer<PlabbleResponseContext> for PlabbleResponsePacket {
     fn read_bytes(
         stream: &mut binary_codec::BitStreamReader,
-        config: Option<&mut SerializerConfig<()>>,
+        config: Option<&mut SerializerConfig<PlabbleResponseContext>>,
     ) -> Result<Self, binary_codec::DeserializationError> {
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);

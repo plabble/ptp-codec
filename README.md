@@ -14,7 +14,7 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 
 ## Packet type
 - The Plabble Transport Protocol is build upon several **packet types**.
-- The packet types and their flags can be found in [type_and_flags.rs](./src/packets/header/type_and_flags.rs).
+- The packet types, their flags and header fields can be found in [type_and_flags.rs](./src/packets/header/type_and_flags.rs).
 
 - **0** [CERTIFICATE](#certificate)
 - **1** [SESSION](#session)
@@ -103,7 +103,7 @@ version = 1
 
 [header]
 packet_type = "Session" # the packet type in PascalCase
-# ... type-specific flags. See type_and_flags.rs
+# ... type-specific header fields/flags. See type_and_flags.rs
 
 [body]
 # ... type-specific properties
@@ -123,7 +123,7 @@ version = 1
 [header]
 packet_type = "Session" # the packet type in PascalCase
 request_counter = 1     # counter of the request to reply to (the server counts the client requests in a session). Optional. Only required if fire_and_forget is NOT set
-# ... type-specific flags. See type_and_flags.rs
+# ... type-specific header fields/flags. See type_and_flags.rs
 
 [body]
 # ... type-specific properties
@@ -317,13 +317,13 @@ Ed25519 = "..."
 3. If the `subscribe` flag is set, the server may continue to send updates for the requested keys/slots until the subscription is cancelled.
 
 ### Get request
-Request header flags:
+Request header:
 - **binary_keys**: keys in the request/response are UTF-8 strings instead of numeric slot indexes.
 - **subscribe**: request a subscription for changes on the requested keys/range.
 - **range_mode_until**: treat a single provided range value as an "until" (end-only) bound.
+- **id**: 16-byte [bucket identifier](#bucket-id) (base64/URL-safe when using the TOML representation).
 
 Request body:
-- **id**: 16-byte [bucket identifier](#bucket-id) (base64/URL-safe when using the TOML representation).
 - **range**: either `Numeric(start?, end?)` or `Binary(start_key?, end_key?)` (both bounds are optional). Numeric ranges use `u16` slots; binary ranges use UTF-8 keys.
 
 Example (numeric range):
@@ -333,9 +333,9 @@ use_encryption = true
 
 [header]
 packet_type = "Get"
+id = "AAAAAAAAAAAAAAAAAAAAAA"  # 16-byte id (base64url)
 
 [body]
-id = "AAAAAAAAAAAAAAAAAAAAAA"  # 16-byte id (base64url)
 range.Numeric = [5, 25]
 ```
 
@@ -346,10 +346,10 @@ use_encryption = true
 
 [header]
 packet_type = "Get"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
 binary_keys = true
 
 [body]
-id = "AAAAAAAAAAAAAAAAAAAAAA"
 range.Binary = ["key_start", "key_end"]
 ```
 
@@ -488,6 +488,9 @@ This is how to create a session key:
 ### PSK ID
 
 ### Authentication
+Plabble has two ways of ensuring the integrity of packets.
+When the `use_encryption` flag in the base packet is off, it will use a Message Authentication Code (MAC).
+If the encryption flag is on, Plabble uses Authenticated Encryption with Associated Data (AEAD).
 
 ### Encrypted client-server communication
 
@@ -499,6 +502,7 @@ The precision of a Plabble Timestamp is thus limited to 1 second which is suffic
 The advantage of the Plabble Timestamp is that it is thus very small, only taking 4 bytes.
 
 ### Plabble dynamic int
+A dynamic int is serialized in a way that every last bit of a byte indicates if another byte is needed for encoding a number. This way, serializing integers can be very efficient. 
 
 ### Certificates
 - Implementation: [certificate.rs](./src/crypto/certificate.rs)

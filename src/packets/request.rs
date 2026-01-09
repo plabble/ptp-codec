@@ -25,11 +25,15 @@ pub struct PlabbleRequestPacket {
     pub body: PlabbleRequestBody,
 }
 
-impl BinarySerializer for PlabbleRequestPacket {
+/// Request context for cryptography, session etc.
+#[derive(Clone)]
+pub struct PlabbleRequestContext {}
+
+impl BinarySerializer<PlabbleRequestContext> for PlabbleRequestPacket {
     fn write_bytes(
         &self,
         stream: &mut BitStreamWriter,
-        config: Option<&mut binary_codec::SerializerConfig<()>>,
+        config: Option<&mut binary_codec::SerializerConfig<PlabbleRequestContext>>,
     ) -> Result<(), binary_codec::SerializationError> {
         self.header.preprocess();
 
@@ -50,10 +54,10 @@ impl BinarySerializer for PlabbleRequestPacket {
     }
 }
 
-impl BinaryDeserializer for PlabbleRequestPacket {
+impl BinaryDeserializer<PlabbleRequestContext> for PlabbleRequestPacket {
     fn read_bytes(
         stream: &mut binary_codec::BitStreamReader,
-        config: Option<&mut SerializerConfig<()>>,
+        config: Option<&mut SerializerConfig<PlabbleRequestContext>>,
     ) -> Result<Self, binary_codec::DeserializationError> {
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
@@ -61,6 +65,10 @@ impl BinaryDeserializer for PlabbleRequestPacket {
         let base = PlabblePacketBase::read_bytes(stream, Some(config))?;
         if base.crypto_settings.is_none() {
             CryptoSettings::apply_defaults(config);
+        }
+
+        if base.use_encryption {
+        } else {
         }
 
         // TODO: header encryption
@@ -104,7 +112,7 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Stream { .. } => todo!(),
             RequestPacketType::Post { .. } => {
                 PlabbleRequestBody::Post(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Patch => todo!(),
             RequestPacketType::Put { .. } => todo!(),
             RequestPacketType::Delete { .. } => todo!(),

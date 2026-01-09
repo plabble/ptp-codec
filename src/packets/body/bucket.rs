@@ -6,20 +6,15 @@ use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::{DisplayFromStr, serde_as};
 
-use crate::core::BucketId;
-
 /// Bucket query structure used for querying bucket data
 /// with a specific ID and range.
 /// The range can be either numeric or binary, depending on the bucket type.
 ///
 /// # Members
-/// - `id`: A 16-byte array representing the unique identifier of the bucket.
 /// - `range`: A `BucketRange` enum representing the range of data to query within the bucket.
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 pub struct BucketQuery {
-    id: BucketId,
-
     #[variant_by = "binary_keys"]
     range: BucketRange,
 }
@@ -28,13 +23,10 @@ pub struct BucketQuery {
 /// with a specific ID and body. (for PUT request)
 ///
 /// # Members
-/// - `id`: A 16-byte array representing the unique identifier of the bucket.
 /// - `body`: A `BucketBody` enum representing the data to be inserted into the bucket.
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 pub struct PutRequestBody {
-    id: BucketId,
-
     #[variant_by = "binary_keys"]
     body: BucketBody,
 }
@@ -89,11 +81,15 @@ pub enum BucketRange {
 
 #[cfg(test)]
 mod tests {
-    use binary_codec::{BinaryDeserializer, BinarySerializer};
+    use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
-    use crate::packets::{
-        header::type_and_flags::RequestPacketType, request::PlabbleRequestPacket,
-        response::PlabbleResponsePacket,
+    use crate::{
+        core::BucketId,
+        packets::{
+            header::type_and_flags::RequestPacketType,
+            request::{PlabbleRequestContext, PlabbleRequestPacket},
+            response::PlabbleResponsePacket,
+        },
     };
 
     #[test]
@@ -105,15 +101,17 @@ mod tests {
 
             [header]
             packet_type = "Get"
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
 
             [body]
-            id = "AAAAAAAAAAAAAAAAAAAAAA"
             range.Numeric = [5, 25]
         "#,
         )
         .unwrap();
 
-        let serialized = packet.to_bytes(None).unwrap();
+        let context = PlabbleRequestContext {};
+        let mut config = SerializerConfig::new(Some(context));
+        let serialized = packet.to_bytes(Some(&mut config)).unwrap();
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
 
         assert_eq!(packet, deserialized);
@@ -157,10 +155,10 @@ mod tests {
 
             [header]
             packet_type = "Get"
+            id = "@test"
             range_mode_until = true
 
             [body]
-            id = "AAAAAAAAAAAAAAAAAAAAAA"
             range.Numeric = [25]
         "#,
         )
@@ -170,28 +168,29 @@ mod tests {
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
 
         assert_eq!(packet, deserialized);
+        assert_eq!(deserialized.header.id, Some(BucketId::parse("@test").unwrap()));
 
         // version = 0001, flags = 0100. Packet type = Get (0010), flags: 0100. 16 bytes id, end 0,25
         assert_eq!(
             vec![
                 0b0100_0001,
                 0b0100_0010,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
+                72,
+                120,
+                202,
+                4,
+                37,
+                199,
+                57,
+                250,
+                66,
+                127,
+                126,
+                218,
+                32,
+                254,
+                132,
+                95,
                 0,
                 25
             ],
@@ -216,10 +215,10 @@ mod tests {
 
             [header]
             packet_type = "Get"
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
             binary_keys = true
 
             [body]
-            id = "AAAAAAAAAAAAAAAAAAAAAA"
             range.Binary = ["key_start", "key_end"]
         "#,
         )

@@ -95,7 +95,7 @@ pub struct PostQuantumSettings {
 }
 
 impl CryptoSettings {
-    pub fn apply_defaults(config: &mut SerializerConfig) {
+    pub fn apply_defaults<T: Clone>(config: &mut SerializerConfig<T>) {
         let defaults = Self::default();
         if defaults.sign_ed25519 {
             config.set_toggle("ed25519", true);

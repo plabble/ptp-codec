@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
-use crate::packets::header::type_and_flags::RequestPacketType;
+use crate::{core::BucketId, packets::header::type_and_flags::RequestPacketType};
 
 /// Plabble Packet request header
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug)]
@@ -18,14 +18,19 @@ pub struct PlabbleRequestHeader {
     #[variant_by = "packet_type"]
     #[serde(flatten)]
     pub packet_type: RequestPacketType,
+
+    /// ID of the bucket, if needed by the type
+    #[toggled_by_variant = "packet_type=2"]
+    pub id: Option<BucketId>,
 }
 
 impl PlabbleRequestHeader {
     /// Create new packet header for specific request packet type
-    pub fn new(packet_type: RequestPacketType) -> Self {
+    pub fn new(packet_type: RequestPacketType, id: Option<BucketId>) -> Self {
         Self {
             _type: RefCell::new(packet_type.get_discriminator()),
             packet_type,
+            id,
         }
     }
 

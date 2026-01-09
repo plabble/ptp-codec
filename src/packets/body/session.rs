@@ -130,6 +130,8 @@ mod tests {
 
         let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized);
+
+        assert_eq!(deserialized.header.id, None);
     }
 
     #[test]

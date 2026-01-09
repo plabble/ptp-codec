@@ -15,7 +15,7 @@ type Blake2b16 = Blake2b<U16>;
 #[serde(transparent)]
 pub struct BucketId {
     #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
-    data: [u8; 16],
+    pub data: [u8; 16],
 }
 
 impl BucketId {

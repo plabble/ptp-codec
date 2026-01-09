@@ -2,7 +2,10 @@ use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::body::{
-    bucket::{BucketQuery, PutRequestBody}, certificate::CertificateRequestBody, post::PostRequestBody, session::SessionRequestBody
+    bucket::{BucketQuery, PutRequestBody},
+    certificate::CertificateRequestBody,
+    post::PostRequestBody,
+    session::SessionRequestBody,
 };
 
 /// An enumeration representing the different types of request bodies
