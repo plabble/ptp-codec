@@ -1,6 +1,8 @@
+use blake2::{Blake2b512, Blake2bMac512, digest::Mac};
+
+mod encryption;
 mod key_exchange;
 mod signatures;
-mod encryption;
 
 /// Supported key-exchange algorithms.
 ///
@@ -22,6 +24,49 @@ pub enum KeyExchangeAlgorithm {
 pub struct KeyExchange {
     algorithm: KeyExchangeAlgorithm,
     secret: Option<Vec<u8>>,
+}
+
+/// Derive a cryptographic key based on crypto settings (blake2b-512 or blake3)
+///
+/// # Properties
+/// - `blake3`: whether to use Blake3 or Blake2b-512
+/// - `ikm`: Input key material (cryptographic key)
+/// - `salt`: 16-byte salt
+/// - `context`: 16-byte context
+///
+/// Returns None if blake3 is not supported or hash function failed
+/// TODO: check compat with Geralt/libsodium https://www.geralt.xyz/message-authentication
+pub fn derive_key(
+    blake3: bool,
+    ikm: &[u8; 64],
+    salt: &[u8; 16],
+    context: &[u8; 16],
+) -> Option<[u8; 64]> {
+    #[cfg(feature = "blake-3")]
+    if blake3 {
+        use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
+        use blake3::Hasher;
+
+        // Encode context with base64-url (no padding)
+        let mut kdf = Hasher::new_derive_key(&BASE64_URL_SAFE_NO_PAD.encode(context));
+        kdf.update(ikm);
+        kdf.update(salt);
+
+        let mut out = [0u8; 64];
+        kdf.finalize_xof().fill(&mut out);
+        return Some(out);
+    }
+
+    #[cfg(not(feature = "blake-3"))]
+    if blake3 {
+        return None;
+    }
+
+    // TODO: is Mac mode correct here? Libsodium?
+    
+    let kdf = Blake2bMac512::new_with_salt_and_personal(ikm, salt, context).ok()?;
+
+    Some(kdf.finalize().into_bytes().into())
 }
 
 pub mod algorithm;

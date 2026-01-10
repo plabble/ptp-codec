@@ -199,12 +199,7 @@ impl ScriptInterpreter {
     }
 
     fn pop(&mut self) -> Option<StackData> {
-        let item = self.stack().pop();
-        if item.is_none() {
-            return None;
-        }
-
-        let item = item.unwrap();
+        let item = self.stack().pop()?;
         self.memory -= item.memory();
 
         Some(item)

@@ -1,6 +1,7 @@
 use binary_codec::CryptoStream;
 use cipher::StreamCipher;
 
+/// Stream cipher crypto stream
 pub struct StreamCipherCryptoStream {
     plaintext: Vec<u8>,
     ciphers: Vec<Box<dyn StreamCipher>>,

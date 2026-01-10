@@ -87,7 +87,7 @@ mod tests {
         core::BucketId,
         packets::{
             header::type_and_flags::RequestPacketType,
-            request::{PlabbleRequestContext, PlabbleRequestPacket},
+            request::{PlabbleRequestPacket},
             response::PlabbleResponsePacket,
         },
     };
@@ -109,8 +109,7 @@ mod tests {
         )
         .unwrap();
 
-        let context = PlabbleRequestContext {};
-        let mut config = SerializerConfig::new(Some(context));
+        let mut config = SerializerConfig::new(None);
         let serialized = packet.to_bytes(Some(&mut config)).unwrap();
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
 

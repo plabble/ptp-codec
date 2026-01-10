@@ -15,6 +15,7 @@ pub struct CryptoSettings {
     pub encrypt_with_aes: bool,
 
     /// Use 32-byte hashes instead of 16-byte ones.
+    /// TODO: I think this one is useless
     #[serde(default)]
     pub larger_hashes: bool,
 

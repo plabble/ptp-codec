@@ -45,7 +45,7 @@ pub struct PlabblePacketBase {
     /// Pre-shared key ID, if using a pre-shared key
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     #[toggled_by = "pre_shared_key"]
-    pub psk_id: Option<[u8; 16]>,
+    pub psk_id: Option<[u8; 12]>,
 
     /// Pre-shared key salt, if using a pre-shared key
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
@@ -125,14 +125,14 @@ mod tests {
     }
 
     #[test]
-    fn can_serialize_packet_with_full_settings_and_psc() {
+    fn can_serialize_packet_with_full_settings_and_psk_id() {
         let toml = r#"
         version = 1
         use_encryption = true
         pre_shared_key = true
         specify_crypto_settings = true
 
-        psk_id = "AQIDBAUGBwgJEBESExQVFg"
+        psk_id = "AQIDBAUGBwgJEBES"
         psk_salt = "BwAAAAAAAAAAAAAAAAAABw"
 
         [crypto_settings]
@@ -172,10 +172,6 @@ mod tests {
                 0x10,
                 0x11,
                 0x12,
-                0x13,
-                0x14,
-                0x15,
-                0x16,
                 7,
                 0,
                 0,

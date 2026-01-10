@@ -57,14 +57,14 @@ use_encryption = false
 # [bit] 4th bit flag. If set to true, next byte will contain 7 flags for cryptography settings. If not set, the defaults will be used.
 specifiy_crypto_settings = true
 
-# [16B] required if pre_shared_key flag is set.
-psk_id = "base64url pre-shared key ID"
+# [12B] required if pre_shared_key flag is set.
+psk_id = "base64url (no padding) pre-shared key ID"
 
 # [16B] required if pre_shared_key flag is set. Random bytes to salt the key generated from PSK
-psk_salt = "base64url random generated salt"
+psk_salt = "base64url (no padding) random generated salt"
 
 # [16B] required if use_encryption flag is not set. 
-mac = "base64url encoded MAC"
+mac = "base64url (no padding) encoded MAC"
 
 # [1B] required if specify_crypto_settings is true
 [crypto_settings]
@@ -289,7 +289,7 @@ with_psk = true
 with_salt = true
 
 [body]
-psk_id = "..." # base64url encoded 12-byte key ID
+psk_id = "..." # base64url (no padding) encoded 12-byte key ID
 salt = "..."
 
 [[body.keys]]
@@ -333,7 +333,7 @@ use_encryption = true
 
 [header]
 packet_type = "Get"
-id = "AAAAAAAAAAAAAAAAAAAAAA"  # 16-byte id (base64url)
+id = "AAAAAAAAAAAAAAAAAAAAAA"  # 16-byte id (base64url (no padding))
 
 [body]
 range.Numeric = [5, 25]
@@ -441,7 +441,9 @@ The bucket ID is the 16-byte server-wide unique ID for one bucket. There are 3 w
 When creating a bucket, you can generate the bucket ID yourself. If it is taken, the server will return an error.
 
 #### Bucket Key
-The bucket key is a 32-byte secret that is derived from the [session key](#session-key) when [creating](#post-request) a bucket. It is stored on both the client and the server and is used for [authentication](#authentication).
+The bucket key is a 64-byte secret that is derived from the [session key](#session-key) when [creating](#post-request) a bucket. It is stored on both the client and the server and is used for [authentication](#authentication).
+
+
 
 #### Bucket permissions
 - Implementation: [post.rs](./src/packets/body/post.rs)
@@ -479,18 +481,26 @@ When creating a [session](#session-flow), the client and server will generate a 
 The session key is used as key material for cryptographic functions during the session.
 
 This is how to create a session key:
-1. For each algorithm specified in the request, create a shared secret. Create a _hasher_ using the `blake2b` or `blake3` algorithm. Use blake3 if this is set in the crypto settings in the request. For each shared secret, _update_ the hash function. _Finalize_ the hasher into a 64-byte hash that will serve as the _input key material_.
-2. Use the `blake2b-512` with _salt and personal_ or `blake3` in KDF mode algorithm.
-3. If the client provided a salt in the [session request](#session-request), provide it to the _salt_ field of the blake KDF or MAC function. If the client did not provide a salt but asked the server for a salt, use the server salt. If also no server salt is available, use the ASCII equivalent of the string value `PLABBLE-PROTOCOL` (which should be exactly 16 bytes)
-4. If the client asked the server to create a salt in the [session request](#session-request), provide it to the _persona_ field of the blake KDF or MAC function. If not, use the ASCII equivalent of the string value `PROTOCOL.PLABBLE` (which should be exactly 16 bytes)
-5. Derive a 64-byte session key using the salts and keep it in memory for the connection. If the user asked in the session request to store it, generate a random 16-byte [_PSK ID_](#psk-id) and return it to the client.
+1. For each algorithm specified in the request, create a shared secret. Create a _hasher_ using the `blake2b-512` or `blake3` algorithm. Use blake3 if this is set in the crypto settings in the request. For each shared secret, _update_ the hash function. _Finalize_ the hasher into a 64-byte hash that will serve as the _input key material_.
+3. If the client **provided a salt** in the [session request](#session-request), provide it as the _salt_. If the client did NOT provide a salt but asked the server for a salt, use the **server salt**. If also no server salt is available, use the ASCII equivalent of the string value `PLABBLE-PROTOCOL` (which is exactly 16 bytes)
+4. If the client asked the server to **create a salt** in the [session request](#session-request), provide it as the _context_. If not, use the ASCII equivalent of the string value `PROTOCOL.PLABBLE` (which is be exactly 16 bytes)
+5. Pass the `input key material`, `salt` and `context` to the [key generation function](#key-generation)
+5. Derive a 64-byte session key and keep it in memory for the connection. If the user asked in the session request to store it, generate a random 12-byte [_PSK ID_](#psk-id) and return it to the client.
 
 ### PSK ID
+We don't want an attacker to relate a PSK ID to a bucket key, so the PSK ID is a randomly generated 12-byte identifier.
 
 ### Authentication
 Plabble has two ways of ensuring the integrity of packets.
 When the `use_encryption` flag in the base packet is off, it will use a Message Authentication Code (MAC).
 If the encryption flag is on, Plabble uses Authenticated Encryption with Associated Data (AEAD).
+
+### Key generation
+Plabble keys are generated using the `blake2b-512` or `blake3` functions.
+The key derivation mechanism accepts 3 input parameters: `ikm` (64-byte input key material/existing key), `salt` (16-byte salt)
+and `context` (16-byte unique(!) context)
+For `blake3`, the context is passed to the *derive_key* mode/KDF mode of blake3 as a `base64-url (no padding)`-encoded UTF-8 string,and the hash is updated with the `ikm` first and then the `salt` before the hasher is finalized.
+For `blake2b-512`, the _MAC mode_ is used accepting directly a `key`, `salt` and `persona`. The context is passed to the persona.
 
 ### Encrypted client-server communication
 

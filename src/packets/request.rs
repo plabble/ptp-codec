@@ -2,9 +2,7 @@ use binary_codec::{BinaryDeserializer, BinarySerializer, BitStreamWriter, Serial
 use serde::{Deserialize, Serialize};
 
 use crate::packets::{
-    base::{PlabblePacketBase, settings::CryptoSettings},
-    body::request_body::PlabbleRequestBody,
-    header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
+    base::{PlabblePacketBase, settings::CryptoSettings}, body::request_body::PlabbleRequestBody, context::PlabblePacketContext, header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType}
 };
 
 /// A Plabble request packet, consisting of a base, header, and body.
@@ -25,15 +23,11 @@ pub struct PlabbleRequestPacket {
     pub body: PlabbleRequestBody,
 }
 
-/// Request context for cryptography, session etc.
-#[derive(Clone)]
-pub struct PlabbleRequestContext {}
-
-impl BinarySerializer<PlabbleRequestContext> for PlabbleRequestPacket {
+impl BinarySerializer<PlabblePacketContext> for PlabbleRequestPacket {
     fn write_bytes(
         &self,
         stream: &mut BitStreamWriter,
-        config: Option<&mut binary_codec::SerializerConfig<PlabbleRequestContext>>,
+        config: Option<&mut binary_codec::SerializerConfig<PlabblePacketContext>>,
     ) -> Result<(), binary_codec::SerializationError> {
         self.header.preprocess();
 
@@ -41,9 +35,7 @@ impl BinarySerializer<PlabbleRequestContext> for PlabbleRequestPacket {
         let config = config.unwrap_or(&mut new_config);
 
         self.base.write_bytes(stream, Some(config))?;
-
-        // println!("{:?} {:?}", stream, config);
-
+        
         // TODO: header encryption
         self.header.write_bytes(stream, Some(config))?;
 
@@ -54,10 +46,10 @@ impl BinarySerializer<PlabbleRequestContext> for PlabbleRequestPacket {
     }
 }
 
-impl BinaryDeserializer<PlabbleRequestContext> for PlabbleRequestPacket {
+impl BinaryDeserializer<PlabblePacketContext> for PlabbleRequestPacket {
     fn read_bytes(
         stream: &mut binary_codec::BitStreamReader,
-        config: Option<&mut SerializerConfig<PlabbleRequestContext>>,
+        config: Option<&mut SerializerConfig<PlabblePacketContext>>,
     ) -> Result<Self, binary_codec::DeserializationError> {
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
