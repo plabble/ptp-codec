@@ -12,7 +12,7 @@ impl StreamCipherCryptoStream {
     pub fn new(ciphers: Vec<Box<dyn StreamCipher>>) -> Self {
         Self {
             plaintext: Vec::new(),
-            ciphers
+            ciphers,
         }
     }
 }

@@ -49,7 +49,7 @@ pub struct PlabblePacketBase {
     /// Pre-shared key salt, if using a pre-shared key
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     #[toggled_by = "pre_shared_key"]
-    pub psk_salt: Option<[u8; 16]>
+    pub psk_salt: Option<[u8; 16]>,
 }
 
 #[cfg(test)]

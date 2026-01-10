@@ -67,11 +67,11 @@ psk_salt = "base64url (no padding) random generated salt"
 [crypto_settings]
 encrypt_with_cha_cha20 = true   # default true, use ChaCha20(Poly1305)
 encrypt_with_aes = false        # use AES for encryption
-larger_hashes = false           # use larger hashes if possible
+# 1 reserved flag for future use
 use_blake3 = false              # use Blake3 instead of Blake2
 sign_ed25519 = true             # default true, use Ed25519 for signing
 key_exchange_x25519 = true      # default true, use X25519 for exchange
-# 1 reserved flagg
+# 1 reserved flag for future use
 use_post_quantum = false        # if set, include another byte with PQ eencryption settings
 
 # [1B] required if crypto_settings.use_post_quantum is set

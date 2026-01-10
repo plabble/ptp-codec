@@ -14,10 +14,9 @@ pub struct CryptoSettings {
     #[serde(default)]
     pub encrypt_with_aes: bool,
 
-    /// Use 32-byte hashes instead of 16-byte ones.
-    /// TODO: I think this one is useless
+    /// Reserved for future use
     #[serde(default)]
-    pub larger_hashes: bool,
+    pub flag_4: bool,
 
     /// Use Blake3 for hashing, MAC and key derivation instead of Blake2.
     #[serde(default)]
@@ -113,7 +112,7 @@ impl Default for CryptoSettings {
         Self {
             encrypt_with_cha_cha20: true,
             encrypt_with_aes: false,
-            larger_hashes: false,
+            flag_4: false,
             use_blake3: false,
             sign_ed25519: true,
             key_exchange_x25519: true,
@@ -149,7 +148,7 @@ mod tests {
         let toml = r#"
         encrypt_with_cha_cha20 = true
         encrypt_with_aes = false
-        larger_hashes = true
+        flag_4 = true
         use_blake3 = false
         sign_ed25519 = true
         key_exchange_x25519 = true
@@ -191,7 +190,7 @@ mod tests {
     fn can_serialize_encryption_settings_without_pqc_and_with_defaults() {
         let toml = r#"
         encrypt_with_aes = true
-        larger_hashes = false
+        flag_4 = false
         use_blake3 = true
         use_post_quantum = false
         "#;

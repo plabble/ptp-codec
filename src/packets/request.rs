@@ -2,7 +2,10 @@ use binary_codec::{BinaryDeserializer, BinarySerializer, BitStreamWriter, Serial
 use serde::{Deserialize, Serialize};
 
 use crate::packets::{
-    base::{PlabblePacketBase, settings::CryptoSettings}, body::request_body::PlabbleRequestBody, context::PlabblePacketContext, header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType}
+    base::{PlabblePacketBase, settings::CryptoSettings},
+    body::request_body::PlabbleRequestBody,
+    context::PlabbleConnectionContext,
+    header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
 };
 
 /// A Plabble request packet, consisting of a base, header, and body.
@@ -23,11 +26,11 @@ pub struct PlabbleRequestPacket {
     pub body: PlabbleRequestBody,
 }
 
-impl BinarySerializer<PlabblePacketContext> for PlabbleRequestPacket {
+impl BinarySerializer<PlabbleConnectionContext> for PlabbleRequestPacket {
     fn write_bytes(
         &self,
         stream: &mut BitStreamWriter,
-        config: Option<&mut binary_codec::SerializerConfig<PlabblePacketContext>>,
+        config: Option<&mut binary_codec::SerializerConfig<PlabbleConnectionContext>>,
     ) -> Result<(), binary_codec::SerializationError> {
         self.header.preprocess();
 
@@ -36,26 +39,24 @@ impl BinarySerializer<PlabblePacketContext> for PlabbleRequestPacket {
 
         // TODO: full packet encryption if in session
         self.base.write_bytes(stream, Some(config))?;
-        
+
         // TODO: header encryption
         self.header.write_bytes(stream, Some(config))?;
 
         // TODO: body encryption
         self.body.write_bytes(stream, Some(config))?;
-        
-        // If MAC is enabled, add it to the packet
-        if !self.base.use_encryption {
 
-        }
+        // If MAC is enabled, add it to the packet
+        if !self.base.use_encryption {}
 
         Ok(())
     }
 }
 
-impl BinaryDeserializer<PlabblePacketContext> for PlabbleRequestPacket {
+impl BinaryDeserializer<PlabbleConnectionContext> for PlabbleRequestPacket {
     fn read_bytes(
         stream: &mut binary_codec::BitStreamReader,
-        config: Option<&mut SerializerConfig<PlabblePacketContext>>,
+        config: Option<&mut SerializerConfig<PlabbleConnectionContext>>,
     ) -> Result<Self, binary_codec::DeserializationError> {
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
@@ -138,3 +139,20 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
 }
 
 // Tests for the request and response packets are in the type-specific files
+
+#[cfg(test)]
+mod tests {
+    // use binary_codec::{BinaryDeserializer, SerializerConfig};
+
+    // use crate::packets::{context::PlabbleConnectionContext, request::PlabbleRequestPacket};
+
+    // #[test]
+    // fn test_serialization_with_context() {
+    //     let mut config = SerializerConfig::new(Some(PlabbleConnectionContext::new()));
+
+    //     let reference = Some(&mut config);
+    //     // config.data.as_mut().unwrap().server_counter += 1;
+
+    //     let packet = PlabbleRequestPacket::from_bytes(&[0u8], reference);
+    // }
+}

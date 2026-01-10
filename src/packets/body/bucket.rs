@@ -86,8 +86,7 @@ mod tests {
     use crate::{
         core::BucketId,
         packets::{
-            header::type_and_flags::RequestPacketType,
-            request::{PlabbleRequestPacket},
+            header::type_and_flags::RequestPacketType, request::PlabbleRequestPacket,
             response::PlabbleResponsePacket,
         },
     };
@@ -167,7 +166,10 @@ mod tests {
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
 
         assert_eq!(packet, deserialized);
-        assert_eq!(deserialized.header.id, Some(BucketId::parse("@test").unwrap()));
+        assert_eq!(
+            deserialized.header.id,
+            Some(BucketId::parse("@test").unwrap())
+        );
 
         // version = 0001, flags = 0100. Packet type = Get (0010), flags: 0100. 16 bytes id, end 0,25
         assert_eq!(

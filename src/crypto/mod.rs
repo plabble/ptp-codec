@@ -88,7 +88,7 @@ pub fn derive_key(
 /// # Parameters
 ///
 /// - `blake3`: whether to use blake3 or blake2b-128
-/// - `key`: 64-byte key, altough blake3 only uses the first 32 bytes as key and updates the hash with the other 32 bytes 
+/// - `key`: 64-byte key, altough blake3 only uses the first 32 bytes as key and updates the hash with the other 32 bytes
 /// - `data`: The data to calculate a MAC for
 /// - `extra_data`: Extra data to update the hasher with
 ///
@@ -123,7 +123,7 @@ pub fn calculate_mac(
     if let Some(extra_data) = extra_data {
         hasher.update(extra_data);
     }
-    
+
     Some(hasher.finalize().into_bytes().into())
 }
 
@@ -131,7 +131,7 @@ pub fn calculate_mac(
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};
 
-    use crate::crypto::{derive_key};
+    use crate::crypto::derive_key;
 
     #[test]
     fn can_derive_blake2b_key() {
