@@ -34,13 +34,19 @@ impl BinarySerializer<PlabblePacketContext> for PlabbleRequestPacket {
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
 
+        // TODO: full packet encryption if in session
         self.base.write_bytes(stream, Some(config))?;
         
         // TODO: header encryption
         self.header.write_bytes(stream, Some(config))?;
 
-        // TODO: body decryption
+        // TODO: body encryption
         self.body.write_bytes(stream, Some(config))?;
+        
+        // If MAC is enabled, add it to the packet
+        if !self.base.use_encryption {
+
+        }
 
         Ok(())
     }
@@ -54,17 +60,28 @@ impl BinaryDeserializer<PlabblePacketContext> for PlabbleRequestPacket {
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
 
+        // TODO: full packet encryption if in session
         let base = PlabblePacketBase::read_bytes(stream, Some(config))?;
         if base.crypto_settings.is_none() {
             CryptoSettings::apply_defaults(config);
+        }
+
+        // If mac is enabled, keep an offset of 16 on the reader
+        if !base.use_encryption {
+            // stream.set_offset_end(16);
         }
 
         // if use encryption, set the crypto in the bitreader. Choose algorithm(s) based on crypto settings
         let header = PlabbleRequestHeader::read_bytes(stream, Some(config))?;
         config.discriminator = Some(header.packet_type.get_discriminator());
 
-        // TODO: body encryption
+        // TODO: body decryption
         let body = PlabbleRequestBody::read_bytes(stream, Some(config))?;
+
+        // IF mac is enabled, check it here
+        if !base.use_encryption {
+            // let mac: &[u8; 16] = stream.slice_end().try_into().expect("A 16-byte MAC on the end");
+        }
 
         Ok(Self { base, header, body })
     }

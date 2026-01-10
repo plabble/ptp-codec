@@ -63,9 +63,6 @@ psk_id = "base64url (no padding) pre-shared key ID"
 # [16B] required if pre_shared_key flag is set. Random bytes to salt the key generated from PSK
 psk_salt = "base64url (no padding) random generated salt"
 
-# [16B] required if use_encryption flag is not set. 
-mac = "base64url (no padding) encoded MAC"
-
 # [1B] required if specify_crypto_settings is true
 [crypto_settings]
 encrypt_with_cha_cha20 = true   # default true, use ChaCha20(Poly1305)
@@ -222,7 +219,7 @@ request_counter = 1
 ### Session request
 Request header flags:
 - **persist_key**: If set to true, persist the generated shared secret key and return a server-generated [PSK ID](#psk-id).
-- **enable_encryption**: If set to true, switch to Plabble [encrypted communication](#encrypted-client-server-communication) between the client and the server.
+- **enable_encryption**: If set to true, switch to Plabble [encrypted communication](#encrypted-client-server-communication) between the client and the server to enjoy full packet encryption
 - **with_salt**: If set to true, include 16-byte random generated salt by client
 - **request_salt**: If set to true, force server to (also) generate and use a salt
 
@@ -495,9 +492,11 @@ Plabble has two ways of ensuring the integrity of packets.
 When the `use_encryption` flag in the base packet is off, it will use a Message Authentication Code (MAC).
 If the encryption flag is on, Plabble uses Authenticated Encryption with Associated Data (AEAD).
 
-
+For each request
 
 ### Key generation
+- Implementation: [context.rs](./src/crypto/mod.rs)
+
 Plabble keys are generated using the `blake2b-512` or `blake3` functions.
 The key derivation mechanism accepts 3 input parameters: `ikm` (64-byte input key material/existing key), `salt` (16-byte salt)
 and `context` (16-byte unique(!) context)

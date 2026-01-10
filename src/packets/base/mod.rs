@@ -28,9 +28,8 @@ pub struct PlabblePacketBase {
     #[toggles("pre_shared_key")]
     pub pre_shared_key: bool,
 
-    /// If set to true, this packet uses encryption. If false, use a MAC (Message Authentication Code).
+    /// If set to true, this packet uses encryption. If false, add a MAC (Message Authentication Code) to the packet
     #[serde(default)]
-    #[toggles("encryption")]
     pub use_encryption: bool,
 
     /// If set to true, use custom encryption settings.
@@ -50,12 +49,7 @@ pub struct PlabblePacketBase {
     /// Pre-shared key salt, if using a pre-shared key
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     #[toggled_by = "pre_shared_key"]
-    pub psk_salt: Option<[u8; 16]>,
-
-    /// Message Authentication Code (MAC)
-    #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
-    #[toggled_by = "!encryption"]
-    pub mac: Option<[u8; 16]>,
+    pub psk_salt: Option<[u8; 16]>
 }
 
 #[cfg(test)]
@@ -88,43 +82,6 @@ mod tests {
     }
 
     #[test]
-    fn can_serialize_packet_with_mac() {
-        let toml = r#"
-        version = 0
-        use_encryption = false
-        mac = "AQIDBAUGBwgJEBESExQVFg"
-        "#;
-
-        let packet: PlabblePacketBase = toml::from_str(toml).unwrap();
-        let bytes = BinarySerializer::<()>::to_bytes(&packet, None).unwrap();
-        let deserialized_packet = BinaryDeserializer::<()>::from_bytes(&bytes, None).unwrap();
-        assert_eq!(packet, deserialized_packet);
-
-        assert_eq!(
-            vec![
-                0b0000_0000,
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                0x10,
-                0x11,
-                0x12,
-                0x13,
-                0x14,
-                0x15,
-                0x16
-            ],
-            bytes
-        );
-    }
-
-    #[test]
     fn can_serialize_packet_with_full_settings_and_psk_id() {
         let toml = r#"
         version = 1
@@ -150,7 +107,6 @@ mod tests {
 
         assert_eq!(config.get_toggle("fire_and_forget"), Some(false));
         assert_eq!(config.get_toggle("pre_shared_key"), Some(true));
-        assert_eq!(config.get_toggle("encryption"), Some(true));
         assert_eq!(config.get_toggle("crypto_settings"), Some(true));
         assert_eq!(config.get_toggle("dsa44"), Some(true));
         assert_eq!(config.get_toggle("dsa65"), Some(false));

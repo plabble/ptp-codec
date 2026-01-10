@@ -29,7 +29,7 @@ pub enum RequestPacketType {
     } = 0,
     /// Start a new session.
     /// - persist_key: Request that the server persist the session key.
-    /// - enable_encryption: Request that the server enable encryption for this session.
+    /// - enable_encryption: Request that the server enable full packet encryption for this session.
     /// - with_salt: Provide a salt to the server for session key derivation.
     /// - request_salt: Request that the server (also) provides a salt for session key derivation
     Session {

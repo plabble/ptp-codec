@@ -1,10 +1,15 @@
-use blake2::{Blake2bMac512, digest::Mac};
+use blake2::{
+    Blake2bMac, Blake2bMac512,
+    digest::{Mac, consts::U16},
+};
 
 pub mod algorithm;
 pub mod certificate;
 pub mod encryption;
 mod key_exchange;
 mod signatures;
+
+type Blake2bMac128 = Blake2bMac<U16>;
 
 /// Supported key-exchange algorithms.
 ///
@@ -30,7 +35,7 @@ pub struct KeyExchange {
 
 /// Derive a cryptographic key based on crypto settings (blake2b-512 or blake3)
 ///
-/// # Properties
+/// # Parameters
 /// - `blake3`: whether to use Blake3 or Blake2b-512
 /// - `ikm`: Input key material (cryptographic key)
 /// - `salt`: 16-byte salt
@@ -45,6 +50,11 @@ pub fn derive_key(
     context: &[u8; 16],
     extra_key: Option<&[u8; 64]>,
 ) -> Option<[u8; 64]> {
+    #[cfg(not(feature = "blake-3"))]
+    if blake3 {
+        return None;
+    }
+
     #[cfg(feature = "blake-3")]
     if blake3 {
         use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
@@ -64,11 +74,6 @@ pub fn derive_key(
         return Some(out);
     }
 
-    #[cfg(not(feature = "blake-3"))]
-    if blake3 {
-        return None;
-    }
-
     // This is called Mac, but is actually useful for key derivation because of salt/personalization
     let mut kdf = Blake2bMac512::new_with_salt_and_personal(ikm, salt, context).ok()?;
     if let Some(extra_key) = extra_key {
@@ -78,11 +83,55 @@ pub fn derive_key(
     Some(kdf.finalize().into_bytes().into())
 }
 
+/// Calculate a MAC (Message Authentication Code) using keyed Blake2b-128 or Blake3
+///
+/// # Parameters
+///
+/// - `blake3`: whether to use blake3 or blake2b-128
+/// - `key`: 64-byte key, altough blake3 only uses the first 32 bytes as key and updates the hash with the other 32 bytes 
+/// - `data`: The data to calculate a MAC for
+/// - `extra_data`: Extra data to update the hasher with
+///
+/// Returns a MAC or None if blake3 is selected but not supported
+pub fn calculate_mac(
+    blake3: bool,
+    key: &[u8; 64],
+    data: &[u8],
+    extra_data: Option<&[u8]>,
+) -> Option<[u8; 16]> {
+    #[cfg(not(feature = "blake-3"))]
+    if blake3 {
+        return None;
+    }
+
+    #[cfg(feature = "blake-3")]
+    if blake3 {
+        use blake3::Hasher;
+        let mut hasher = Hasher::new_keyed(key[..32].try_into().unwrap());
+        hasher.update(&key[32..]); // add the rest of the key material
+        hasher.update(data);
+        if let Some(extra_data) = extra_data {
+            hasher.update(extra_data);
+        }
+
+        let mut mac = [0u8; 16];
+        hasher.finalize_xof().fill(&mut mac);
+        return Some(mac);
+    }
+
+    let mut hasher = Blake2bMac128::new(key.into());
+    if let Some(extra_data) = extra_data {
+        hasher.update(extra_data);
+    }
+    
+    Some(hasher.finalize().into_bytes().into())
+}
+
 #[cfg(test)]
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};
 
-    use crate::crypto::derive_key;
+    use crate::crypto::{derive_key};
 
     #[test]
     fn can_derive_blake2b_key() {

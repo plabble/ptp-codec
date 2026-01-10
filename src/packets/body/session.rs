@@ -58,7 +58,6 @@ mod tests {
         let packet: PlabbleRequestPacket = toml::from_str(
             r#"
         version = 1
-        mac = "AAAAAAAAAAAAAAAAAAAAAA"
 
         [header]
         packet_type = "Session"
@@ -71,26 +70,10 @@ mod tests {
 
         let bytes = packet.to_bytes(None).unwrap();
 
-        // Version 0001, flags 0000. 16-byte zero-Mac. Packet type 0001, packet flags 0000. 32-byte x25519 key.
+        // Version 0001, flags 0000. Packet type 0001, packet flags 0000. 32-byte x25519 key.
         assert_eq!(
             vec![
                 0b0000_0001,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
                 0b0000_0001,
                 141,
                 110,
