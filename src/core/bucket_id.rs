@@ -7,7 +7,7 @@ use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
-type Blake2b16 = Blake2b<U16>;
+type Blake2b128 = Blake2b<U16>;
 
 /// Bucket Identifier
 #[serde_as]
@@ -24,7 +24,7 @@ impl BucketId {
     pub fn parse(repr: &str) -> Option<Self> {
         match repr.chars().next()? {
             '#' => {
-                let mut hasher = Blake2b16::new();
+                let mut hasher = Blake2b128::new();
                 hasher.update(repr[1..].as_bytes());
 
                 Some(Self {

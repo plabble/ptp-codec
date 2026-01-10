@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 base64 = "0.22.1"
-binary-codec = "0.4.7"
+binary-codec = "0.4.8"
 blake2 = "0.10.6"
 blake3 = { version = "1.8.2", optional = true }
 chacha20 = "0.9.1"

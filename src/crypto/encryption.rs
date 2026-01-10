@@ -8,7 +8,8 @@ pub struct StreamCipherCryptoStream {
 }
 
 impl StreamCipherCryptoStream {
-    fn new(ciphers: Vec<Box<dyn StreamCipher>>) -> Self {
+    /// Create new stream cipher stream
+    pub fn new(ciphers: Vec<Box<dyn StreamCipher>>) -> Self {
         Self {
             plaintext: Vec::new(),
             ciphers
@@ -17,11 +18,11 @@ impl StreamCipherCryptoStream {
 }
 
 impl CryptoStream for StreamCipherCryptoStream {
-    fn decrypt_byte(&mut self, b: u8) -> u8 {
-        self.decrypt_slice(&[b])[0]
+    fn apply_keystream_byte(&mut self, b: u8) -> u8 {
+        self.apply_keystream(&[b])[0]
     }
 
-    fn decrypt_slice(&mut self, slice: &[u8]) -> &[u8] {
+    fn apply_keystream(&mut self, slice: &[u8]) -> &[u8] {
         let offset = self.plaintext.len();
         self.plaintext.extend_from_slice(slice);
         let slice = &mut self.plaintext[offset..];

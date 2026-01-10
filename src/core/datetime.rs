@@ -12,12 +12,12 @@ fn epoch() -> DateTime<Utc> {
 }
 
 impl PlabbleDateTime {
-    pub fn timestamp(&self) -> i64 {
-        (self.0 - epoch()).num_seconds()
+    pub fn timestamp(&self) -> u32 {
+        (self.0 - epoch()).num_seconds() as u32
     }
 
-    pub fn new(timestamp: i64) -> Self {
-        Self(epoch() + Duration::seconds(timestamp))
+    pub fn new(timestamp: u32) -> Self {
+        Self(epoch() + Duration::seconds(timestamp as i64))
     }
 }
 
@@ -27,7 +27,7 @@ impl<T: Clone> BinarySerializer<T> for PlabbleDateTime {
         stream: &mut binary_codec::BitStreamWriter,
         _: Option<&mut binary_codec::SerializerConfig<T>>,
     ) -> Result<(), binary_codec::SerializationError> {
-        stream.write_fixed_int(self.timestamp() as u32);
+        stream.write_fixed_int(self.timestamp());
         Ok(())
     }
 }
@@ -38,7 +38,7 @@ impl<T: Clone> BinaryDeserializer<T> for PlabbleDateTime {
         _: Option<&mut binary_codec::SerializerConfig<T>>,
     ) -> Result<Self, binary_codec::DeserializationError> {
         let seconds: u32 = stream.read_fixed_int()?;
-        Ok(PlabbleDateTime::new(seconds as i64))
+        Ok(PlabbleDateTime::new(seconds))
     }
 }
 

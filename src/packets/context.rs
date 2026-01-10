@@ -24,13 +24,13 @@ impl PlabblePacketContext {
     /// 
     /// # Properties
     /// - `base`: Plabble packet base
-    /// - `alt_key`: If set, use 0x77 instead of 0x11 as last byte of context (giving another key using same input key)
+    /// - `alt_byte`: The byte to add to the context part to randomize the key. 0x77 for the first key and +1 for each other key
     /// - `is_request`: If set, use context string `plabble.req.c` instead of `plabble.res.c`. This ensures that,
     /// even if you got the same counter, the request is still encrypted with another key than the response
     pub fn create_key(
         &self,
         base: &PlabblePacketBase,
-        alt_key: bool,
+        alt_byte: u8,
         is_request: bool,
     ) -> Option<[u8; 64]> {
         let settings = base.crypto_settings.clone().unwrap_or_default();
@@ -61,9 +61,9 @@ impl PlabblePacketContext {
             })
             .to_be_bytes(),
         );
-        context.push(if alt_key { 0x77 } else { 0x11 });
-        let context: &[u8; 16] = &context.try_into().unwrap();
+        context.push(alt_byte);
 
-        derive_key(settings.use_blake3, &session_key, salt, context)
+        let context: &[u8; 16] = &context.try_into().unwrap();
+        derive_key(settings.use_blake3, &session_key, salt, context, None)
     }
 }

@@ -495,6 +495,8 @@ Plabble has two ways of ensuring the integrity of packets.
 When the `use_encryption` flag in the base packet is off, it will use a Message Authentication Code (MAC).
 If the encryption flag is on, Plabble uses Authenticated Encryption with Associated Data (AEAD).
 
+
+
 ### Key generation
 Plabble keys are generated using the `blake2b-512` or `blake3` functions.
 The key derivation mechanism accepts 3 input parameters: `ikm` (64-byte input key material/existing key), `salt` (16-byte salt)
@@ -521,4 +523,4 @@ Plabble uses its own certificate format, the _Plabble Certificate_. This is beca
 As a Plabble Client programmer, you need to include the root certificate in the client application.
 
 #### Certificate ID
-Every certificate has a unique 16-byte certificate ID. The ID is created by hashing the fields `valid_from`, `valid_to`, `issuer_uri`, `data` together using `blake2b-128`. The data field thus MUST be unique.
+Every certificate has a unique 16-byte certificate ID. The ID is created by hashing the fields `valid_from`, `valid_to`, `issuer_uri`, `data` together using `blake2b-128` (in incremental mode). The data field thus MUST be unique.
