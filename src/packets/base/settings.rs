@@ -3,12 +3,12 @@ use binary_codec::{FromBytes, SerializerConfig, ToBytes};
 use serde::{Deserialize, Serialize};
 
 /// Cryptography settings for a session, request or response
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone, Copy)]
 pub struct CryptoSettings {
-    /// If true, encrypt with ChaCha20 and ChaCha20-Poly1305
+    /// If true, encrypt with XChaCha20 and XChaCha20-Poly1305
     /// This is the default if no encryption settings are specified.
     #[serde(default = "default_true")]
-    pub encrypt_with_cha_cha20: bool,
+    pub encrypt_with_chacha: bool,
 
     /// If true, encrypt with AES-CTR and AES-GCM.
     #[serde(default)]
@@ -48,7 +48,7 @@ pub struct CryptoSettings {
 }
 
 /// Post-Quantum cryptography settings
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone, Copy)]
 pub struct PostQuantumSettings {
     /// Sign with ML-DSA-44, public key size 1312 B, signature 2420 B.
     /// Super fast, NIST level 1 security.
@@ -110,7 +110,7 @@ impl CryptoSettings {
 impl Default for CryptoSettings {
     fn default() -> Self {
         Self {
-            encrypt_with_cha_cha20: true,
+            encrypt_with_chacha: true,
             encrypt_with_aes: false,
             flag_4: false,
             use_blake3: false,
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn can_serialize_encryption_settings_with_pqc() {
         let toml = r#"
-        encrypt_with_cha_cha20 = true
+        encrypt_with_chacha = true
         encrypt_with_aes = false
         flag_4 = true
         use_blake3 = false
@@ -200,7 +200,7 @@ mod tests {
 
         let deserialized_settings = BinaryDeserializer::<()>::from_bytes(&bytes, None).unwrap();
         assert_eq!(settings, deserialized_settings);
-        assert_eq!(settings.encrypt_with_cha_cha20, true);
+        assert_eq!(settings.encrypt_with_chacha, true);
         assert_eq!(settings.sign_ed25519, true);
         assert_eq!(settings.key_exchange_x25519, true);
         assert_eq!(settings.flag_64, false);

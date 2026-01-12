@@ -18,8 +18,7 @@ pub struct PlabbleConnectionContext {
     pub session_key: Option<[u8; 64]>,
 
     /// Cryptography settings
-    /// altough crypto settings need to be sent in each Plabble packet, it is remembered for the
-    /// next packet to make full packet encryption possible. Ofcourse it will be overwritten on each request
+    /// Will be remembered for an entire session, but will be overwritten with any packet that specifies crypto settings
     pub crypto_settings: Option<CryptoSettings>,
 
     /// If full packet encryption is used
@@ -47,11 +46,13 @@ impl PlabbleConnectionContext {
     }
 
     /// Create a cryptographic key based on the context and packet base for authentication or encryption
-    /// TODO: how to handle full packet encryption?
+    /// - The keys are never reused, for each part of the packet is a new key generated thanks to `alt_byte`
+    /// - Every packet has a unique key thanks to the counters 
+    /// - Request and response packet with same counter and alt have still a different key thanks to `is_request`
     ///
     /// # Properties
     /// - `base`: Plabble packet base, if it is available
-    /// - `alt_byte`: The byte to add to the context part to randomize the key. 0x77 for the first key and +1 for each other key
+    /// - `alt_byte`: The byte to add to the context part to randomize the key.
     /// - `is_request`: If set, use context string `plabble.req.c` instead of `plabble.res.c`. This ensures that,
     /// even if you got the same counter, the request is still encrypted with another key than the response
     pub fn create_key(
@@ -63,8 +64,7 @@ impl PlabbleConnectionContext {
         // Get crypto settings from current connection, or from base packet, or get default
         let settings = self
             .crypto_settings
-            .clone()
-            .or_else(|| base?.crypto_settings.clone())
+            .or_else(|| base?.crypto_settings)
             .unwrap_or_default();
 
         // If session key is not already given/in PSK mode retrieve it from the store using PSK
@@ -99,5 +99,36 @@ impl PlabbleConnectionContext {
 
         let context: &[u8; 16] = &context.try_into().unwrap();
         derive_key(settings.use_blake3, &session_key, salt, context, None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::packets::context::PlabbleConnectionContext;
+
+    #[test]
+    fn keys_are_unique_by_alt_byte_and_is_request() {
+        let mut context = PlabbleConnectionContext::new();
+        context.session_key = Some([0u8; 64]);
+        let key1 = context.create_key(None, 0, true).unwrap();
+        let key2 = context.create_key(None, 0, false).unwrap();
+        let key3 = context.create_key(None, 1, true).unwrap();
+        let key4 = context.create_key(None, 1, false).unwrap();
+
+        assert_ne!(key1, key2);
+        assert_ne!(key1, key3);
+        assert_ne!(key1, key4);
+        assert_ne!(key2, key3);
+        assert_ne!(key2, key4);
+        assert_ne!(key3, key4);
+
+        // Same alt_byte, is_request and session_key = same key
+        let key1b = context.create_key(None, 0, true).unwrap();
+        assert_eq!(key1, key1b);
+
+        // But not if the session key changed
+        context.session_key = Some([1u8; 64]);
+        let key1c = context.create_key(None, 0, true).unwrap();
+        assert_ne!(key1, key1c);
     }
 }

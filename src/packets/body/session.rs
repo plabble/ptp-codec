@@ -139,8 +139,6 @@ mod tests {
         )
         .unwrap();
 
-        println!("{:?}", packet);
-
         let bytes = packet.to_bytes(None).unwrap();
 
         // Version 0001, flags 0100. Packet type 0001, packet flags 0101. PSK expiration 0, 190, 135, 200. salt 16 bytes, 32-byte x25519 key

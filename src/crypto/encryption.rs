@@ -1,5 +1,13 @@
+use aes::Aes256;
+use aes_gcm::{Aes256Gcm, aead::Payload};
 use binary_codec::CryptoStream;
-use cipher::StreamCipher;
+use chacha20::XChaCha20;
+use chacha20poly1305::{XChaCha20Poly1305, aead::Aead};
+use cipher::{KeyInit, KeyIvInit, StreamCipher};
+use log::debug;
+
+use crate::packets::{base::PlabblePacketBase, context::PlabbleConnectionContext};
+type Aes256Ctr64Le = ctr::Ctr64LE<Aes256>;
 
 /// Stream cipher crypto stream
 pub struct StreamCipherCryptoStream {
@@ -30,6 +38,147 @@ impl CryptoStream for StreamCipherCryptoStream {
             cipher.as_mut().apply_keystream(slice);
         }
         slice
+    }
+}
+
+impl PlabbleConnectionContext {
+    /// Create a cryptographic stream for encrypting/decrypting a packet using one of the stream ciphers (XChaCha20/Aes256-CTR)
+    pub fn create_crypto_stream(
+        &self,
+        base: Option<&PlabblePacketBase>,
+        is_request: bool,
+    ) -> Option<Box<dyn CryptoStream>> {
+        let settings = self.crypto_settings.unwrap_or_default();
+        let mut ciphers: Vec<Box<dyn StreamCipher>> = Vec::new();
+
+        let mut keys = (0..10).map(|i| self.create_key(base, i + 0x00, is_request));
+
+        // If ChaCha20-encryption is enabled, use XChaCha20 with 32 bytes from the IKM plus 12 bytes from the IKM as nonce
+        if settings.encrypt_with_chacha
+            && let Some(key) = keys.next()?
+        {
+            debug!("Using XChaCha cipher, req: {is_request}");
+            ciphers.push(Box::new(XChaCha20::new(
+                key[..32].into(),
+                key[32..56].into(),
+            )));
+        }
+
+        // If AES-encryption is enabled, use AES256-CTR with 32 bytes from the IKM plus 16 bytes from the IKM as IV
+        if settings.encrypt_with_aes
+            && let Some(key) = keys.next()?
+        {
+            debug!("Using Aes256-CTR (64LE) cipher, req: {is_request}");
+            ciphers.push(Box::new(Aes256Ctr64Le::new(
+                key[..32].into(),
+                key[32..48].into(),
+            )));
+        }
+
+        if ciphers.is_empty() {
+            None
+        } else {
+            Some(Box::new(StreamCipherCryptoStream::new(ciphers)))
+        }
+    }
+
+    /// Encrypt Plabble packet body with AES256-GCM/XChaCha20-Poly1305
+    pub fn encrypt(
+        &self,
+        base: &PlabblePacketBase,
+        is_request: bool,
+        data: &[u8],
+        aad: &[u8],
+    ) -> Option<Vec<u8>> {
+        let settings = self.crypto_settings.unwrap_or_default();
+        let mut keys = (0..10).map(|i| self.create_key(Some(base), i + 0x77, is_request));
+
+        let mut buff = data.to_vec();
+
+        if settings.encrypt_with_chacha
+            && let Some(key) = keys.next()?
+        {
+            debug!("Encrypting body using XChaCha20-Poly1305, req: {is_request}");
+            let cipher = XChaCha20Poly1305::new(key[..32].into());
+            buff = cipher
+                .encrypt(
+                    key[32..56].into(),
+                    Payload {
+                        msg: &buff[..],
+                        aad,
+                    },
+                )
+                .ok()?;
+        }
+
+        if settings.encrypt_with_aes
+            && let Some(key) = keys.next()?
+        {
+            debug!("Encrypting body using AES-256-GCM, req: {is_request}");
+            let cipher = Aes256Gcm::new(key[..32].into());
+            buff = cipher
+                .encrypt(
+                    key[32..48].into(),
+                    Payload {
+                        msg: &buff[..],
+                        aad,
+                    },
+                )
+                .ok()?;
+        }
+
+        Some(buff)
+    }
+
+    /// Decrypt Plabble packet body with AES256-GCM/XChaCha20-Poly1305
+    pub fn decrypt(
+        &self,
+        base: &PlabblePacketBase,
+        is_request: bool,
+        data: &[u8],
+        aad: &[u8],
+    ) -> Option<Vec<u8>> {
+        let settings = self.crypto_settings.unwrap_or_default();
+        let mut keys = (0..10).map(|i| self.create_key(Some(base), i + 0x77, is_request));
+
+        let mut buff = data.to_vec();
+
+        // Important: the order of decrypting should be the exact opposite of encrypting!
+        // For stream ciphers, this doesn't matter, but for AEAD it does!
+
+        if settings.encrypt_with_aes
+            && let Some(key) = keys.next()?
+        {
+            debug!("Decrypting body using AES-256-GCM, req: {is_request}");
+            let cipher = Aes256Gcm::new(key[..32].into());
+            buff = cipher
+                .decrypt(
+                    key[32..48].into(),
+                    Payload {
+                        msg: &buff[..],
+                        aad,
+                    },
+                )
+                .ok()?;
+        }
+
+        if settings.encrypt_with_chacha
+            && let Some(key) = keys.next()?
+        {
+            debug!("Decrypting body using XChaCha20-Poly1305, req: {is_request}");
+            let cipher = XChaCha20Poly1305::new(key[..32].into());
+            buff = cipher
+                .decrypt(
+                    key[32..56].into(),
+                    Payload {
+                        msg: &buff[..],
+                        aad,
+                    },
+                )
+                .ok()?;
+        }
+
+        Some(buff)
     }
 }
 
@@ -92,7 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aes_and_chacha_decrypt() {
+    fn test_aes_and_chacha_stream_decrypt() {
         // input encrypted with aes128-ctr, then with chacha20
         let input = BASE64_STANDARD.decode("5TFrPHSvv+jBTqDP2g==").unwrap();
         let key1 = b"00000000000000000000000000000000";

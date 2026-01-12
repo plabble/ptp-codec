@@ -1,4 +1,4 @@
-use binary_codec::{BinaryDeserializer, BinarySerializer, BitStreamWriter, SerializerConfig};
+use binary_codec::{BinaryDeserializer, BinarySerializer, BitStreamReader, BitStreamWriter, DeserializationError, SerializationError, SerializerConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::{
@@ -30,8 +30,8 @@ impl BinarySerializer<PlabbleConnectionContext> for PlabbleRequestPacket {
     fn write_bytes(
         &self,
         stream: &mut BitStreamWriter,
-        config: Option<&mut binary_codec::SerializerConfig<PlabbleConnectionContext>>,
-    ) -> Result<(), binary_codec::SerializationError> {
+        config: Option<&mut SerializerConfig<PlabbleConnectionContext>>,
+    ) -> Result<(), SerializationError> {
         self.header.preprocess();
 
         let mut new_config = SerializerConfig::new(None);
@@ -55,31 +55,49 @@ impl BinarySerializer<PlabbleConnectionContext> for PlabbleRequestPacket {
 
 impl BinaryDeserializer<PlabbleConnectionContext> for PlabbleRequestPacket {
     fn read_bytes(
-        stream: &mut binary_codec::BitStreamReader,
+        stream: &mut BitStreamReader,
         config: Option<&mut SerializerConfig<PlabbleConnectionContext>>,
-    ) -> Result<Self, binary_codec::DeserializationError> {
+    ) -> Result<Self, DeserializationError> {
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
 
-        // TODO: full packet encryption if in session
+        // If full encryption is enabled, try set it
+        if let Some(ctx) = &config.data && ctx.full_encryption {
+            stream.set_crypto(ctx.create_crypto_stream(None, true));
+        }
+        
         let base = PlabblePacketBase::read_bytes(stream, Some(config))?;
         if base.crypto_settings.is_none() {
+            // TODO: apply context settings
             CryptoSettings::apply_defaults(config);
+        } else {
+            // TODO: overwrite context settings
         }
 
-        // If mac is enabled, keep an offset of 16 on the reader
+        // If encryption enabled, try set it (might overwrite the full packet encryption key, if that was the case)
+        if base.use_encryption && let Some(ctx) = &config.data {
+            stream.set_crypto(ctx.create_crypto_stream(Some(&base), true));
+        }
+
+        // TODO If MAC is enabled, keep an offset of 16 on the reader
         if !base.use_encryption {
             // stream.set_offset_end(16);
         }
 
-        // if use encryption, set the crypto in the bitreader. Choose algorithm(s) based on crypto settings
         let header = PlabbleRequestHeader::read_bytes(stream, Some(config))?;
         config.discriminator = Some(header.packet_type.get_discriminator());
 
-        // TODO: body decryption
-        let body = PlabbleRequestBody::read_bytes(stream, Some(config))?;
+        // Read body bytes from stream
+        let mut body = stream.read_bytes(stream.bytes_left())?.to_owned();
+        
+        // Decrypt the body if that is needed
+        if base.use_encryption {
 
-        // IF mac is enabled, check it here
+        }
+
+        let body = PlabbleRequestBody::from_bytes(&body, Some(config))?;
+
+        // TODO IF mac is enabled, check it here
         if !base.use_encryption {
             // let mac: &[u8; 16] = stream.slice_end().try_into().expect("A 16-byte MAC on the end");
         }

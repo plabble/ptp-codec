@@ -65,7 +65,7 @@ psk_salt = "base64url (no padding) random generated salt"
 
 # [1B] required if specify_crypto_settings is true
 [crypto_settings]
-encrypt_with_cha_cha20 = true   # default true, use ChaCha20(Poly1305)
+encrypt_with_chacha = true   # default true, use ChaCha20(Poly1305)
 encrypt_with_aes = false        # use AES for encryption
 # 1 reserved flag for future use
 use_blake3 = false              # use Blake3 instead of Blake2
