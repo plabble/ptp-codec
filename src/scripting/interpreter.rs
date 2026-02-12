@@ -1,4 +1,4 @@
-use std::cmp;
+use std::{cmp, ops::Neg};
 
 use binary_codec::BinaryDeserializer;
 use chrono::Utc;
@@ -35,6 +35,9 @@ pub enum ScriptError {
 
     /// When an operation expected a number but got something else
     NotANumber,
+
+    /// When an operation expected a float but got something else
+    NotAFloat,
 
     /// When an operation expected a boolean but got something else
     NotABoolean,
@@ -234,6 +237,12 @@ impl ScriptInterpreter {
             .ok_or(ScriptError::NotANumber)
     }
 
+    fn pop_float(&mut self) -> Result<f64, ScriptError> {
+        self.pop()
+            .and_then(|n| n.as_float())
+            .ok_or(ScriptError::NotAFloat)
+    }
+
     fn pop_boolean(&mut self) -> Result<bool, ScriptError> {
         self.pop()
             .and_then(|b| b.as_boolean())
@@ -248,14 +257,29 @@ impl ScriptInterpreter {
         match (a, b) {
             (StackData::Boolean(a), StackData::Boolean(b)) => return Ok(a == b),
             (StackData::Number(a), StackData::Number(b)) => return Ok(a == b),
+            (StackData::Float(a), StackData::Float(b)) => return Ok(a == b),
             (StackData::Byte(a), StackData::Byte(b)) => return Ok(a == b),
             (StackData::Number(a), StackData::Byte(b)) => return Ok(a == b as i128),
             (StackData::Byte(a), StackData::Number(b)) => return Ok(a as i128 == b),
+            (StackData::Float(a), StackData::Number(b)) => {
+                return Ok(a.fract() == 0.0 && a as i128 == b);
+            }
+            (StackData::Number(a), StackData::Float(b)) => {
+                return Ok(b.fract() == 0.0 && a == b as i128);
+            }
+            (StackData::Float(a), StackData::Byte(b)) => return Ok(a == b as f64),
+            (StackData::Byte(a), StackData::Float(b)) => return Ok(a as f64 == b),
             (StackData::Boolean(a), StackData::Number(b)) => {
                 return Ok((if a { 1 } else { 0 }) == b);
             }
             (StackData::Number(a), StackData::Boolean(b)) => {
                 return Ok(a == (if b { 1 } else { 0 }));
+            }
+            (StackData::Boolean(a), StackData::Float(b)) => {
+                return Ok((if a { 1f64 } else { 0f64 }) == b);
+            }
+            (StackData::Float(a), StackData::Boolean(b)) => {
+                return Ok(a == (if b { 1f64 } else { 0f64 }));
             }
             (StackData::Boolean(a), StackData::Byte(b)) => return Ok((if a { 1 } else { 0 }) == b),
             (StackData::Byte(a), StackData::Boolean(b)) => return Ok(a == (if b { 1 } else { 0 })),
@@ -304,6 +328,7 @@ impl ScriptInterpreter {
             Opcode::PUSHL2 { len: _, data } => self.push(StackData::Buffer(data))?,
             Opcode::PUSHL4 { len: _, data } => self.push(StackData::Buffer(data))?,
             Opcode::PUSHINT(val) => self.push(StackData::Number(val))?,
+            Opcode::PUSHFLOAT(val) => self.push(StackData::Float(val))?,
             Opcode::ADD => {
                 self.ensure_stack_size(2)?;
                 let b = self.pop_number()?;
@@ -341,15 +366,69 @@ impl ScriptInterpreter {
             }
             Opcode::NEG => {
                 self.ensure_stack_size(1)?;
-                let a = self.pop_number()?;
-                let c = a.checked_neg().ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c))?;
+                let val = self.pop();
+
+                match val {
+                    Some(StackData::Number(a)) => {
+                        let c = a.checked_neg().ok_or(ScriptError::MathError)?;
+                        self.push(StackData::Number(c))?;
+                    }
+                    Some(StackData::Float(a)) => {
+                        self.push(StackData::Float(a.neg()))?;
+                    }
+                    _ => return Err(ScriptError::NotANumber),
+                }
             }
             Opcode::ABS => {
                 self.ensure_stack_size(1)?;
-                let a = self.pop_number()?;
-                let c = a.checked_abs().ok_or(ScriptError::MathError)?;
-                self.push(StackData::Number(c))?;
+                let val = self.pop();
+
+                match val {
+                    Some(StackData::Number(a)) => {
+                        let c = a.checked_abs().ok_or(ScriptError::MathError)?;
+                        self.push(StackData::Number(c))?;
+                    }
+                    Some(StackData::Float(a)) => {
+                        self.push(StackData::Float(a.abs()))?;
+                    }
+                    _ => return Err(ScriptError::NotANumber),
+                }
+            }
+            Opcode::FADD => {
+                self.ensure_stack_size(2)?;
+                let b = self.pop_float()?;
+                let a = self.pop_float()?;
+                self.push(StackData::Float(a + b))?;
+            }
+            Opcode::FSUB => {
+                self.ensure_stack_size(2)?;
+                let b = self.pop_float()?;
+                let a = self.pop_float()?;
+                self.push(StackData::Float(a - b))?;
+            }
+            Opcode::FMUL => {
+                self.ensure_stack_size(2)?;
+                let b = self.pop_float()?;
+                let a = self.pop_float()?;
+                self.push(StackData::Float(a * b))?;
+            }
+            Opcode::FDIV => {
+                self.ensure_stack_size(2)?;
+                let b = self.pop_float()?;
+                let a = self.pop_float()?;
+                if b == 0.0 {
+                    return Err(ScriptError::MathError);
+                }
+                self.push(StackData::Float(a / b))?;
+            }
+            Opcode::FMOD => {
+                self.ensure_stack_size(2)?;
+                let b = self.pop_float()?;
+                let a = self.pop_float()?;
+                if b == 0.0 {
+                    return Err(ScriptError::MathError);
+                }
+                self.push(StackData::Float(a % b))?;
             }
             Opcode::LT => {
                 self.ensure_stack_size(2)?;
@@ -386,6 +465,62 @@ impl ScriptInterpreter {
                 let a = self.pop_number()?;
                 let b = self.pop_number()?;
                 self.push(StackData::Number(cmp::max(a, b)))?;
+            }
+            Opcode::FLT => {
+                self.ensure_stack_size(2)?;
+                let a = self.pop_float()?;
+                let b = self.pop_float()?;
+                self.push(StackData::Boolean(b < a))?;
+            }
+            Opcode::FGT => {
+                self.ensure_stack_size(2)?;
+                let a = self.pop_float()?;
+                let b = self.pop_float()?;
+                self.push(StackData::Boolean(b > a))?;
+            }
+            Opcode::FLTE => {
+                self.ensure_stack_size(2)?;
+                let a = self.pop_float()?;
+                let b = self.pop_float()?;
+                self.push(StackData::Boolean(b <= a))?;
+            }
+            Opcode::FGTE => {
+                self.ensure_stack_size(2)?;
+                let a = self.pop_float()?;
+                let b = self.pop_float()?;
+                self.push(StackData::Boolean(b >= a))?;
+            }
+            Opcode::FMIN => {
+                self.ensure_stack_size(2)?;
+                let a = self.pop_float()?;
+                let b = self.pop_float()?;
+                self.push(StackData::Float(a.min(b)))?;
+            }
+            Opcode::FMAX => {
+                self.ensure_stack_size(2)?;
+                let a = self.pop_float()?;
+                let b = self.pop_float()?;
+                self.push(StackData::Float(a.max(b)))?;
+            }
+            Opcode::FLOOR => {
+                self.ensure_stack_size(1)?;
+                let a = self.pop_float()?;
+                self.push(StackData::Float(a.floor()))?;
+            }
+            Opcode::CEIL => {
+                self.ensure_stack_size(1)?;
+                let a = self.pop_float()?;
+                self.push(StackData::Float(a.ceil()))?;
+            }
+            Opcode::ROUND => {
+                self.ensure_stack_size(1)?;
+                let a = self.pop_float()?;
+                self.push(StackData::Float(a.round()))?;
+            }
+            Opcode::ROUNDE => {
+                self.ensure_stack_size(1)?;
+                let a = self.pop_float()?;
+                self.push(StackData::Float(a.round_ties_even()))?;
             }
             Opcode::BAND => {
                 self.ensure_stack_size(2)?;
@@ -471,16 +606,14 @@ impl ScriptInterpreter {
             }
             Opcode::SQRT => {
                 self.ensure_stack_size(1)?;
-                let a = self.pop_number()?;
-                if a < 0 {
+                let a = self.pop_float()?;
+                if a < 0.0 {
                     return Err(ScriptError::MathError);
                 }
-                let c = (a as f64).sqrt() as i128;
-                self.push(StackData::Number(c))?;
+                let c = a.sqrt();
+                self.push(StackData::Float(c))?;
             }
             Opcode::NOP => { /* NOP = do nothing */ }
-
-            /* Control flow */
             Opcode::IF => {
                 self.ensure_stack_size(1)?;
 
@@ -699,6 +832,11 @@ impl ScriptInterpreter {
                 let num = self.pop_number()?;
                 self.push(StackData::Number(num))?;
             }
+            Opcode::FLOAT => {
+                self.ensure_stack_size(1)?;
+                let num = self.pop_float()?;
+                self.push(StackData::Float(num))?;
+            }
             Opcode::SERVER => todo!(),
             Opcode::SELECT => todo!(),
             Opcode::READ => todo!(),
@@ -753,15 +891,11 @@ impl ScriptInterpreter {
                 bytes.splice((offset as usize)..((offset + length) as usize), splice_data);
                 self.push(StackData::Buffer(bytes))?;
             }
-
-            /* Crypto operations */
             Opcode::HASH => todo!(),
             Opcode::SIGN => todo!(),
             Opcode::VERIFY => todo!(),
             Opcode::ENCRYPT => todo!(),
             Opcode::DECRYPT => todo!(),
-
-            /* Special opcodes */
             Opcode::TIME => {
                 let now = PlabbleDateTime(Utc::now());
                 self.push(StackData::Number(now.timestamp() as i128))?;
@@ -991,7 +1125,7 @@ mod tests {
             Opcode::PUSHINT(10),
             Opcode::PUSHL1 {
                 len: 0,
-                data: vec![0x02, 5, 0x02, 2, 0xB],
+                data: vec![0x02, 5, 0x02, 2, 0xC],
             },
             Opcode::EVAL,
             Opcode::EQ,
@@ -1528,7 +1662,7 @@ mod tests {
     #[test]
     fn evalsub_executes_child_script_and_pushes_result() {
         // child script: PUSH1(9); RETURN
-        let child_bytes = vec![0x02, 9, 0x32]; // PUSH1, 9, RETURN
+        let child_bytes = vec![0x02, 9, 0x4F]; // PUSH1, 9, RETURN
 
         let script = OpcodeScript::new(vec![
             Opcode::PUSHL1 {
@@ -1787,7 +1921,7 @@ mod tests {
     #[test]
     fn evalsub_child_assert_failure_propagates() {
         // child: FALSE, ASSERT -> ASSERT will fail
-        let child_bytes = vec![0u8, 49u8]; // FALSE = 0, ASSERT = 49
+        let child_bytes = vec![0u8, 78u8]; // FALSE = 0, ASSERT = 78
         let script = OpcodeScript::new(vec![
             Opcode::PUSHL1 {
                 len: 0,
@@ -2245,7 +2379,7 @@ mod tests {
         let script = OpcodeScript::new(vec![
             Opcode::PUSHL1 {
                 len: 0,
-                data: vec![0x00, 0x30],
+                data: vec![0x00, 0x4D],
             }, // hidden JMP
             Opcode::EVAL,
         ]);
@@ -2469,5 +2603,162 @@ mod tests {
         let res = i.exec();
 
         assert_eq!(res, Ok(None));
+    }
+
+    #[test]
+    fn float_arithmetic_and_comparisons() {
+        let script = OpcodeScript::new(vec![
+            // FADD: 1.5 + 2.5 = 4.0
+            Opcode::PUSHFLOAT(1.5),
+            Opcode::PUSHFLOAT(2.5),
+            Opcode::FADD,
+            Opcode::PUSHFLOAT(4.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // FSUB: 5.5 - 2.0 = 3.5
+            Opcode::PUSHFLOAT(5.5),
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::FSUB,
+            Opcode::PUSHFLOAT(3.5),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // FMUL: 2.0 * 3.5 = 7.0
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::PUSHFLOAT(3.5),
+            Opcode::FMUL,
+            Opcode::PUSHFLOAT(7.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // FDIV: 7.5 / 2.5 = 3.0
+            Opcode::PUSHFLOAT(7.5),
+            Opcode::PUSHFLOAT(2.5),
+            Opcode::FDIV,
+            Opcode::PUSHFLOAT(3.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // FMOD: 7.5 % 2.0 = 1.5
+            Opcode::PUSHFLOAT(7.5),
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::FMOD,
+            Opcode::PUSHFLOAT(1.5),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // FLT: 2.0 < 3.0 => true
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::PUSHFLOAT(3.0),
+            Opcode::FLT,
+            Opcode::ASSERT,
+            // FGT: 3.0 > 2.0 => true
+            Opcode::PUSHFLOAT(3.0),
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::FGT,
+            Opcode::ASSERT,
+            // FLTE: 2.0 <= 2.0 => true
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::FLTE,
+            Opcode::ASSERT,
+            // FGTE: 3.0 >= 2.0 => true
+            Opcode::PUSHFLOAT(3.0),
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::FGTE,
+            Opcode::ASSERT,
+            // FMIN: min(2.5, 3.5) = 2.5
+            Opcode::PUSHFLOAT(2.5),
+            Opcode::PUSHFLOAT(3.5),
+            Opcode::FMIN,
+            Opcode::PUSHFLOAT(2.5),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // FMAX: max(2.5, 3.5) = 3.5
+            Opcode::PUSHFLOAT(2.5),
+            Opcode::PUSHFLOAT(3.5),
+            Opcode::FMAX,
+            Opcode::PUSHFLOAT(3.5),
+            Opcode::EQ,
+            Opcode::ASSERT,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
+    }
+
+    #[test]
+    fn float_number_casting() {
+        let script = OpcodeScript::new(vec![
+            // Cast int to float: 42 -> 42.0
+            Opcode::PUSHINT(42),
+            Opcode::FLOAT,
+            Opcode::PUSHFLOAT(42.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // Cast float to int: 13.0 -> 13
+            Opcode::PUSHFLOAT(13.0),
+            Opcode::NUMBER,
+            Opcode::PUSHINT(13),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // Cast float with fraction to int: 13.7 -> 13 (should truncate)
+            Opcode::PUSHFLOAT(13.7),
+            Opcode::NUMBER,
+            Opcode::PUSHINT(13),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // Compare float to number
+            Opcode::PUSHINT(10),
+            Opcode::PUSHFLOAT(3.33),
+            Opcode::PUSHFLOAT(6.66),
+            Opcode::FADD,
+            Opcode::ROUND,
+            Opcode::NUMBER,
+            Opcode::EQ,
+            Opcode::ASSERT
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
+    }
+
+    #[test]
+    fn float_floor_ceil_round_rounede() {
+        let script = OpcodeScript::new(vec![
+            // FLOOR: 3.7 -> 3.0
+            Opcode::PUSHFLOAT(3.7),
+            Opcode::FLOOR,
+            Opcode::PUSHFLOAT(3.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // CEIL: 3.2 -> 4.0
+            Opcode::PUSHFLOAT(3.2),
+            Opcode::CEIL,
+            Opcode::PUSHFLOAT(4.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // ROUND: 2.5 -> 3.0, 2.4 -> 2.0
+            Opcode::PUSHFLOAT(2.5),
+            Opcode::ROUND,
+            Opcode::PUSHFLOAT(3.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            Opcode::PUSHFLOAT(2.4),
+            Opcode::ROUND,
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            // ROUNDE: 2.5 -> 2.0 (ties to even), 3.5 -> 4.0
+            Opcode::PUSHFLOAT(2.5),
+            Opcode::ROUNDE,
+            Opcode::PUSHFLOAT(2.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            Opcode::PUSHFLOAT(3.5),
+            Opcode::ROUNDE,
+            Opcode::PUSHFLOAT(4.0),
+            Opcode::EQ,
+            Opcode::ASSERT,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
     }
 }

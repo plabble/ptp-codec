@@ -48,109 +48,136 @@ pub enum Opcode {
     // Push dynamic int to the stack
     PUSHINT(#[dyn_int] i128) = 8,
 
+    // Push floating point number to the stack. Floats are 64-bit IEEE 754 binary64
+    PUSHFLOAT(f64) = 9,
+
     /* END OF PUSH-ONLY OPCODES */
     // Numeric operations - all numbers are signed Plabble dynints
-    ADD = 9,  // Pop two numbers from the stack and sum them
-    SUB = 10, // Pop two numbers from the stack and substract them
-    MUL = 11, // Pop two numbers from the stack and multiply them
-    DIV = 12, // Pop two numbers from the stack and divide them
-    MOD = 13, // Pop two numbers from the stack and modulo divide them
-    NEG = 14, // Pop one number and negate it
-    ABS = 15, // Pop one number and make it positive
+    ADD = 10,  // Pop two numbers from the stack and sum them
+    SUB = 11, // Pop two numbers from the stack and substract them
+    MUL = 12, // Pop two numbers from the stack and multiply them
+    DIV = 13, // Pop two numbers from the stack and divide them
+    MOD = 14, // Pop two numbers from the stack and modulo divide them
+    
+    NEG = 15, // Pop one number and negate it
+    ABS = 16, // Pop one number and make it positive
+ 
+    // Floating point numeric operations
+    FADD = 17, // Pop two floats from the stack and sum them
+    FSUB = 18, // Pop two floats from the stack and substract them
+    FMUL = 19, // Pop two floats from the stack and multiply them
+    FDIV = 20, // Pop two floats from the stack and divide them
+    FMOD = 21, // Pop two floats from the stack and modulo divide them
 
-    // Numberic comparation operations - all numbers are signed Plabble dynints. Returns FALSE or TRUE
-    LT = 16,  // Pop two numbers and check if second number is smaller
-    GT = 17,  // Pop two numbers and check if second number is greater
-    LTE = 18, // Pop two numbers and check if second number is smaller or equal
-    GTE = 19, // Pop two numbers and check if second number is greater or equal
-    MIN = 20, // Pop two numbers and return smallest
-    MAX = 21, // Pop two numbers and return largest
+    // Numberic comparation operations - all numbers are signed Plabble dynints. Returns FALSE of TRUE
+    LT = 22,  // Pop two numbers and check if second number is smaller
+    GT = 23,  // Pop two numbers and check if second number is greater
+    LTE = 24, // Pop two numbers and check if second number is smaller or equal
+    GTE = 25, // Pop two numbers and check if second number is greater or equal
+    MIN = 26, // Pop two numbers and return smallest
+    MAX = 27, // Pop two numbers and return largest
+
+    // Floating point numeric comparation operations. Returns FALSE of TRUE
+    FLT = 28,  // Pop two floats and check if second number is smaller
+    FGT = 29,  // Pop two floats and check if second number is greater
+    FLTE = 30, // Pop two floats and check if second number is smaller or equal
+    FGTE = 31, // Pop two floats and check if second number is greater or equal
+    FMIN = 32, // Pop two floats and return smallest
+    FMAX = 33, // Pop two floats and return largest
+    // 34, 35
+    FLOOR = 36, // Pop one float and round it down to nearest integer 
+    CEIL = 37, // Pop one float and round it up to nearest integer
+    ROUND = 38, // Pop one float and round it to nearest integer
+    ROUNDE = 39, // Pop one float and round it to nearest integer, rounding even
 
     // Binary numeric operations
-    BAND = 22, // Pop two numbers and perform bitwise AND
-    BOR = 23,  // Pop two numbers and perform bitwise OR
-    BXOR = 24, // Pop two numbers and perform bitwise XOR
-    BSHL = 25, // Pop two numbers, shift first left by second
-    BSHR = 26, // Pop two numbers, shift first right by second
-    BNOT = 27, // Pop one number and bitwise NOT
+    BAND = 40, // Pop two numbers and perform bitwise AND
+    BOR = 41,  // Pop two numbers and perform bitwise OR
+    BXOR = 42, // Pop two numbers and perform bitwise XOR
+    BSHL = 43, // Pop two numbers, shift first left by second
+    BSHR = 44, // Pop two numbers, shift first right by second
+    BNOT = 45, // Pop one number and bitwise NOT
 
     // Boolean/logic operations
-    NOT = 28, // Pop boolean and invert it
-    AND = 29, // Pop two booleans and check if both true
-    OR = 30,  // Pop two booleans and check if one is true
-    XOR = 31, // Pop two booleans and check if exactly ONE is true
+    NOT = 50, // Pop boolean and invert it
+    AND = 51, // Pop two booleans and check if both true
+    OR = 52,  // Pop two booleans and check if one is true
+    XOR = 53, // Pop two booleans and check if exactly ONE is true
 
-    EQ = 32,  // Pop two items and check if they are equal
-    NEQ = 33, // Pop two items and check if they are different
+    EQ = 54,  // Pop two items and check if they are equal
+    NEQ = 55, // Pop two items and check if they are different
+    // 56 - 60
 
     // Advanced numerics
-    POW = 34,  // Pop two numbers, calculate exponent
-    SQRT = 35, // Pop two numbers, calculate square root
-    // 36 - 40
+    POW = 60,  // Pop two numbers, calculate exponent
+    SQRT = 61, // Pop one float, calculate square root
+    // 62 - 69
 
     // Control flow
-    NOP = 41,   // Do nothing
-    IF = 42,    // If statement (takes boolean from stack)
-    ELSE = 43,  // Else statement
-    FI = 44,    // End if
-    BREAK = 45, // Break loop (skip to next POOL)
-    LOOP = 46,  // Start loop
-    POOL = 47,  // End of loop
-    JMP = 48,   // Jump to address (takes unsigned dynint as address from stack)
+    NOP = 70,   // Do nothing
+    IF = 71,    // If statement (takes boolean from stack)
+    ELSE = 72,  // Else statement
+    FI = 73,    // End if
+    BREAK = 74, // Break loop (skip to next POOL)
+    LOOP = 75,  // Start loop
+    POOL = 76,  // End of loop
+    JMP = 77,   // Jump to address (takes unsigned dynint as address from stack)
 
-    ASSERT = 49, // Crash if top is not true
-    RETURN = 50, // Stop execution, return stack as result
+    ASSERT = 78, // Crash if top is not true
+    RETURN = 79, // Stop execution, return stack as result
+    // 80 - 89
 
     // Stack manipulation
-    DUP = 51,  // Duplicate top item of stack
-    DUP2 = 52, // Duplicate top two items of stack
-    DUP3 = 53, // Duplicate top three items of stack
-    DUP4 = 54, // Duplicate top four items of stack
+    DUP = 90,  // Duplicate top item of stack
+    DUP2 = 91, // Duplicate top two items of stack
+    DUP3 = 92, // Duplicate top three items of stack
+    DUP4 = 93, // Duplicate top four items of stack
+    DUPN(u8) = 94, // Duplicate top item of stack N times (takes byte for count from script)
 
-    // Duplicate top item of stack N times (takes byte for count from script)
-    DUPN(u8) = 55,
+    SWAP = 95,   // Swap top two items of stack
+    ROT = 96,    // Rotate top three items of stack
+    POP = 97,    // Take one item from stack
+    COPY = 98, // Take the item at index n (takes unsigned dynint as address from stack) and copy it to top
+    BUBBLE = 99, // Take the item at index n (takes unsigned dynint as address from stack) and move it to top
+    SINK = 100, // Take the item at index n (takes unsigned dynint as address from stack) and move it to bottom
 
-    SWAP = 56,   // Swap top two items of stack
-    ROT = 57,    // Rotate top three items of stack
-    POP = 58,    // Take one item from stack
-    COPY = 59, // Take the item at index n (takes unsigned dynint as address from stack) and copy it to top
-    BUBBLE = 60, // Take the item at index n (takes unsigned dynint as address from stack) and move it to top
-    SINK = 61, // Take the item at index n (takes unsigned dynint as address from stack) and move it to bottom
-
-    TOALT = 62,    // Move top item to alt (other) stack
-    FROMALT = 63,  // Move top item from alt (other) stack back
-    SNAPSHOT = 64, // Store a snapshot of the current stack
-    RESTORE = 65,  // Restore the snapshot (replaces current stack)
-    CLEAR = 66,    // Clear current stack
-    SWITCH = 67,   // Switches between current and alt stack
-    CONCAT = 68,   // Merge top two items together as bytes
-    COUNT = 69,    // Push number of items in stack to stack (excluding itself)
+    TOALT = 101,    // Move top item to alt (other) stack
+    FROMALT = 102,  // Move top item from alt (other) stack back
+    SNAPSHOT = 103, // Store a snapshot of the current stack
+    RESTORE = 104,  // Restore the snapshot (replaces current stack)
+    CLEAR = 105,    // Clear current stack
+    SWITCH = 106,   // Switches between current and alt stack
+    CONCAT = 107,   // Merge top two items together as bytes
+    COUNT = 108,    // Push number of items in stack to stack (excluding itself)
+    // 109 - 119
 
     // Casts
-    NUMBER = 70, // Cast current value to number. This is only needed if you for instance want to compare a byte array as a number to a number
-    // 71 - 80,
+    NUMBER = 120, // Cast current value to number. This is only needed if you for instance want to compare a byte array as a number to a number
+    FLOAT = 121,  // Cast current value to float. Floats are 64-bit IEEE 754 binary64
+    // 122 - 129,
 
     // Bucket operations
-    SERVER = 81, // Connect to other server. Takes address from stack
-    SELECT = 82, // Select bucket by ID (takes 16 bytes for bucket ID)
-    READ = 83, // Read numeric slot of bucket (takes 2 bytes for u16 bucket index) and push result to stack
-    WRITE = 84, // Write numeric slot to bucket. Takes 2 bytes for slot, content from stack
-    APPEND = 85, // Write to bucket, next free slot. Takes content from stack
-    DELETE = 86, // Delete slot from bucket. Takes 2 bytes for slot number.
-    // 87 - 90
+    SERVER = 130, // Connect to other server. Takes address from stack
+    SELECT = 131, // Select bucket by ID (takes 16 bytes for bucket ID)
+    READ = 132, // Read numeric slot of bucket (takes 2 bytes for u16 bucket index) and push result to stack
+    WRITE = 133, // Write numeric slot to bucket. Takes 2 bytes for slot, content from stack
+    APPEND = 134, // Write to bucket, next free slot. Takes content from stack
+    DELETE = 135, // Delete slot from bucket. Takes 2 bytes for slot number.
+    // 136 - 139
 
     // Slice operations
-    LEN = 91,     // Pops top item from stack and returns slice length
-    REVERSE = 92, // Reverse bytes of top item
-    SLICE = 93, // Slice bytes from existing byte array (copy). Takes 2 numbers, one for offset, one for length.
-    SPLICE = 94, // Splice bytes from existing byte array (modifies). Takes 2 numbers, one for range offset, one for range length, then bytes to put, then bytes to splice into
+    LEN = 140,     // Pops top item from stack and returns slice length
+    REVERSE = 141, // Reverse bytes of top item
+    SLICE = 142, // Slice bytes from existing byte array (copy). Takes 2 numbers, one for offset, one for length.
+    SPLICE = 143, // Splice bytes from existing byte array (modifies). Takes 2 numbers, one for range offset, one for range length, then bytes to put, then bytes to splice into
+    // 144 - 149
 
     // Crypto operations
-    HASH = 101,    // Take byte for algorithm, hashes bytes and put them back on stack
-    SIGN = 102, // Take byte for algorithm, signature, data to sign and puts signature back on stack
-    VERIFY = 103, // Takes byte for algorithm, public key, signature, data and puts boolean back
-    ENCRYPT = 104, // Takes byte for algorithm, key, data and puts encrypted data back
-    DECRYPT = 105, // Takes byte for algorithm, key, ciphertext and puts plain data back
+    HASH = 150,    // Take byte for algorithm, hashes bytes and put them back on stack
+    SIGN = 151, // Take byte for algorithm, signature, data to sign and puts signature back on stack
+    VERIFY = 152, // Takes byte for algorithm, public key, signature, data and puts boolean back
+    ENCRYPT = 153, // Takes byte for algorithm, key, data and puts encrypted data back
+    DECRYPT = 154, // Takes byte for algorithm, key, ciphertext and puts plain data back
 
     // Special: 200+
     TIME = 200, // Push the current time as a Plabble numeric timestamp to the stack
@@ -228,7 +255,7 @@ impl OpcodeScript {
     /// we don't want the unlocker to use any control statement or whatever.
     /// The unlocker script should only contain push statements and be put BEFORE the locking script
     pub fn is_push_only(&self) -> bool {
-        self.instructions.iter().all(|i| i.get_discriminator() <= 8)
+        self.instructions.iter().all(|i| i.get_discriminator() < 10)
     }
 
     /// Generate a jump target map for this script
@@ -308,7 +335,7 @@ pub mod tests {
 
     #[test]
     fn can_deserialize_simple_script() {
-        let bytes = vec![0x01, 0x02, 1, 32];
+        let bytes = vec![0x01, 0x02, 1, 54];
         let config: Option<&mut SerializerConfig> = None;
         let script = OpcodeScript::from_bytes(&bytes, config).unwrap();
 

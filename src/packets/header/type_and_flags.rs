@@ -173,6 +173,17 @@ pub enum RequestPacketType {
         #[serde(default)]
         select_random_hops: bool,
     } = 12,
+    /// Custom packet type for supporting sub-protocols
+    Custom {
+        #[serde(default)]
+        flag1: bool,
+        #[serde(default)]
+        flag2: bool,
+        #[serde(default)]
+        flag3: bool,
+        #[serde(default)]
+        flag4: bool,
+    } = 13,
     /// Execute a server-side opcode script
     /// - allow_bucket_operations: Allow the script to perform bucket operations.
     /// - allow_eval: Allow the script to use eval functionality (can be dangerous).
@@ -236,6 +247,17 @@ pub enum ResponsePacketType {
         #[serde(default)]
         include_hop_info: bool,
     } = 12,
+    /// Custom packet type for supporting sub-protocols
+    Custom {
+        #[serde(default)]
+        flag1: bool,
+        #[serde(default)]
+        flag2: bool,
+        #[serde(default)]
+        flag3: bool,
+        #[serde(default)]
+        flag4: bool,
+    } = 13,
     /// Response to an opcode execution request.
     Opcode = 14,
     /// Error response

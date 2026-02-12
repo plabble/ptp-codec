@@ -25,6 +25,7 @@ use crate::packets::body::{
 /// - `Register`: Represents a register response body.
 /// - `Identity`: Represents an identity response body.
 /// - `Proxy`: Represents a proxy response body.
+/// - `Custom`: Represents a custom response body (for sub-protocols).
 /// - `Opcode`: Represents an opcode response body.
 /// - `Error`: Represents an error response body.
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
@@ -45,6 +46,7 @@ pub enum PlabbleResponseBody {
     Register = 10,
     Identity = 11,
     Proxy = 12,
+    Custom = 13,
     Opcode = 14,
     Error(PlabbleError) = 15,
 }

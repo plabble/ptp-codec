@@ -80,7 +80,7 @@ impl PlabbleConnectionContext {
             (session_key, &base?.psk_salt?)
         };
 
-        // Context/persona is: `plabble.req.c`/`plabble.res.c` (ASCII) + client/server counter + 0x11 or 0x77 = 16 bytes
+        // Context/persona is: `plabble.req.c`/`plabble.res.c` (ASCII) + client/server counter + (alt byte) = 16 bytes
         let mut context = Vec::new();
         context.extend_from_slice(if is_request {
             b"plabble.req.c"

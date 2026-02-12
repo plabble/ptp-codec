@@ -29,7 +29,7 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **10** REGISTER
 - **11** IDENTIFY
 - **12** PROXY
-- 13 is reserved for future use
+- **13** CUSTOM
 - **14** OPCODE
 - **15** ERROR
 
@@ -66,7 +66,7 @@ psk_salt = "base64url (no padding) random generated salt"
 # [1B] required if specify_crypto_settings is true
 [crypto_settings]
 encrypt_with_chacha = true   # default true, use ChaCha20(Poly1305)
-encrypt_with_aes = false        # use AES for encryption
+encrypt_with_aes = false        # use AES 256 (CTR/GCM) for encryption
 # 1 reserved flag for future use
 use_blake3 = false              # use Blake3 instead of Blake2
 sign_ed25519 = true             # default true, use Ed25519 for signing
@@ -504,6 +504,11 @@ For `blake3`, the context is passed to the *derive_key* mode/KDF mode of blake3 
 For `blake2b-512`, the _MAC mode_ is used accepting directly a `key`, `salt` and `persona`. The context is passed to the persona.
 
 ### Encrypted client-server communication
+Packets are encrypted in 3 places:
+1. When full packet encryption is enabled (which can be after a starting a [Session](#session)), for each encryption algorithm specified in the [crypto settings](#plabble-packet-base) a crypto stream is created (see [encryption.rs](./src/crypto/encryption.rs)) and applied for all bytes written or read. This is always the base packet and MAYBE also the rest of the packet, but that depends on the base packet crypto settings.
+2. If the packet base has crypto settings specified, a new crypto stream is created and this will override the crypto stream set before the packet base was written/read. Now we can read or write the header.
+3. The body might be encrypted twice: first using ...
+
 
 ### Plabble Timestamp
 - Implementation: [datetime.rs](./src/core/datetime.rs)

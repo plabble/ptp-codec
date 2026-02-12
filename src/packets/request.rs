@@ -81,7 +81,7 @@ impl BinaryDeserializer<PlabbleConnectionContext> for PlabbleRequestPacket {
 
         // TODO If MAC is enabled, keep an offset of 16 on the reader
         if !base.use_encryption {
-            // stream.set_offset_end(16);
+            stream.set_offset_end(16);
         }
 
         let header = PlabbleRequestHeader::read_bytes(stream, Some(config))?;
@@ -91,15 +91,16 @@ impl BinaryDeserializer<PlabbleConnectionContext> for PlabbleRequestPacket {
         let mut body = stream.read_bytes(stream.bytes_left())?.to_owned();
         
         // Decrypt the body if that is needed
-        if base.use_encryption {
-
+        if base.use_encryption && let Some(ctx) = &config.data {
+            // TODO: AAD
+            let res = ctx.decrypt(&base, true, &body, &body);
         }
 
         let body = PlabbleRequestBody::from_bytes(&body, Some(config))?;
 
         // TODO IF mac is enabled, check it here
         if !base.use_encryption {
-            // let mac: &[u8; 16] = stream.slice_end().try_into().expect("A 16-byte MAC on the end");
+            let mac: &[u8; 16] = stream.slice_end().try_into().expect("A 16-byte MAC on the end");
         }
 
         Ok(Self { base, header, body })
@@ -145,6 +146,7 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Register => todo!(),
             RequestPacketType::Identify => todo!(),
             RequestPacketType::Proxy { .. } => todo!(),
+            RequestPacketType::Custom { .. } => todo!(),
             RequestPacketType::Opcode { .. } => todo!(),
         };
 

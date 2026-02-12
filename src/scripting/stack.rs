@@ -4,6 +4,7 @@ use binary_codec::{BitStreamReader, BitStreamWriter};
 pub enum StackData {
     Boolean(bool),
     Number(i128),
+    Float(f64),
     Buffer(Vec<u8>),
     Byte(u8),
 }
@@ -13,6 +14,7 @@ impl StackData {
         match self {
             StackData::Boolean(_) => 1,
             StackData::Number(_) => 2,
+            StackData::Float(_) => 3,
             StackData::Buffer(items) => items.len() * 2,
             StackData::Byte(_) => 2,
         }
@@ -38,6 +40,11 @@ impl StackData {
                 1 => Some(true),
                 _ => None,
             },
+            StackData::Float(f) => match *f {
+                0.0 => Some(false),
+                1.0 => Some(true),
+                _ => None,
+            }
         }
     }
 
@@ -61,6 +68,29 @@ impl StackData {
                 }
             }
             StackData::Byte(b) => Some(*b as i128),
+            StackData::Float(f) => Some(*f as i128),
+        }
+    }
+
+    pub fn as_float(&self) -> Option<f64> {
+        match self {
+            StackData::Boolean(b) => {
+                if *b {
+                    Some(1.0)
+                } else {
+                    Some(0.0)
+                }
+            }
+            StackData::Number(n) => Some(*n as f64),
+            StackData::Float(f) => Some(*f),
+            StackData::Buffer(b) => {
+                if b.len() < 8 {
+                    None
+                } else {
+                    Some(f64::from_be_bytes(b[0..8].try_into().unwrap()))
+                }
+            }
+            StackData::Byte(b) => Some(*b as f64),
         }
     }
 
@@ -82,6 +112,7 @@ impl StackData {
                 }
             }
             StackData::Byte(b) => Some(*b),
+            StackData::Float(f) => Some(f.round() as u8),
         }
     }
 
@@ -102,6 +133,9 @@ impl StackData {
             }
             StackData::Buffer(items) => Some(items.clone()),
             StackData::Byte(b) => Some(vec![*b]),
+            StackData::Float(f) => {
+                Some(f.to_be_bytes().to_vec().into())
+            }
         }
     }
 }

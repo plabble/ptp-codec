@@ -115,6 +115,7 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Register => todo!(),
             ResponsePacketType::Identify => todo!(),
             ResponsePacketType::Proxy { .. } => todo!(),
+            ResponsePacketType::Custom { .. } => todo!(),
             ResponsePacketType::Opcode => todo!(),
             ResponsePacketType::Error => {
                 PlabbleResponseBody::Error(raw.body.deserialize_into().unwrap())

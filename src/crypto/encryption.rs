@@ -91,7 +91,7 @@ impl PlabbleConnectionContext {
         aad: &[u8],
     ) -> Option<Vec<u8>> {
         let settings = self.crypto_settings.unwrap_or_default();
-        let mut keys = (0..10).map(|i| self.create_key(Some(base), i + 0x77, is_request));
+        let mut keys = (0..2).map(|i| self.create_key(Some(base), i + 0x77, is_request));
 
         let mut buff = data.to_vec();
 
@@ -139,7 +139,7 @@ impl PlabbleConnectionContext {
         aad: &[u8],
     ) -> Option<Vec<u8>> {
         let settings = self.crypto_settings.unwrap_or_default();
-        let mut keys = (0..10).map(|i| self.create_key(Some(base), i + 0x77, is_request));
+        let mut keys = (0..2).map(|i| self.create_key(Some(base), i + 0x77, is_request));
 
         let mut buff = data.to_vec();
 
