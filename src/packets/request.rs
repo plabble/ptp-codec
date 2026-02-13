@@ -244,26 +244,56 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Once;
-
+    use crate::{
+        errors::DeserializationError,
+        packets::{
+            base::settings::CryptoSettings, context::PlabbleConnectionContext,
+            request::PlabbleRequestPacket,
+        },
+    };
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
-    use crate::{errors::DeserializationError, packets::{base::settings::CryptoSettings, context::PlabbleConnectionContext, request::PlabbleRequestPacket}};
+    #[test]
+    fn can_decrypt_and_decrypt_request_packet() {
+        // init_logger();
+        let packet: PlabbleRequestPacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = true
 
-    static INIT: Once = Once::new();
+            [header]
+            packet_type = "Get"
+            id = "EjRWeJCrze_-3LoJh2VDIQ"
 
-    fn init_logger() {
-        INIT.call_once(|| {
-            env_logger::Builder::new()
-                .is_test(true) // important for tests
-                .filter_level(log::LevelFilter::Trace)
-                .init();
-        });
+            [body]
+            range.Numeric = [1, 5]
+        "#,
+        )
+        .unwrap();
+
+        let context = PlabbleConnectionContext::new();
+        let mut config = SerializerConfig::new(Some(context));
+
+        let context = config.data.as_mut().unwrap();
+        context.session_key = Some([0u8; 64]);
+
+        let encrypted = packet.to_bytes(Some(&mut config)).unwrap();
+        // 22 + 16 byte ciphertext (poly1305 tag is 16 bytes)
+        assert_eq!(22 + 16, encrypted.len());
+
+        let decrypted = PlabbleRequestPacket::from_bytes(&encrypted, Some(&mut config)).unwrap();
+
+        // 22-byte plaintext (base+header (2b), 16 byte bucket id, 2x 2-byte number)
+        assert_eq!(
+            "41021234567890abcdeffedcba098765432100010005",
+            hex::encode(decrypted.to_bytes(None).unwrap())
+        );
+        assert_eq!(packet, decrypted);
     }
-    
+
     #[test]
     fn can_serialize_and_deserialize_request_packet_with_mac() {
-        init_logger();
+        // init_logger();
         let packet: PlabbleRequestPacket = toml::from_str(
             r#"
             version = 1
@@ -280,7 +310,7 @@ mod tests {
 
         let context = PlabbleConnectionContext::new();
         let mut config = SerializerConfig::new(Some(context));
-        
+
         let context = config.data.as_mut().unwrap();
         context.session_key = Some([0u8; 64]);
 
@@ -291,23 +321,37 @@ mod tests {
         assert_eq!(packet_b, hex::encode(packet.to_bytes(None).unwrap()));
 
         // With MAC
-        assert_eq!(format!("{}{}", packet_b, mac), hex::encode(packet.to_bytes(Some(&mut config)).unwrap()));
+        assert_eq!(
+            format!("{}{}", packet_b, mac),
+            hex::encode(packet.to_bytes(Some(&mut config)).unwrap())
+        );
 
         // Decode with MAC
         let deserialized = PlabbleRequestPacket::from_bytes(
-            &hex::decode(format!("{}{}", packet_b, mac)).unwrap(), Some(&mut config)).unwrap();
+            &hex::decode(format!("{}{}", packet_b, mac)).unwrap(),
+            Some(&mut config),
+        )
+        .unwrap();
 
         assert_eq!(packet, deserialized);
-    
+
         // Not possible to decode with wrong MAC
         let wrong = PlabbleRequestPacket::from_bytes(
-            &hex::decode(format!("{}{}", packet_b, "7d671afeb16844378ec2ba55aa1fd6ab")).unwrap(), Some(&mut config));
+            &hex::decode(format!(
+                "{}{}",
+                packet_b, "7d671afeb16844378ec2ba55aa1fd6ab"
+            ))
+            .unwrap(),
+            Some(&mut config),
+        );
 
         assert_eq!(Err(DeserializationError::IntegrityFailed), wrong);
 
         // Not possible to decode with wrong data
         let wrong = PlabbleRequestPacket::from_bytes(
-            &hex::decode(format!("{}{}", "01021234567890abcdeffedcba0987654320", mac)).unwrap(), Some(&mut config));
+            &hex::decode(format!("{}{}", "01021234567890abcdeffedcba0987654320", mac)).unwrap(),
+            Some(&mut config),
+        );
 
         assert_eq!(Err(DeserializationError::IntegrityFailed), wrong);
 
@@ -320,7 +364,7 @@ mod tests {
 
         let encrypted = packet.to_bytes(Some(&mut config)).unwrap();
         let decrypted = PlabbleRequestPacket::from_bytes(&encrypted, Some(&mut config)).unwrap();
-        
+
         assert_eq!(packet, decrypted);
     }
 }

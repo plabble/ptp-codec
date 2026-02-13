@@ -137,9 +137,9 @@ checksum = "7d809780667f4410e7c41b07f52439b94d2bdf8528eeedc287fa38d3b7f95d82"
 
 [[package]]
 name = "binary-codec"
-version = "0.5.6"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "521211356446b591341f04a5bf32cab47b6ee4300a913eb4ad350b01953c944f"
+checksum = "3977e18fdf8ecdc3d69a84a564fecc71899d42b7ef7bb446043eebf8a0b5fe3b"
 dependencies = [
  "binary-codec-derive",
 ]

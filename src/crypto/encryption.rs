@@ -50,6 +50,16 @@ impl CryptoStream for StreamCipherCryptoStream {
             &self.modified
         }
     }
+    
+    fn replace(&mut self, other: &Box<dyn CryptoStream>) {
+        self.original = other.get_cached(true).to_vec();
+        self.modified = other.get_cached(false).to_vec();
+    }
+
+    fn set_cached(&mut self, data: &[u8]) {
+        self.original = data.to_vec();
+        self.modified = data.to_vec();
+    }
 }
 
 impl PlabbleConnectionContext {
@@ -129,7 +139,7 @@ impl PlabbleConnectionContext {
             let cipher = Aes256Gcm::new(key[..32].into());
             buff = cipher
                 .encrypt(
-                    key[32..48].into(),
+                    key[32..44].into(),
                     Payload {
                         msg: &buff[..],
                         aad,
@@ -164,7 +174,7 @@ impl PlabbleConnectionContext {
             let cipher = Aes256Gcm::new(key[..32].into());
             buff = cipher
                 .decrypt(
-                    key[32..48].into(),
+                    key[32..44].into(),
                     Payload {
                         msg: &buff[..],
                         aad,
