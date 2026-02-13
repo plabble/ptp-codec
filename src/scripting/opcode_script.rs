@@ -201,6 +201,25 @@ pub enum Opcode {
 
 */
 
+/// Settings for the script engine, such as limits and allowed operations.
+/// 
+/// # Properties
+/// - `memory_limit`: The maximum memory usage of the script, in memory points
+/// - `executions_limit`: The maximum number of opcode executions allowed for the script
+/// - `opcode_limit`: The maximum number of opcodes allowed in the script
+/// - `search_limit`: The maximum number of cursor movements allowed in the script (e.g., for jumps and loops)
+/// - `max_slice_size`: The maximum size of byte slices that can be created or manipulated by the script
+/// - `max_stack_items`: The maximum number of items allowed on the stack
+/// - `max_script_len`: The maximum length of the script in bytes
+/// - `max_nesting_depth`: The maximum depth of nested control flow structures (e.g., IFs and loops)
+/// - `allow_clear`: Whether the CLEAR opcode is allowed in the script
+/// - `allow_control_flow`: Whether control flow opcodes (IF, ELSE, FI, LOOP, POOL, JMP) are allowed in the script
+/// - `allow_loop`: Whether loop opcodes (LOOP and POOL) are allowed in the script
+/// - `allow_jump`: Whether the JMP opcode is allowed in the script
+/// - `allow_non_push`: Whether non-push opcodes are allowed in the script (if false, only push opcodes will be allowed)
+/// - `allow_eval`: Whether the EVAL opcode is allowed in the script
+/// - `allow_sandboxed_eval`: Whether the EVALSUB opcode is allowed in the script
+/// - `allow_bucket_actions`: Whether bucket operation opcodes (SERVER, SELECT, READ, WRITE, APPEND, DELETE) are allowed in the script
 #[derive(Debug, Clone)]
 pub struct ScriptSettings {
     pub memory_limit: usize,
@@ -238,9 +257,9 @@ impl Default for ScriptSettings {
             allow_jump: true,
             allow_control_flow: true,
             allow_non_push: true,
-            allow_eval: true,
-            allow_sandboxed_eval: true,
-            allow_bucket_actions: true,
+            allow_eval: false,
+            allow_sandboxed_eval: false,
+            allow_bucket_actions: false,
         }
     }
 }

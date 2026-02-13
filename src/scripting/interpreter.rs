@@ -108,6 +108,7 @@ impl ScriptInterpreter {
         instance
     }
 
+    /// Validate a script against the current settings, without executing it. This is useful to check if a script is valid before forking or executing it.
     pub fn validate_script(&self, script: &OpcodeScript) -> Result<(), ScriptError> {
         if !self.settings.allow_non_push && !script.is_push_only() {
             return Err(ScriptError::NonPushNotAllowed);
@@ -174,10 +175,12 @@ impl ScriptInterpreter {
         Ok(())
     }
 
+    /// Calculate the total memory used by the current stack, without counting the snapshot (which is not active memory)
     fn calculate_memory(&mut self) -> usize {
         self.stack().iter().map(|i| i.memory()).sum()
     }
 
+    /// Get a mutable reference to the currently active stack (main or alt, depending on the current mode)
     fn stack(&mut self) -> &mut Vec<StackData> {
         if self.use_alt_stack {
             &mut self.alt_stack
@@ -186,6 +189,8 @@ impl ScriptInterpreter {
         }
     }
 
+    /// Get a mutable reference to the currently active alt stack (main or alt, depending on the current mode).
+    /// This is used for TOALT and FROMALT operations, which move items between stacks, so we need to be able to access the alt stack even when it's not active
     fn alt_stack(&mut self) -> &mut Vec<StackData> {
         if self.use_alt_stack {
             &mut self.main_stack
@@ -194,6 +199,7 @@ impl ScriptInterpreter {
         }
     }
 
+    /// Ensure the stack has at least `size` items, otherwise return a StackUnderflow error with the required size
     fn ensure_stack_size(&mut self, size: usize) -> Result<(), ScriptError> {
         if self.stack().len() < size {
             return Err(ScriptError::StackUnderflow(size - self.stack().len()));
@@ -201,6 +207,7 @@ impl ScriptInterpreter {
         Ok(())
     }
 
+    /// Pop an item from the currently active stack, and decrease the memory count by the memory used by the popped item. Return None if the stack is empty.
     fn pop(&mut self) -> Option<StackData> {
         let item = self.stack().pop()?;
         self.memory -= item.memory();
@@ -208,6 +215,7 @@ impl ScriptInterpreter {
         Some(item)
     }
 
+    /// Push an item to the currently active stack, and increase the memory count by the memory used by the pushed item. Return an error if the new memory usage exceeds the limit, or if the new stack height exceeds the limit.
     fn push(&mut self, item: StackData) -> Result<(), ScriptError> {
         let item_memory = item.memory();
 
@@ -231,24 +239,29 @@ impl ScriptInterpreter {
         Ok(())
     }
 
+    /// Pop an item from the stack and try to convert it to a number. Return an error if the stack is empty or if the item cannot be converted to a number.
     fn pop_number(&mut self) -> Result<i128, ScriptError> {
         self.pop()
             .and_then(|n| n.as_number())
             .ok_or(ScriptError::NotANumber)
     }
 
+    /// Pop an item from the stack and try to convert it to a float. Return an error if the stack is empty or if the item cannot be converted to a float.
     fn pop_float(&mut self) -> Result<f64, ScriptError> {
         self.pop()
             .and_then(|n| n.as_float())
             .ok_or(ScriptError::NotAFloat)
     }
 
+    /// Pop an item from the stack and try to convert it to a boolean. Return an error if the stack is empty or if the item cannot be converted to a boolean.
     fn pop_boolean(&mut self) -> Result<bool, ScriptError> {
         self.pop()
             .and_then(|b| b.as_boolean())
             .ok_or(ScriptError::NotABoolean)
     }
 
+    /// Pop two items from the stack and check if they are equal, using the equality rules defined in the function.
+    /// Return an error if the stack has less than 2 items, or if the items cannot be compared (e.g., different types that cannot be converted to a common type).
     fn check_equality(&mut self) -> Result<bool, ScriptError> {
         self.ensure_stack_size(2)?;
         let a = self.pop().unwrap();
@@ -280,6 +293,9 @@ impl ScriptInterpreter {
         }
     }
 
+    /// Execute the script until completion, and return the final stack as a single buffer (by concatenating all items' buffer representations)
+    /// if a RETURN opcode is executed, or None if the script finishes without a RETURN.
+    /// Return an error if any opcode execution fails, or if the script is invalid.
     pub fn exec(&mut self) -> Result<Option<Vec<u8>>, ScriptError> {
         self.validate_script(&self.script)?;
 
@@ -293,6 +309,7 @@ impl ScriptInterpreter {
         Ok(None)
     }
 
+    /// Execute the next opcode in the script, and return the final stack as a single buffer if a RETURN opcode is executed, or None otherwise.
     pub fn exec_next(&mut self) -> Result<Option<Vec<u8>>, ScriptError> {
         if self.cursor >= self.script.instructions.len() {
             return Ok(None);
@@ -1117,7 +1134,10 @@ mod tests {
             Opcode::ASSERT,
         ]);
 
-        let mut interpreter = ScriptInterpreter::new(script, None);
+        let mut settings = ScriptSettings::default();
+        settings.allow_eval = true;
+
+        let mut interpreter = ScriptInterpreter::new(script, Some(settings));
         let result = interpreter.exec();
 
         assert_eq!(result, Ok(None));
@@ -1657,7 +1677,10 @@ mod tests {
             Opcode::EVALSUB,
         ]);
 
-        let mut i = ScriptInterpreter::new(script, None);
+        let mut settings = ScriptSettings::default();
+        settings.allow_sandboxed_eval = true;
+
+        let mut i = ScriptInterpreter::new(script, Some(settings));
         let r = i.exec();
         assert_eq!(r, Ok(None));
         // child result should be pushed as a buffer [9]
@@ -1914,7 +1937,11 @@ mod tests {
             },
             Opcode::EVALSUB,
         ]);
-        let mut i = ScriptInterpreter::new(script, None);
+
+        let mut settings = ScriptSettings::default();
+        settings.allow_sandboxed_eval = true;
+
+        let mut i = ScriptInterpreter::new(script, Some(settings));
         let err = i.exec().unwrap_err();
         assert_eq!(err, ScriptError::AssertionFailed);
     }
@@ -1930,7 +1957,11 @@ mod tests {
             Opcode::EVALSUB,
             Opcode::COUNT,
         ]);
-        let mut i = ScriptInterpreter::new(script, None);
+
+        let mut settings = ScriptSettings::default();
+        settings.allow_sandboxed_eval = true;
+
+        let mut i = ScriptInterpreter::new(script, Some(settings));
         assert_eq!(i.exec(), Ok(None));
         // COUNT should be 0 because sub pushed nothing
         assert_eq!(i.main_stack.last(), Some(&StackData::Number(0)));
@@ -2360,6 +2391,7 @@ mod tests {
     fn can_prevent_action_if_that_is_not_allowed() {
         let mut settings = ScriptSettings::default();
         settings.allow_jump = false;
+        settings.allow_eval = true;
 
         let script = OpcodeScript::new(vec![
             Opcode::PUSHL1 {
@@ -2566,7 +2598,11 @@ mod tests {
             });
             instructions.push(code);
 
-            let mut i = ScriptInterpreter::new(OpcodeScript::new(instructions), None);
+            let mut settings = ScriptSettings::default();
+            settings.allow_eval = true;
+            settings.allow_sandboxed_eval = true;
+
+            let mut i = ScriptInterpreter::new(OpcodeScript::new(instructions), Some(settings));
             let res = i.exec();
             assert_eq!(res, Err(ScriptError::OpcodeLimitExceeded));
         }
