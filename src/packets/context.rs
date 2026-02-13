@@ -31,9 +31,7 @@ pub struct PlabbleConnectionContext {
     pub server_counter: u16,
 
     /// When sending a packet, whether to include the bucket key in the authenticated data (for MAC and encryption).
-    pub include_bucket_key_in_auth_data: bool,
-
-    pub outside_session: bool
+    pub include_bucket_key_in_auth_data: bool
 }
 
 impl Default for PlabbleConnectionContext {
@@ -53,8 +51,7 @@ impl PlabbleConnectionContext {
             full_encryption: false,
             client_counter: 0,
             server_counter: 0,
-            include_bucket_key_in_auth_data: false,
-            outside_session: false,
+            include_bucket_key_in_auth_data: false
         }
     }
 
@@ -147,7 +144,7 @@ impl PlabbleConnectionContext {
 
 #[cfg(test)]
 mod tests {
-    use crate::packets::context::PlabbleConnectionContext;
+    use crate::packets::{base::PlabblePacketBase, context::PlabbleConnectionContext};
 
     #[test]
     fn keys_are_unique_by_alt_byte_and_is_request() {
@@ -173,5 +170,28 @@ mod tests {
         context.session_key = Some([1u8; 64]);
         let key1c = context.create_key(None, 0, true).unwrap();
         assert_ne!(key1, key1c);
+
+        // Base packet with PSK ID should override session key
+        let mut base = PlabblePacketBase {
+            version: 0,
+            fire_and_forget: false,
+            use_encryption: false,
+            pre_shared_key: true,
+            specify_crypto_settings: false,
+            crypto_settings: None,
+            psk_id: Some([0u8; 12]),
+            psk_salt: Some([0u8; 16]),
+        };
+
+        context.get_psk = Some(|_| Some([0u8; 64]));
+        let key4 = context.create_key(Some(&base), 0, true).unwrap();
+        assert_ne!(key1, key4);
+        assert_ne!(key2, key4);
+        assert_ne!(key3, key4);
+
+        // If the salt is different, the key should be different too
+        base.psk_salt = Some([1u8; 16]);
+        let key5 = context.create_key(Some(&base), 0, true).unwrap();
+        assert_ne!(key4, key5);
     }
 }

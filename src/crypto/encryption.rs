@@ -11,7 +11,8 @@ type Aes256Ctr64Le = ctr::Ctr64LE<Aes256>;
 
 /// Stream cipher crypto stream
 pub struct StreamCipherCryptoStream {
-    plaintext: Vec<u8>,
+    original: Vec<u8>,
+    modified: Vec<u8>,
     ciphers: Vec<Box<dyn StreamCipher>>,
 }
 
@@ -19,7 +20,8 @@ impl StreamCipherCryptoStream {
     /// Create new stream cipher stream
     pub fn new(ciphers: Vec<Box<dyn StreamCipher>>) -> Self {
         Self {
-            plaintext: Vec::new(),
+            original: Vec::new(),
+            modified: Vec::new(),
             ciphers,
         }
     }
@@ -31,17 +33,22 @@ impl CryptoStream for StreamCipherCryptoStream {
     }
 
     fn apply_keystream(&mut self, slice: &[u8]) -> &[u8] {
-        let offset = self.plaintext.len();
-        self.plaintext.extend_from_slice(slice);
-        let slice = &mut self.plaintext[offset..];
+        let offset = self.modified.len();
+        self.original.extend_from_slice(slice);
+        self.modified.extend_from_slice(slice);
+        let slice = &mut self.modified[offset..];
         for cipher in self.ciphers.iter_mut() {
             cipher.as_mut().apply_keystream(slice);
         }
         slice
     }
 
-    fn get_plaintext(&self) -> &[u8] {
-        &self.plaintext
+    fn get_cached(&self, original: bool) -> &[u8] {
+        if original {
+            &self.original
+        } else {
+            &self.modified
+        }
     }
 }
 

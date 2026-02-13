@@ -15,7 +15,7 @@ crate-type = ["rlib"]
 aes = "0.8.4"
 aes-gcm = "0.10.3"
 base64 = "0.22.1"
-binary-codec = "0.5.4"
+binary-codec = "0.5.6"
 blake2 = "0.10.6"
 blake3 = { version = "1.8.2", optional = true }
 ctr = "0.9.2"

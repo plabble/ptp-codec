@@ -36,6 +36,11 @@ impl PlabbleRequestHeader {
         }
     }
 
+    /// Indicates if SESSION packet
+    pub fn is_session_packet(&self) -> bool {
+        matches!(self.packet_type, RequestPacketType::Session {..})
+    }
+
     pub fn preprocess(&self) {
         self._type.replace(self.packet_type.get_discriminator());
     }

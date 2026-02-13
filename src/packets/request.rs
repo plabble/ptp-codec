@@ -79,10 +79,10 @@ impl BinarySerializer<PlabbleConnectionContext, SerializationError> for PlabbleR
         // Write the body bytes to the stream
         stream.write_bytes(&body_bytes);
 
-        // If MAC is enabled and inside session, calculate and add it to the packet
+        // If MAC is enabled and not a SESSION request (or PSK is present), calculate and add it to the packet
         if !self.base.use_encryption
             && let Some(ctx) = &config.data
-            && !ctx.outside_session
+            && (!self.header.is_session_packet() || self.base.pre_shared_key)
         {
             let mac_key = ctx
                 .create_key(Some(&self.base), 0xFF, true)
@@ -151,13 +151,16 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
         let body = PlabbleRequestBody::from_bytes(&body_bytes, Some(config))?;
 
         // Verify the MAC if that is enabled (and context provided), first without bucket key and then with bucket key as AAD
+        // Note that SESSION packets without PSK do never have a MAC, because there is no shared key yet
         if !base.use_encryption
             && let Some(ctx) = &config.data
+            && (!header.is_session_packet() || base.pre_shared_key)
         {
             let expected: [u8; 16] = stream
                 .slice_end()
                 .try_into()
                 .expect("A 16-byte MAC on the end");
+
             let mac_key = ctx
                 .create_key(Some(&base), 0xFF, true)
                 .expect("Failed to create MAC key from context");
@@ -168,6 +171,7 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
                 &body_bytes,
                 Some(&ctx.create_authenticated_data(&raw_base_and_header, None)),
             );
+
             if mac1 != expected {
                 let mac2 = calculate_mac(
                     ctx.use_blake3(),
@@ -240,12 +244,26 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Once;
+
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
-    use crate::{errors::DeserializationError, packets::{context::PlabbleConnectionContext, request::PlabbleRequestPacket}};
+    use crate::{errors::DeserializationError, packets::{base::settings::CryptoSettings, context::PlabbleConnectionContext, request::PlabbleRequestPacket}};
 
+    static INIT: Once = Once::new();
+
+    fn init_logger() {
+        INIT.call_once(|| {
+            env_logger::Builder::new()
+                .is_test(true) // important for tests
+                .filter_level(log::LevelFilter::Trace)
+                .init();
+        });
+    }
+    
     #[test]
     fn can_serialize_and_deserialize_request_packet_with_mac() {
+        init_logger();
         let packet: PlabbleRequestPacket = toml::from_str(
             r#"
             version = 1
@@ -293,5 +311,16 @@ mod tests {
 
         assert_eq!(Err(DeserializationError::IntegrityFailed), wrong);
 
+        // With full packet encryption, the header and MAC are encrypted (this example uses double cipher)
+        let context = config.data.as_mut().unwrap();
+        context.full_encryption = true;
+        let mut settings = CryptoSettings::default();
+        settings.encrypt_with_aes = true;
+        context.crypto_settings = Some(settings);
+
+        let encrypted = packet.to_bytes(Some(&mut config)).unwrap();
+        let decrypted = PlabbleRequestPacket::from_bytes(&encrypted, Some(&mut config)).unwrap();
+        
+        assert_eq!(packet, decrypted);
     }
 }

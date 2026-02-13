@@ -71,9 +71,10 @@ impl BinarySerializer<PlabbleConnectionContext, SerializationError> for PlabbleR
         stream.write_bytes(&body_bytes);
 
         // If MAC is enabled and inside session, calculate and add it to the packet
+        // Note that SESSION packets without PSK do never have a MAC, because there is no shared key yet
         if !self.base.use_encryption
             && let Some(ctx) = &config.data
-            && !ctx.outside_session
+            && (!self.header.is_session_packet() || self.base.pre_shared_key)
         {
             let mac_key = ctx
                 .create_key(Some(&self.base), 0xFF, false)
@@ -129,8 +130,10 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
         let body = PlabbleResponseBody::from_bytes(&body_bytes, Some(config))?;
 
         // Verify the MAC if that is enabled (and context provided)
+        // Note that SESSION packets without PSK do never have a MAC, because there is no shared key yet
         if !base.use_encryption
             && let Some(ctx) = &config.data
+            && (!header.is_session_packet() || base.pre_shared_key)
         {
             let expected: [u8; 16] = stream
                 .slice_end()

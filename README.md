@@ -525,6 +525,8 @@ For `blake2b-512`, the _MAC mode_ is used accepting directly a `key`, `salt` and
 8. Optionally, if no encryption was used, the MAC is read from the stream and checked.
 
 #### Authenticated data
+- Implementation: [context.rs](./src/packets/context.rs)
+
 The authenticated data is a `blake2b-256` or `blake3` (64-byte) hash of the raw plaintext base packet bytes and header bytes and is used to authenticate the entire packet and decrypt the body. Optionally, also the [bucket key](#bucket-key) is appended if it is needed. When reading a request, the server first tries to decrypt the packet (or verify the MAC) _without_ the bucket key, and then _with_ the bucket key. At least one of them must succeed or the packet will be rejected. Responses never contain the bucket key in the authenticated data.
 
 ### Plabble Timestamp
