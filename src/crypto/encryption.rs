@@ -55,7 +55,7 @@ impl PlabbleConnectionContext {
         let settings = self.crypto_settings.unwrap_or_default();
         let mut ciphers: Vec<Box<dyn StreamCipher>> = Vec::new();
 
-        let mut keys = (0..10).map(|i| self.create_key(base, i + 0x00, is_request));
+        let mut keys = (0..10).map(|i| self.create_key(base, i, is_request));
 
         // If ChaCha20-encryption is enabled, use XChaCha20 with 32 bytes from the IKM plus 12 bytes from the IKM as nonce
         if settings.encrypt_with_chacha

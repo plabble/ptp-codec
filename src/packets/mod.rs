@@ -45,7 +45,7 @@ fn read_base_packet(
     if let Some(settings) = &base.crypto_settings
         && let Some(ctx) = config.data.as_mut()
     {
-        ctx.crypto_settings = base.crypto_settings.clone();
+        ctx.crypto_settings = base.crypto_settings;
         settings.apply_to(config);
     } else {
         CryptoSettings::default().apply_to(config);
@@ -97,7 +97,7 @@ fn write_base_packet(
     if let Some(settings) = &base.crypto_settings
         && let Some(ctx) = config.data.as_mut()
     {
-        ctx.crypto_settings = base.crypto_settings.clone();
+        ctx.crypto_settings = base.crypto_settings;
         settings.apply_to(config);
     } else {
         CryptoSettings::default().apply_to(config);
@@ -107,7 +107,7 @@ fn write_base_packet(
     if base.use_encryption
         && let Some(ctx) = &config.data
     {
-        stream.set_crypto(ctx.create_crypto_stream(Some(&base), true));
+        stream.set_crypto(ctx.create_crypto_stream(Some(base), true));
     }
 
     Ok(())

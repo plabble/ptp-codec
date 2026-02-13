@@ -49,6 +49,7 @@ pub struct CryptoSettings {
 
 /// Post-Quantum cryptography settings
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone, Copy)]
+#[derive(Default)]
 pub struct PostQuantumSettings {
     /// Sign with ML-DSA-44, public key size 1312 B, signature 2420 B.
     /// Super fast, NIST level 1 security.
@@ -122,20 +123,6 @@ impl Default for CryptoSettings {
     }
 }
 
-impl Default for PostQuantumSettings {
-    fn default() -> Self {
-        Self {
-            sign_pqc_dsa_44: false,
-            sign_pqc_dsa_65: false,
-            sign_pqc_falcon: false,
-            sign_pqc_slh_dsa: false,
-            key_exchange_pqc_kem_512: false,
-            key_exchange_pqc_kem_768: false,
-            flag_64: false,
-            flag_128: false,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

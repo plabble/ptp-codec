@@ -24,7 +24,7 @@ impl KeyExchange {
             KeyExchangeAlgorithm::X25519 => {
                 use x25519_dalek::PublicKey;
 
-                let secret = StaticSecret::random_from_rng(&mut rand_core_064::OsRng);
+                let secret = StaticSecret::random_from_rng(rand_core_064::OsRng);
                 let public = PublicKey::from(&secret);
                 self.secret = Some(secret.as_bytes().to_vec());
 
@@ -80,7 +80,7 @@ impl KeyExchange {
         match self.algorithm {
             KeyExchangeAlgorithm::X25519 => {
                 if let KeyExhangeRequest::X25519(other_pub) = req {
-                    let secret = EphemeralSecret::random_from_rng(&mut rand_core_064::OsRng);
+                    let secret = EphemeralSecret::random_from_rng(rand_core_064::OsRng);
                     let public = PublicKey::from(&secret);
                     let other_pub = PublicKey::from(*other_pub);
 

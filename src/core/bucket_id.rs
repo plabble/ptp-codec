@@ -23,10 +23,10 @@ impl BucketId {
     pub fn parse(repr: &str) -> Option<Self> {
         match repr.chars().next()? {
             '#' => Some(Self {
-                data: hash_128(false, vec![repr[1..].as_bytes()]),
+                data: hash_128(false, vec![&repr.as_bytes()[1..]]),
             }),
             '@' => {
-                let hash = hash_128(true, vec![repr[1..].as_bytes()]);
+                let hash = hash_128(true, vec![&repr.as_bytes()[1..]]);
                 Some(Self { data: hash })
             }
             _ => {

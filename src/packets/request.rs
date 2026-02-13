@@ -80,8 +80,8 @@ impl BinarySerializer<PlabbleConnectionContext, SerializationError> for PlabbleR
         stream.write_bytes(&body_bytes);
 
         // If MAC is enabled, calculate and add it to the packet
-        if !self.base.use_encryption {
-            if let Some(ctx) = &config.data {
+        if !self.base.use_encryption
+            && let Some(ctx) = &config.data {
                 let mac_key = ctx
                     .create_key(Some(&self.base), 0xFF, true)
                     .expect("Failed to create MAC key from context");
@@ -101,7 +101,6 @@ impl BinarySerializer<PlabbleConnectionContext, SerializationError> for PlabbleR
                 );
                 stream.write_bytes(&mac);
             }
-        }
 
         Ok(())
     }

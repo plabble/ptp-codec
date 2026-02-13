@@ -255,34 +255,34 @@ impl ScriptInterpreter {
         let b = self.pop().unwrap();
 
         match (a, b) {
-            (StackData::Boolean(a), StackData::Boolean(b)) => return Ok(a == b),
-            (StackData::Number(a), StackData::Number(b)) => return Ok(a == b),
-            (StackData::Float(a), StackData::Float(b)) => return Ok(a == b),
-            (StackData::Byte(a), StackData::Byte(b)) => return Ok(a == b),
-            (StackData::Number(a), StackData::Byte(b)) => return Ok(a == b as i128),
-            (StackData::Byte(a), StackData::Number(b)) => return Ok(a as i128 == b),
+            (StackData::Boolean(a), StackData::Boolean(b)) => Ok(a == b),
+            (StackData::Number(a), StackData::Number(b)) => Ok(a == b),
+            (StackData::Float(a), StackData::Float(b)) => Ok(a == b),
+            (StackData::Byte(a), StackData::Byte(b)) => Ok(a == b),
+            (StackData::Number(a), StackData::Byte(b)) => Ok(a == b as i128),
+            (StackData::Byte(a), StackData::Number(b)) => Ok(a as i128 == b),
             (StackData::Float(a), StackData::Number(b)) => {
-                return Ok(a.fract() == 0.0 && a as i128 == b);
+                Ok(a.fract() == 0.0 && a as i128 == b)
             }
             (StackData::Number(a), StackData::Float(b)) => {
-                return Ok(b.fract() == 0.0 && a == b as i128);
+                Ok(b.fract() == 0.0 && a == b as i128)
             }
-            (StackData::Float(a), StackData::Byte(b)) => return Ok(a == b as f64),
-            (StackData::Byte(a), StackData::Float(b)) => return Ok(a as f64 == b),
+            (StackData::Float(a), StackData::Byte(b)) => Ok(a == b as f64),
+            (StackData::Byte(a), StackData::Float(b)) => Ok(a as f64 == b),
             (StackData::Boolean(a), StackData::Number(b)) => {
-                return Ok((if a { 1 } else { 0 }) == b);
+                Ok((if a { 1 } else { 0 }) == b)
             }
             (StackData::Number(a), StackData::Boolean(b)) => {
-                return Ok(a == (if b { 1 } else { 0 }));
+                Ok(a == (if b { 1 } else { 0 }))
             }
             (StackData::Boolean(a), StackData::Float(b)) => {
-                return Ok((if a { 1f64 } else { 0f64 }) == b);
+                Ok((if a { 1f64 } else { 0f64 }) == b)
             }
             (StackData::Float(a), StackData::Boolean(b)) => {
-                return Ok(a == (if b { 1f64 } else { 0f64 }));
+                Ok(a == (if b { 1f64 } else { 0f64 }))
             }
-            (StackData::Boolean(a), StackData::Byte(b)) => return Ok((if a { 1 } else { 0 }) == b),
-            (StackData::Byte(a), StackData::Boolean(b)) => return Ok(a == (if b { 1 } else { 0 })),
+            (StackData::Boolean(a), StackData::Byte(b)) => Ok((if a { 1 } else { 0 }) == b),
+            (StackData::Byte(a), StackData::Boolean(b)) => Ok(a == (if b { 1 } else { 0 })),
             (a, b) => {
                 let a = a.as_buffer().expect("Failed to convert to buffer");
                 let b = b.as_buffer().expect("Failed to convert to buffer");
@@ -1014,12 +1014,10 @@ impl ScriptInterpreter {
             } else if *code == close {
                 if backwards {
                     depth += 1;
+                } else if depth == 0 {
+                    return Ok(cursor as usize);
                 } else {
-                    if depth == 0 {
-                        return Ok(cursor as usize);
-                    } else {
-                        depth -= 1;
-                    }
+                    depth -= 1;
                 }
             } else if let Some(ref or) = or
                 && or == code
