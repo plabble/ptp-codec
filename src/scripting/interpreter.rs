@@ -287,7 +287,7 @@ impl ScriptInterpreter {
                 let a = a.as_buffer().expect("Failed to convert to buffer");
                 let b = b.as_buffer().expect("Failed to convert to buffer");
 
-                return Ok(a == b);
+                Ok(a == b)
             }
         }
     }
@@ -956,7 +956,7 @@ impl ScriptInterpreter {
                 // Insert new script instructions at current position
                 self.script.instructions.splice(
                     self.cursor + 1..self.cursor + 1,
-                    script.instructions.into_iter(),
+                    script.instructions,
                 );
             }
         };
@@ -1036,7 +1036,7 @@ impl ScriptInterpreter {
             cursor += step;
             self.searches += 1;
 
-            if depth.abs() as usize > self.settings.max_nesting_depth {
+            if depth.unsigned_abs() > self.settings.max_nesting_depth {
                 return Err(ScriptError::MaxDepthExceeded);
             }
         }
@@ -2712,7 +2712,7 @@ mod tests {
             Opcode::ROUND,
             Opcode::NUMBER,
             Opcode::EQ,
-            Opcode::ASSERT
+            Opcode::ASSERT,
         ]);
 
         let mut i = ScriptInterpreter::new(script, None);

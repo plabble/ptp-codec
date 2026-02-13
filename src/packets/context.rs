@@ -29,6 +29,9 @@ pub struct PlabbleConnectionContext {
 
     /// Server packet counter
     pub server_counter: u16,
+
+    /// When sending a packet, whether to include the bucket key in the authenticated data (for MAC and encryption).
+    pub include_bucket_key_in_auth_data: bool,
 }
 
 impl PlabbleConnectionContext {
@@ -42,26 +45,33 @@ impl PlabbleConnectionContext {
             full_encryption: false,
             client_counter: 0,
             server_counter: 0,
+            include_bucket_key_in_auth_data: false,
         }
     }
 
     /// Indicates if current context crypto settings require blake3 hashing (for MAC and key derivation)
     pub fn use_blake3(&self) -> bool {
-        self.crypto_settings.as_ref().map_or(false, |s| s.use_blake3)
+        self.crypto_settings
+            .as_ref()
+            .map_or(false, |s| s.use_blake3)
     }
 
     /// Create authenticated data for the packet, based on the base and header bytes and optionally bucket key
-    /// 
+    ///
     /// The authenticated data is used for MAC and encryption, to ensure integrity and authenticity of the packet.
     /// The authenticated data is created by hashing the base and header bytes, and optionally the bucket key if available.
-    /// 
+    ///
     /// # Parameters
     /// - `raw_base_and_header`: The raw bytes of the packet base and header,
     /// - `bucket_id`: The bucket ID, used to retrieve the bucket key if available. If not given or not found, the bucket key is not included in the authenticated data.
-    /// 
+    ///
     /// # Returns
     /// The authenticated data as a 32-byte array, or None if hashing failed (when blake3 is requested but not supported by server).
-    pub fn create_authenticated_data(&self, raw_base_and_header: &[u8], bucket_id: Option<&BucketId>) -> [u8; 32] {
+    pub fn create_authenticated_data(
+        &self,
+        raw_base_and_header: &[u8],
+        bucket_id: Option<&BucketId>,
+    ) -> [u8; 32] {
         let bucket_key = bucket_id.and_then(|id| self.get_bucket_key.and_then(|f| f(id)));
 
         let mut data = Vec::new();
@@ -75,7 +85,7 @@ impl PlabbleConnectionContext {
 
     /// Create a cryptographic key based on the context and packet base for authentication or encryption
     /// - The keys are never reused, for each part of the packet is a new key generated thanks to `alt_byte`
-    /// - Every packet has a unique key thanks to the counters 
+    /// - Every packet has a unique key thanks to the counters
     /// - Request and response packet with same counter and alt have still a different key thanks to `is_request`
     ///
     /// # Properties

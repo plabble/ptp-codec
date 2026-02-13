@@ -8,7 +8,6 @@ use serde_with::serde_as;
 
 use crate::crypto::hash_128;
 
-
 /// Bucket Identifier
 #[serde_as]
 #[derive(Debug, Serialize, ToBytes, FromBytes, PartialEq)]
@@ -23,11 +22,9 @@ impl BucketId {
     /// Accepts a 16-byte base64-urlencoded string, or a UTF-8 string prefixed with magic prefix `#` (hash with Blake2b) or `@` (hash with Blake3)
     pub fn parse(repr: &str) -> Option<Self> {
         match repr.chars().next()? {
-            '#' => {
-                Some(Self {
-                    data: hash_128(false, vec![repr[1..].as_bytes()]),
-                })
-            }
+            '#' => Some(Self {
+                data: hash_128(false, vec![repr[1..].as_bytes()]),
+            }),
             '@' => {
                 let hash = hash_128(true, vec![repr[1..].as_bytes()]);
                 Some(Self { data: hash })

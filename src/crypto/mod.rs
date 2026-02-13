@@ -145,7 +145,7 @@ pub fn hash_256(blake3: bool, data: Vec<&[u8]>) -> [u8; 32] {
             hasher.update(d);
         }
 
-        return *hasher.finalize().as_bytes()
+        return *hasher.finalize().as_bytes();
     }
 
     let mut hasher = Blake2b256::new();

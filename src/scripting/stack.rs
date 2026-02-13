@@ -29,7 +29,7 @@ impl StackData {
                 _ => None,
             },
             StackData::Buffer(b) => {
-                if b.len() == 0 {
+                if b.is_empty() {
                     None
                 } else {
                     StackData::Byte(b[0]).as_boolean()
@@ -44,7 +44,7 @@ impl StackData {
                 0.0 => Some(false),
                 1.0 => Some(true),
                 _ => None,
-            }
+            },
         }
     }
 
@@ -59,7 +59,7 @@ impl StackData {
             }
             StackData::Number(n) => Some(*n),
             StackData::Buffer(b) => {
-                if b.len() == 0 {
+                if b.is_empty() {
                     None
                 } else {
                     // Try to read dynamic int
@@ -107,7 +107,7 @@ impl StackData {
             }
             StackData::Number(n) => (*n).try_into().ok(),
             StackData::Buffer(b) => {
-                if b.len() == 0 {
+                if b.is_empty() {
                     None
                 } else {
                     Some(b[0])
@@ -135,9 +135,7 @@ impl StackData {
             }
             StackData::Buffer(items) => Some(items.clone()),
             StackData::Byte(b) => Some(vec![*b]),
-            StackData::Float(f) => {
-                Some(f.to_be_bytes().to_vec().into())
-            }
+            StackData::Float(f) => Some(f.to_be_bytes().to_vec()),
         }
     }
 }

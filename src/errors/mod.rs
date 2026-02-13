@@ -1,5 +1,5 @@
-use binary_codec::SerializationError as BinarySerializationError;
 use binary_codec::DeserializationError as BinaryDeserializationError;
+use binary_codec::SerializationError as BinarySerializationError;
 
 /// Plabble Serialization Error (based on binary_codec errors)
 #[derive(Debug, PartialEq)]
@@ -15,14 +15,23 @@ pub enum SerializationError {
 
     /// Validation did fail for the data
     InvalidData(String),
+
+    /// Encryption failed
+    EncryptionFailed,
 }
 
 impl From<BinarySerializationError> for SerializationError {
     fn from(err: BinarySerializationError) -> Self {
         match err {
-            BinarySerializationError::ValueOutOfBounds(a, b, c) => SerializationError::ValueOutOfBounds(a, b, c),
-            BinarySerializationError::UnexpectedLength(a, b) => SerializationError::UnexpectedLength(a, b),
-            BinarySerializationError::MissingLengthByKey(a) => SerializationError::MissingLengthByKey(a),
+            BinarySerializationError::ValueOutOfBounds(a, b, c) => {
+                SerializationError::ValueOutOfBounds(a, b, c)
+            }
+            BinarySerializationError::UnexpectedLength(a, b) => {
+                SerializationError::UnexpectedLength(a, b)
+            }
+            BinarySerializationError::MissingLengthByKey(a) => {
+                SerializationError::MissingLengthByKey(a)
+            }
             BinarySerializationError::InvalidData(a) => SerializationError::InvalidData(a),
         }
     }
@@ -50,16 +59,24 @@ pub enum DeserializationError {
     DecryptionFailed,
 
     /// MAC verification failed (e.g. due to wrong key or corrupted data)
-    IntegrityFailed
+    IntegrityFailed,
 }
 
 impl From<BinaryDeserializationError> for DeserializationError {
     fn from(err: BinaryDeserializationError) -> Self {
         match err {
-            BinaryDeserializationError::NotEnoughBytes(a) => DeserializationError::NotEnoughBytes(a),
-            BinaryDeserializationError::UnexpectedLength(a, b) => DeserializationError::UnexpectedLength(a, b),
-            BinaryDeserializationError::UnknownDiscriminant(a) => DeserializationError::UnknownDiscriminant(a),
-            BinaryDeserializationError::MissingLengthByKey(a) => DeserializationError::MissingLengthByKey(a),
+            BinaryDeserializationError::NotEnoughBytes(a) => {
+                DeserializationError::NotEnoughBytes(a)
+            }
+            BinaryDeserializationError::UnexpectedLength(a, b) => {
+                DeserializationError::UnexpectedLength(a, b)
+            }
+            BinaryDeserializationError::UnknownDiscriminant(a) => {
+                DeserializationError::UnknownDiscriminant(a)
+            }
+            BinaryDeserializationError::MissingLengthByKey(a) => {
+                DeserializationError::MissingLengthByKey(a)
+            }
             BinaryDeserializationError::InvalidData(a) => DeserializationError::InvalidData(a),
         }
     }

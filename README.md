@@ -507,6 +507,12 @@ For `blake2b-512`, the _MAC mode_ is used accepting directly a `key`, `salt` and
 #### Encryption/decryption stream
 
 #### Packet Encryption
+1. If full packet encryption is enabled (within a [Session](#session)), all outgoing bytes will be encrypted with a [crypto stream](#encryptiondecryption-stream).
+2. The base packet is serialized, encrypted and sent. If the [crypto_settings](#plabble-packet-base) are set, the crypto settings of the encryption context are overwritten
+3. If encryption is enabled on the base packet, the current crypto stream is overwritten with a new crypto stream based on the base packet settings. If no encryption is used, the MAC will be calculated at the end of the stream and appended to the packet.
+4. The packet header is serialized, encrypted and sent.
+5. The body is serialized, encrypted and sent using the authenticated data.
+6. Optionally, if no encryption was used, the MAC is calculated and appended to the stream.
 
 #### Packet Decryption
 1. If full packet encryption is enabled (within a [Session](#session)), all incoming bytes will be decrypted with a[crypto stream](#encryptiondecryption-stream). 

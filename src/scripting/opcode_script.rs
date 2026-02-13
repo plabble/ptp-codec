@@ -53,15 +53,15 @@ pub enum Opcode {
 
     /* END OF PUSH-ONLY OPCODES */
     // Numeric operations - all numbers are signed Plabble dynints
-    ADD = 10,  // Pop two numbers from the stack and sum them
+    ADD = 10, // Pop two numbers from the stack and sum them
     SUB = 11, // Pop two numbers from the stack and substract them
     MUL = 12, // Pop two numbers from the stack and multiply them
     DIV = 13, // Pop two numbers from the stack and divide them
     MOD = 14, // Pop two numbers from the stack and modulo divide them
-    
+
     NEG = 15, // Pop one number and negate it
     ABS = 16, // Pop one number and make it positive
- 
+
     // Floating point numeric operations
     FADD = 17, // Pop two floats from the stack and sum them
     FSUB = 18, // Pop two floats from the stack and substract them
@@ -85,9 +85,9 @@ pub enum Opcode {
     FMIN = 32, // Pop two floats and return smallest
     FMAX = 33, // Pop two floats and return largest
     // 34, 35
-    FLOOR = 36, // Pop one float and round it down to nearest integer 
-    CEIL = 37, // Pop one float and round it up to nearest integer
-    ROUND = 38, // Pop one float and round it to nearest integer
+    FLOOR = 36,  // Pop one float and round it down to nearest integer
+    CEIL = 37,   // Pop one float and round it up to nearest integer
+    ROUND = 38,  // Pop one float and round it to nearest integer
     ROUNDE = 39, // Pop one float and round it to nearest integer, rounding even
 
     // Binary numeric operations
@@ -128,10 +128,10 @@ pub enum Opcode {
     // 80 - 89
 
     // Stack manipulation
-    DUP = 90,  // Duplicate top item of stack
-    DUP2 = 91, // Duplicate top two items of stack
-    DUP3 = 92, // Duplicate top three items of stack
-    DUP4 = 93, // Duplicate top four items of stack
+    DUP = 90,      // Duplicate top item of stack
+    DUP2 = 91,     // Duplicate top two items of stack
+    DUP3 = 92,     // Duplicate top three items of stack
+    DUP4 = 93,     // Duplicate top four items of stack
     DUPN(u8) = 94, // Duplicate top item of stack N times (takes byte for count from script)
 
     SWAP = 95,   // Swap top two items of stack
@@ -180,7 +180,7 @@ pub enum Opcode {
     DECRYPT = 154, // Takes byte for algorithm, key, ciphertext and puts plain data back
     // 155 - 159
 
-    // TODO: missing (slice) operations for modifying strings/byte arrays 
+    // TODO: missing (slice) operations for modifying strings/byte arrays
     // (INDEXOF, SPLIT, CONTAINS, STARTSWITH?(can be done with slice), ENDSWITH, JOIN)
 
     // Special: 200+
