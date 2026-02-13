@@ -48,8 +48,7 @@ pub struct CryptoSettings {
 }
 
 /// Post-Quantum cryptography settings
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone, Copy)]
-#[derive(Default)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Default)]
 pub struct PostQuantumSettings {
     /// Sign with ML-DSA-44, public key size 1312 B, signature 2420 B.
     /// Super fast, NIST level 1 security.
@@ -122,7 +121,6 @@ impl Default for CryptoSettings {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

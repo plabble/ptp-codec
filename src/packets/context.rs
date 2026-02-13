@@ -57,9 +57,7 @@ impl PlabbleConnectionContext {
 
     /// Indicates if current context crypto settings require blake3 hashing (for MAC and key derivation)
     pub fn use_blake3(&self) -> bool {
-        self.crypto_settings
-            .as_ref()
-            .is_some_and(|s| s.use_blake3)
+        self.crypto_settings.as_ref().is_some_and(|s| s.use_blake3)
     }
 
     /// Create authenticated data for the packet, based on the base and header bytes and optionally bucket key
@@ -113,8 +111,7 @@ impl PlabbleConnectionContext {
 
         // If not session key is already given/session is in PSK mode, retrieve it from the store using PSK
         let (session_key, salt) = if let Some(session_key) = &self.session_key
-            && !base.map(|b| b.pre_shared_key)
-                .unwrap_or_default()
+            && !base.map(|b| b.pre_shared_key).unwrap_or_default()
         {
             (*session_key, b"PLABBLE.PROTOCOL")
         } else {

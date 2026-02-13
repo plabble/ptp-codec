@@ -261,26 +261,14 @@ impl ScriptInterpreter {
             (StackData::Byte(a), StackData::Byte(b)) => Ok(a == b),
             (StackData::Number(a), StackData::Byte(b)) => Ok(a == b as i128),
             (StackData::Byte(a), StackData::Number(b)) => Ok(a as i128 == b),
-            (StackData::Float(a), StackData::Number(b)) => {
-                Ok(a.fract() == 0.0 && a as i128 == b)
-            }
-            (StackData::Number(a), StackData::Float(b)) => {
-                Ok(b.fract() == 0.0 && a == b as i128)
-            }
+            (StackData::Float(a), StackData::Number(b)) => Ok(a.fract() == 0.0 && a as i128 == b),
+            (StackData::Number(a), StackData::Float(b)) => Ok(b.fract() == 0.0 && a == b as i128),
             (StackData::Float(a), StackData::Byte(b)) => Ok(a == b as f64),
             (StackData::Byte(a), StackData::Float(b)) => Ok(a as f64 == b),
-            (StackData::Boolean(a), StackData::Number(b)) => {
-                Ok((if a { 1 } else { 0 }) == b)
-            }
-            (StackData::Number(a), StackData::Boolean(b)) => {
-                Ok(a == (if b { 1 } else { 0 }))
-            }
-            (StackData::Boolean(a), StackData::Float(b)) => {
-                Ok((if a { 1f64 } else { 0f64 }) == b)
-            }
-            (StackData::Float(a), StackData::Boolean(b)) => {
-                Ok(a == (if b { 1f64 } else { 0f64 }))
-            }
+            (StackData::Boolean(a), StackData::Number(b)) => Ok((if a { 1 } else { 0 }) == b),
+            (StackData::Number(a), StackData::Boolean(b)) => Ok(a == (if b { 1 } else { 0 })),
+            (StackData::Boolean(a), StackData::Float(b)) => Ok((if a { 1f64 } else { 0f64 }) == b),
+            (StackData::Float(a), StackData::Boolean(b)) => Ok(a == (if b { 1f64 } else { 0f64 })),
             (StackData::Boolean(a), StackData::Byte(b)) => Ok((if a { 1 } else { 0 }) == b),
             (StackData::Byte(a), StackData::Boolean(b)) => Ok(a == (if b { 1 } else { 0 })),
             (a, b) => {
@@ -954,10 +942,9 @@ impl ScriptInterpreter {
                 }
 
                 // Insert new script instructions at current position
-                self.script.instructions.splice(
-                    self.cursor + 1..self.cursor + 1,
-                    script.instructions,
-                );
+                self.script
+                    .instructions
+                    .splice(self.cursor + 1..self.cursor + 1, script.instructions);
             }
         };
 
