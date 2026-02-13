@@ -79,9 +79,10 @@ impl BinarySerializer<PlabbleConnectionContext, SerializationError> for PlabbleR
         // Write the body bytes to the stream
         stream.write_bytes(&body_bytes);
 
-        // If MAC is enabled, calculate and add it to the packet
+        // If MAC is enabled and inside session, calculate and add it to the packet
         if !self.base.use_encryption
             && let Some(ctx) = &config.data
+            && !ctx.outside_session
         {
             let mac_key = ctx
                 .create_key(Some(&self.base), 0xFF, true)
@@ -239,17 +240,58 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
 
 #[cfg(test)]
 mod tests {
-    // use binary_codec::{BinaryDeserializer, SerializerConfig};
+    use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
-    // use crate::packets::{context::PlabbleConnectionContext, request::PlabbleRequestPacket};
+    use crate::{errors::DeserializationError, packets::{context::PlabbleConnectionContext, request::PlabbleRequestPacket}};
 
-    // #[test]
-    // fn test_serialization_with_context() {
-    //     let mut config = SerializerConfig::new(Some(PlabbleConnectionContext::new()));
+    #[test]
+    fn can_serialize_and_deserialize_request_packet_with_mac() {
+        let packet: PlabbleRequestPacket = toml::from_str(
+            r#"
+            version = 1
 
-    //     let reference = Some(&mut config);
-    //     // config.data.as_mut().unwrap().server_counter += 1;
+            [header]
+            packet_type = "Get"
+            id = "EjRWeJCrze_-3LoJh2VDIQ"
 
-    //     let packet = PlabbleRequestPacket::from_bytes(&[0u8], reference);
-    // }
+            [body]
+            range.Numeric = []
+        "#,
+        )
+        .unwrap();
+
+        let context = PlabbleConnectionContext::new();
+        let mut config = SerializerConfig::new(Some(context));
+        
+        let context = config.data.as_mut().unwrap();
+        context.session_key = Some([0u8; 64]);
+
+        let packet_b = "01021234567890abcdeffedcba0987654321";
+        let mac = "7d671afeb16844378ec2ba55aa1fd6aa";
+
+        // Without MAC
+        assert_eq!(packet_b, hex::encode(packet.to_bytes(None).unwrap()));
+
+        // With MAC
+        assert_eq!(format!("{}{}", packet_b, mac), hex::encode(packet.to_bytes(Some(&mut config)).unwrap()));
+
+        // Decode with MAC
+        let deserialized = PlabbleRequestPacket::from_bytes(
+            &hex::decode(format!("{}{}", packet_b, mac)).unwrap(), Some(&mut config)).unwrap();
+
+        assert_eq!(packet, deserialized);
+    
+        // Not possible to decode with wrong MAC
+        let wrong = PlabbleRequestPacket::from_bytes(
+            &hex::decode(format!("{}{}", packet_b, "7d671afeb16844378ec2ba55aa1fd6ab")).unwrap(), Some(&mut config));
+
+        assert_eq!(Err(DeserializationError::IntegrityFailed), wrong);
+
+        // Not possible to decode with wrong data
+        let wrong = PlabbleRequestPacket::from_bytes(
+            &hex::decode(format!("{}{}", "01021234567890abcdeffedcba0987654320", mac)).unwrap(), Some(&mut config));
+
+        assert_eq!(Err(DeserializationError::IntegrityFailed), wrong);
+
+    }
 }

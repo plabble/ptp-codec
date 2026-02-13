@@ -70,9 +70,10 @@ impl BinarySerializer<PlabbleConnectionContext, SerializationError> for PlabbleR
         // Write the body bytes to the stream
         stream.write_bytes(&body_bytes);
 
-        // If MAC is enabled, calculate and add it to the packet
+        // If MAC is enabled and inside session, calculate and add it to the packet
         if !self.base.use_encryption
             && let Some(ctx) = &config.data
+            && !ctx.outside_session
         {
             let mac_key = ctx
                 .create_key(Some(&self.base), 0xFF, false)

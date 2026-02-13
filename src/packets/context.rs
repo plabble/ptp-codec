@@ -32,6 +32,8 @@ pub struct PlabbleConnectionContext {
 
     /// When sending a packet, whether to include the bucket key in the authenticated data (for MAC and encryption).
     pub include_bucket_key_in_auth_data: bool,
+
+    pub outside_session: bool
 }
 
 impl Default for PlabbleConnectionContext {
@@ -52,6 +54,7 @@ impl PlabbleConnectionContext {
             client_counter: 0,
             server_counter: 0,
             include_bucket_key_in_auth_data: false,
+            outside_session: false,
         }
     }
 

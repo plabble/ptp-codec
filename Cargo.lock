@@ -788,6 +788,7 @@ dependencies = [
  "ctr",
  "ed25519-dalek",
  "env_logger",
+ "hex",
  "log",
  "ml-dsa",
  "ml-kem",
