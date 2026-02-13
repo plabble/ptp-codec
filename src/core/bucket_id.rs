@@ -1,13 +1,13 @@
 use ::base64::Engine;
 use ::base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use binary_codec::{FromBytes, ToBytes};
-use blake2::{Blake2b, Digest, digest::consts::U16};
 use serde::{Deserialize, Serialize};
 use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
-type Blake2b128 = Blake2b<U16>;
+use crate::crypto::hash_128;
+
 
 /// Bucket Identifier
 #[serde_as]
@@ -24,29 +24,13 @@ impl BucketId {
     pub fn parse(repr: &str) -> Option<Self> {
         match repr.chars().next()? {
             '#' => {
-                let mut hasher = Blake2b128::new();
-                hasher.update(repr[1..].as_bytes());
-
                 Some(Self {
-                    data: hasher.finalize().into(),
+                    data: hash_128(false, vec![repr[1..].as_bytes()]),
                 })
             }
             '@' => {
-                #[cfg(not(feature = "blake-3"))]
-                return None;
-
-                #[cfg(feature = "blake-3")]
-                {
-                    let mut data = [0u8; 16];
-
-                    let mut hasher = blake3::Hasher::new();
-                    hasher.update(repr[1..].as_bytes());
-
-                    let mut reader = hasher.finalize_xof();
-                    reader.fill(&mut data);
-
-                    Some(Self { data })
-                }
+                let hash = hash_128(true, vec![repr[1..].as_bytes()]);
+                Some(Self { data: hash })
             }
             _ => {
                 let decode = BASE64_URL_SAFE_NO_PAD.decode(repr).ok()?;

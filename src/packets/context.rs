@@ -1,6 +1,6 @@
 use crate::{
     core::BucketId,
-    crypto::derive_key,
+    crypto::{derive_key, hash_256},
     packets::base::{PlabblePacketBase, settings::CryptoSettings},
 };
 
@@ -45,6 +45,34 @@ impl PlabbleConnectionContext {
         }
     }
 
+    /// Indicates if current context crypto settings require blake3 hashing (for MAC and key derivation)
+    pub fn use_blake3(&self) -> bool {
+        self.crypto_settings.as_ref().map_or(false, |s| s.use_blake3)
+    }
+
+    /// Create authenticated data for the packet, based on the base and header bytes and optionally bucket key
+    /// 
+    /// The authenticated data is used for MAC and encryption, to ensure integrity and authenticity of the packet.
+    /// The authenticated data is created by hashing the base and header bytes, and optionally the bucket key if available.
+    /// 
+    /// # Parameters
+    /// - `raw_base_and_header`: The raw bytes of the packet base and header,
+    /// - `bucket_id`: The bucket ID, used to retrieve the bucket key if available. If not given or not found, the bucket key is not included in the authenticated data.
+    /// 
+    /// # Returns
+    /// The authenticated data as a 32-byte array, or None if hashing failed (when blake3 is requested but not supported by server).
+    pub fn create_authenticated_data(&self, raw_base_and_header: &[u8], bucket_id: Option<&BucketId>) -> [u8; 32] {
+        let bucket_key = bucket_id.and_then(|id| self.get_bucket_key.and_then(|f| f(id)));
+
+        let mut data = Vec::new();
+        data.push(raw_base_and_header);
+        if let Some(ref bucket_key) = bucket_key {
+            data.push(bucket_key);
+        }
+
+        hash_256(self.use_blake3(), data)
+    }
+
     /// Create a cryptographic key based on the context and packet base for authentication or encryption
     /// - The keys are never reused, for each part of the packet is a new key generated thanks to `alt_byte`
     /// - Every packet has a unique key thanks to the counters 
@@ -61,13 +89,13 @@ impl PlabbleConnectionContext {
         alt_byte: u8,
         is_request: bool,
     ) -> Option<[u8; 64]> {
-        // Get crypto settings from current connection, or from base packet, or get default
+        // Get crypto settings from current connection, or from base packet (if already available), or get default
         let settings = self
             .crypto_settings
             .or_else(|| base?.crypto_settings)
             .unwrap_or_default();
 
-        // If session key is not already given/in PSK mode retrieve it from the store using PSK
+        // If not session key is already given/session is in PSK mode, retrieve it from the store using PSK
         let (session_key, salt) = if let Some(session_key) = &self.session_key
             && !base
                 .and_then(|b| Some(b.pre_shared_key))
@@ -76,8 +104,8 @@ impl PlabbleConnectionContext {
             (*session_key, b"PLABBLE.PROTOCOL")
         } else {
             // If it is not given, use a PSK. If that won't resolve, this function will return none
-            let session_key = (self.get_psk?)(&base?.psk_id?)?;
-            (session_key, &base?.psk_salt?)
+            let pre_shared_key = (self.get_psk?)(&base?.psk_id?)?;
+            (pre_shared_key, &base?.psk_salt?)
         };
 
         // Context/persona is: `plabble.req.c`/`plabble.res.c` (ASCII) + client/server counter + (alt byte) = 16 bytes

@@ -441,7 +441,6 @@ When creating a bucket, you can generate the bucket ID yourself. If it is taken,
 The bucket key is a 64-byte secret that is derived from the [session key](#session-key) when [creating](#post-request) a bucket. It is stored on both the client and the server and is used for [authentication](#authentication).
 
 
-
 #### Bucket permissions
 - Implementation: [post.rs](./src/packets/body/post.rs)
 
@@ -504,11 +503,23 @@ For `blake3`, the context is passed to the *derive_key* mode/KDF mode of blake3 
 For `blake2b-512`, the _MAC mode_ is used accepting directly a `key`, `salt` and `persona`. The context is passed to the persona.
 
 ### Encrypted client-server communication
-Packets are encrypted in 3 places:
-1. When full packet encryption is enabled (which can be after a starting a [Session](#session)), for each encryption algorithm specified in the [crypto settings](#plabble-packet-base) a crypto stream is created (see [encryption.rs](./src/crypto/encryption.rs)) and applied for all bytes written or read. This is always the base packet and MAYBE also the rest of the packet, but that depends on the base packet crypto settings.
-2. If the packet base has crypto settings specified, a new crypto stream is created and this will override the crypto stream set before the packet base was written/read. Now we can read or write the header.
-3. The body might be encrypted twice: first using ...
 
+#### Encryption/decryption stream
+
+#### Packet Encryption
+
+#### Packet Decryption
+1. If full packet encryption is enabled (within a [Session](#session)), all incoming bytes will be decrypted with a[crypto stream](#encryptiondecryption-stream). 
+2. The base packet is read, decrypted and parsed. If the [crypto_settings](#plabble-packet-base) are set, the crypto settings of the decryption context are overwritten
+3. If encryption is enabled on the base packet, the current crypto stream is overwritten with a new crypto stream based on the base packet settings. If no encryption is used, a 16-byte offset will be kept at the end of the stream for the MAC.
+4. The packet header is read, decrypted and parsed.
+5. The body bytes are read and decrypted. But this is not yet the plain text, because the body is encrypted twice.
+6. The [associated data/authentication data](#authenticated-data) is generated from the context to make AEAD-decryption possible on the body.
+7. The body is decrypted and parsed using the authenticated data.
+8. Optionally, if no encryption was used, the MAC is read from the stream and checked.
+
+#### Authenticated data
+The authenticated data is a `blake2b-256` or `blake3` (64-byte) hash of the raw plaintext base packet bytes and header bytes and is used to authenticate the entire packet and decrypt the body. Optionally, also the [bucket key](#bucket-key) is appended if it is needed. When reading a request, the server first tries to decrypt the packet (or verify the MAC) _without_ the bucket key, and then _with_ the bucket key. At least one of them must succeed or the packet will be rejected. Responses never contain the bucket key in the authenticated data.
 
 ### Plabble Timestamp
 - Implementation: [datetime.rs](./src/core/datetime.rs)

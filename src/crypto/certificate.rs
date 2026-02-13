@@ -1,6 +1,6 @@
+use crate::crypto::hash_128;
 use crate::default_true;
 use binary_codec::{FromBytes, ToBytes};
-use blake2::{Blake2b, Digest, digest::consts::U16};
 use serde::{Deserialize, Serialize};
 use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
@@ -10,8 +10,6 @@ use crate::{
     core::PlabbleDateTime,
     crypto::algorithm::{CryptoSignature, VerificationKey},
 };
-
-type Blake2b128 = Blake2b<U16>;
 
 /// Plabble Certificate
 #[serde_as]
@@ -76,15 +74,18 @@ pub struct CertificateBody {
 impl CertificateBody {
     /// Calculate/hash certificate ID (blake2b-128 hash of `valid_from`, `valid_to` (as u32-BE), `issuer_uri` and `data`)
     pub fn get_id(&self) -> [u8; 16] {
-        let mut hasher = Blake2b128::new();
-        hasher.update(self.valid_from.timestamp().to_be_bytes());
-        hasher.update(self.valid_until.timestamp().to_be_bytes());
-        if let Some(issuer_uri) = &self.issuer_uri {
-            hasher.update(issuer_uri.as_bytes());
-        }
-        hasher.update(self.data.as_bytes());
+        let from = self.valid_from.timestamp().to_be_bytes();
+        let until = self.valid_until.timestamp().to_be_bytes();
 
-        hasher.finalize().into()
+        let mut data: Vec<&[u8]> = Vec::new();
+        data.push(&from);
+        data.push(&until);
+        if let Some(issuer_uri) = &self.issuer_uri {
+            data.push(issuer_uri.as_bytes());
+        }
+        data.push(self.data.as_bytes());
+
+        hash_128(false, data)
     }
 }
 

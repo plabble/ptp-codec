@@ -86,8 +86,10 @@ impl StackData {
             StackData::Buffer(b) => {
                 if b.len() < 8 {
                     None
-                } else {
+                } else if b.len() == 8 {
                     Some(f64::from_be_bytes(b[0..8].try_into().unwrap()))
+                } else {
+                    self.as_number().map(|n| n as f64)
                 }
             }
             StackData::Byte(b) => Some(*b as f64),

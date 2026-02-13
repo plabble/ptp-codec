@@ -39,6 +39,10 @@ impl CryptoStream for StreamCipherCryptoStream {
         }
         slice
     }
+
+    fn get_plaintext(&self) -> &[u8] {
+        &self.plaintext
+    }
 }
 
 impl PlabbleConnectionContext {

@@ -178,6 +178,10 @@ pub enum Opcode {
     VERIFY = 152, // Takes byte for algorithm, public key, signature, data and puts boolean back
     ENCRYPT = 153, // Takes byte for algorithm, key, data and puts encrypted data back
     DECRYPT = 154, // Takes byte for algorithm, key, ciphertext and puts plain data back
+    // 155 - 159
+
+    // TODO: missing (slice) operations for modifying strings/byte arrays 
+    // (INDEXOF, SPLIT, CONTAINS, STARTSWITH?(can be done with slice), ENDSWITH, JOIN)
 
     // Special: 200+
     TIME = 200, // Push the current time as a Plabble numeric timestamp to the stack

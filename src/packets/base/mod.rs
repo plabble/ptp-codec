@@ -11,6 +11,8 @@ pub mod settings;
 /// Plabble Protocol Packet base
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug)]
+#[codec_ser_error("crate::errors::SerializationError")]
+#[codec_de_error("crate::errors::DeserializationError")]
 pub struct PlabblePacketBase {
     /// Plabble Protocol version
     /// 0 = debug
@@ -56,6 +58,8 @@ pub struct PlabblePacketBase {
 mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
+    use crate::errors::{DeserializationError, SerializationError};
+
     use super::*;
 
     #[test]
@@ -67,9 +71,9 @@ mod tests {
         "#;
 
         let packet: PlabblePacketBase = toml::from_str(toml).unwrap();
-        let bytes = BinarySerializer::<()>::to_bytes(&packet, None).unwrap();
+        let bytes = BinarySerializer::<(), SerializationError>::to_bytes(&packet, None).unwrap();
 
-        let deserialized_packet = BinaryDeserializer::<()>::from_bytes(&bytes, None).unwrap();
+        let deserialized_packet = BinaryDeserializer::<(), DeserializationError>::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized_packet);
         assert_eq!(packet.fire_and_forget, true);
         assert_eq!(packet.use_encryption, true);
@@ -102,7 +106,7 @@ mod tests {
         let packet: PlabblePacketBase = toml::from_str(toml).unwrap();
         let mut config = SerializerConfig::<()>::new(None);
         let bytes = packet.to_bytes(Some(&mut config)).unwrap();
-        let deserialized_packet = BinaryDeserializer::<()>::from_bytes(&bytes, None).unwrap();
+        let deserialized_packet = BinaryDeserializer::<(), DeserializationError>::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized_packet);
 
         assert_eq!(config.get_toggle("fire_and_forget"), Some(false));

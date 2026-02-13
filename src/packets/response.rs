@@ -1,11 +1,11 @@
 use binary_codec::{BinaryDeserializer, BinarySerializer, BitStreamWriter, SerializerConfig};
 use serde::{Deserialize, Serialize};
 
-use crate::packets::{
+use crate::{errors::{SerializationError, DeserializationError}, packets::{
     base::{PlabblePacketBase, settings::CryptoSettings},
     body::response_body::PlabbleResponseBody,
     header::{response_header::PlabbleResponseHeader, type_and_flags::ResponsePacketType},
-};
+}};
 
 /// A Plabble response packet, consisting of a base, header, and body.
 /// The body type is determined by the packet type in the header.
@@ -29,12 +29,12 @@ pub struct PlabbleResponsePacket {
 #[derive(Clone)]
 pub struct PlabbleResponseContext {}
 
-impl BinarySerializer<PlabbleResponseContext> for PlabbleResponsePacket {
+impl BinarySerializer<PlabbleResponseContext, SerializationError> for PlabbleResponsePacket {
     fn write_bytes(
         &self,
         stream: &mut BitStreamWriter,
         config: Option<&mut binary_codec::SerializerConfig<PlabbleResponseContext>>,
-    ) -> Result<(), binary_codec::SerializationError> {
+    ) -> Result<(), SerializationError> {
         self.header.preprocess();
 
         let mut new_config = SerializerConfig::new(None);
@@ -54,11 +54,11 @@ impl BinarySerializer<PlabbleResponseContext> for PlabbleResponsePacket {
     }
 }
 
-impl BinaryDeserializer<PlabbleResponseContext> for PlabbleResponsePacket {
+impl BinaryDeserializer<PlabbleResponseContext, DeserializationError> for PlabbleResponsePacket {
     fn read_bytes(
         stream: &mut binary_codec::BitStreamReader,
         config: Option<&mut SerializerConfig<PlabbleResponseContext>>,
-    ) -> Result<Self, binary_codec::DeserializationError> {
+    ) -> Result<Self, DeserializationError> {
         let mut new_config = SerializerConfig::new(None);
         let config = config.unwrap_or(&mut new_config);
 
