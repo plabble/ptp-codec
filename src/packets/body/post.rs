@@ -95,7 +95,7 @@ pub struct BucketSettings {
     /// Access Control List (ACL) with user IDs
     #[serde_as(as = "Vec<Base64<UrlSafe, Unpadded>>")]
     #[dyn_length]
-    access_control_list: Vec<[u8; 20]>,
+    access_control_list: Vec<[u8; 16]>,
 }
 
 /// Bucket create request body
@@ -135,7 +135,7 @@ mod tests {
             range.Numeric = [1]
 
             settings.access_control_list = [
-                "AAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAA"
             ]
 
             [body.settings.permissions]
@@ -183,11 +183,7 @@ mod tests {
                 0b0110_1001, // sdwa_rbsd
                 0b0000_0110, // xxxx_pldb
                 1,           // ACL length
-                // 20-byte ID(s)
-                0,
-                0,
-                0,
-                0,
+                // 16-byte ID(s)
                 0,
                 0,
                 0,

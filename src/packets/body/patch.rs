@@ -6,6 +6,7 @@ use serde_with::serde_as;
 
 use crate::packets::body::post::BucketPermissions;
 
+/// Change bucket permissions or ACL entries.
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 pub struct PatchRequestBody {
@@ -13,17 +14,17 @@ pub struct PatchRequestBody {
     #[toggled_by = "update_perm"]
     permissions: Option<BucketPermissions>,
 
-    /// If toggled by flags, add the following ACL entries to the bucket (without overwriting existing ACL)
+    /// If toggled by flags, add the following ACL entries (user IDs/user certificate IDs) to the bucket (without overwriting existing ACL)
     #[toggled_by = "acl_add"]
     #[serde_as(as = "Option<Vec<Base64<UrlSafe, Unpadded>>>")]
     #[dyn_length]
-    acl_add: Option<Vec<[u8; 20]>>,
+    acl_add: Option<Vec<[u8; 16]>>,
 
-    /// If toggled by flags, remove the following ACL entries from the bucket
+    /// If toggled by flags, remove the following ACL entries (user IDs/user certificate IDs) from the bucket
     #[toggled_by = "acl_del"]
     #[serde_as(as = "Option<Vec<Base64<UrlSafe, Unpadded>>>")]
     #[dyn_length]
-    acl_del: Option<Vec<[u8; 20]>>,
+    acl_del: Option<Vec<[u8; 16]>>,
 }
 
 #[cfg(test)]
@@ -72,7 +73,7 @@ mod tests {
             add_to_acl = true
 
             [body]
-            acl_add = ["AAAAAAAAAAAAAAAAAAAAAAAAAAA"]
+            acl_add = ["AAAAAAAAAAAAAAAAAAAAAA"]
         "#,
         )
         .unwrap();
@@ -97,8 +98,8 @@ mod tests {
             remove_from_acl = true
 
             [body]
-            acl_add = ["AAAAAAAAAAAAAAAAAAAAAAAAAAA"]
-            acl_del = ["AAAAAAAAAAAAAAAAAAAAAAAAAAA"]
+            acl_add = ["AAAAAAAAAAAAAAAAAAAAAA"]
+            acl_del = ["AAAAAAAAAAAAAAAAAAAAAA"]
         "#,
         )
         .unwrap();

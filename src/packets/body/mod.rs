@@ -7,3 +7,5 @@ pub mod patch;
 pub mod request_body;
 pub mod response_body;
 pub mod session;
+pub mod register;
+pub mod identify;

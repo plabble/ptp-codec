@@ -192,8 +192,10 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Delete => PlabbleResponseBody::Delete,
             ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
             ResponsePacketType::Unsubscribe => PlabbleResponseBody::Unsubscribe,
-            ResponsePacketType::Register => todo!(),
-            ResponsePacketType::Identify => todo!(),
+            ResponsePacketType::Register => {
+                PlabbleResponseBody::Register(raw.body.deserialize_into().unwrap())
+            },
+            ResponsePacketType::Identify => PlabbleResponseBody::Identity,
             ResponsePacketType::Proxy { .. } => todo!(),
             ResponsePacketType::Custom { .. } => {
                 PlabbleResponseBody::Custom(raw.body.deserialize_into().unwrap())

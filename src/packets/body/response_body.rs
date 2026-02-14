@@ -1,10 +1,10 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
-use crate::packets::body::{
+use crate::{crypto::certificate::Certificate, packets::body::{
     bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody,
     error::PlabbleError, session::SessionResponseBody,
-};
+}};
 
 /// An enumeration representing the different types of response bodies
 /// that can be sent in a Plabble response.
@@ -43,7 +43,7 @@ pub enum PlabbleResponseBody {
     Delete = 7,
     Subscribe = 8,
     Unsubscribe = 9,
-    Register = 10,
+    Register(Certificate) = 10,
     Identity = 11,
     Proxy = 12,
     Custom(CustomBody) = 13,

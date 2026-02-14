@@ -1,13 +1,19 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
+use serde_with::base64::{Base64, UrlSafe};
+use serde_with::formats::Unpadded;
+use serde_with::serde_as;
 
 /// Custom request/response body for sub-protocols, containing a protocol ID and raw data
+#[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
 pub struct CustomBody {
     /// Protocol ID to identify the sub-protocol this body belongs to
     pub protocol: u16,
 
     /// Raw data for the sub-protocol, which can be parsed according to the protocol ID
+    /// Represented as base64url (no padding) in TOML/JSON.
+    #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
     pub data: Vec<u8>,
 }
 
@@ -31,7 +37,7 @@ mod tests {
 
             [body]
             protocol = 42
-            data = [1, 2, 3, 4, 5]
+            data = "AQIDBAU"
         "#).unwrap();
 
         let serialized = packet.to_bytes(None).unwrap();
@@ -57,7 +63,7 @@ mod tests {
 
             [body]
             protocol = 42
-            data = [1, 2, 3, 4, 5]
+            data = "AQIDBAU"
         "#).unwrap();
 
         let serialized = packet.to_bytes(None).unwrap();

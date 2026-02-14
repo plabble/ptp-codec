@@ -25,9 +25,11 @@ pub struct Certificate {
     #[serde(default)]
     root_cert: bool,
 
-    /// The unique certificate ID
+    // 4 bits reserved for future use
+
+    /// The unique certificate ID - this is NOT a fingerprint for it does not contain the keys or signatures but only the data
     /// This is a hash of the following certificate data:
-    /// - Blake2b_128(valid_from, valid_to, issuer_uri, data)
+    /// - Blake2b_128(valid_from, valid_until, issuer_uri, data)
     #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
     id: [u8; 16],
 

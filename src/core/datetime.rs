@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[serde(transparent)]
 pub struct PlabbleDateTime(pub DateTime<Utc>);
 
+/// Plabble Epoch
 fn epoch() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap()
 }

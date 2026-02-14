@@ -26,10 +26,10 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **7** [DELETE](#delete)
 - **8** [SUBSCRIBE](#subscribe)
 - **9** [UNSUBSCRIBE](#unsubscribe)
-- **10** REGISTER
-- **11** IDENTIFY
+- **10** [REGISTER](#register)
+- **11** [IDENTIFY](#identify)
 - **12** PROXY
-- **13** CUSTOM
+- **13** [CUSTOM](#custom)
 - **14** OPCODE
 - **15** ERROR
 
@@ -432,8 +432,8 @@ Request header:
 
 Request body:
 - **permissions**: Optional `BucketPermissions` object describing permission flags to set (see [post.rs](./src/packets/body/post.rs)).
-- **acl_add**: Optional list of base64url (no padding) encoded 20-byte user IDs to add to the ACL.
-- **acl_del**: Optional list of base64url (no padding) encoded 20-byte user IDs to remove from the ACL.
+- **acl_add**: Optional list of base64url (no padding) encoded 16-byte [user IDs](#identity) to add to the ACL.
+- **acl_del**: Optional list of base64url (no padding) encoded 16-byte [user IDs](#identity) to remove from the ACL.
 
 Example (update permissions):
 ```toml
@@ -659,11 +659,181 @@ range.Numeric = [5, 25]
 ### Unsubscribe response
 Empty response without flags.
 
+
+## Register
+- **Goal**: Create a new identity on the server (register a certificate).
+- Implementation: [register.rs](./src/packets/body/register.rs)
+
+> Warning: This request SHOULD NOT be accepted without encryption; onboarding policies may vary by server. The server MUST validate the claims to be unique.
+
+### Register flow
+1. The client generates one or more signing keypairs according to `crypto_settings`.
+2. The client sends a `Register` request containing the public keys and `claims` describing the identity.
+3. The server validates the request, optionally applies screening/onboarding rules, and issues a certificate.
+4. The server returns the newly created certificate in the response body. This SHOULD be a full certificate.
+
+### Register request
+Request header:
+- **packet_type**: `Register` (no extra header flags defined)
+
+Request body:
+- **keys**: `Vec<VerificationKey>` — public signing keys for the algorithms declared in `crypto_settings` (multi-enum).
+- **claims**: `String` — key-value claims, UTF-8, separated by `;`, e.g. `USERNAME=henk;AGE=24`.
+
+Example:
+```toml
+version = 1
+specify_crypto_settings = true
+
+[crypto_settings]
+sign_ed25519 = true
+
+[header]
+packet_type = "Register"
+
+[body]
+claims = "USERNAME=henk;AGE=24"
+
+[[body.keys]]
+Ed25519 = "8KIgA6PQbtFvWSCgPBKXx0LCgb2kiV6nyspoLCdr8Jg"
+```
+
+### Register response
+Response body:
+- **certificate**: `Certificate` — the issued certificate for the new identity (see `certificate.rs`).
+
+Example:
+```toml
+[header]
+packet_type = "Register"
+response_to = 0
+
+[body.certificate]
+full_cert = true
+root_cert = false
+keys = ["<public key base64>"]
+valid_from = "2026-01-01T00:00:00+00:00"
+valid_until = "2027-01-01T00:00:00+00:00"
+signatures = ["<CA signature base64>"]
+data = "CA=plabble;CN=Username"
+uri = "https://certs.plabble.org/certs/test.cert"
+parent_uri = "plabble://chat.plabble.org/certificate?id=..."
+```
+
+## Identify
+- **Goal**: prove identity to the server by offering a certificate (or chain) and signatures to bind an identity to the current session.
+- Implementation: [identify.rs](./src/packets/body/identify.rs)
+
+> Warning: The server SHOULD NOT persist identities; identities are intended to be ephemeral and are typically stored in RAM only. The server MUST validate the `timestamp` to prevent replay attacks and decide an acceptance window for identities.
+
+### Identify flow
+1. The client creates an `Identify` request containing a `timestamp`, one or more `signatures` and a `certificates` chain.
+2. The server verifies the timestamp is within an acceptable time window to avoid replay attacks.
+3. The server validates the provided signatures using the public keys present in the certificate chain (algorithms from `crypto_settings`).
+4. If valid, the server binds the identity to the session temporarily and may accept identity-bound actions (e.g. ACL updates) for a limited time.
+
+### Identify request
+Request header:
+- **packet_type**: `Identify` (no additional header flags defined)
+
+Request body:
+- **timestamp**: `PlabbleDateTime` — Plabble timestamp, REQUIRED. Server checks freshness.
+- **signatures**: `Vec<CryptoSignature>` — one or more signatures (multi-enum) covering the `timestamp` and other session-specific data (`session_key` and `server_id`, which is the server certificate ID). Algorithms follow `crypto_settings` in the base packet.
+- **certificates**: `Vec<Certificate>` — certificate chain where the first entry is the certificate of the identity owner (may be a compact or full certificate depending on `full_cert` field).
+
+Example:
+```toml
+version = 1
+specify_crypto_settings = true
+
+[crypto_settings]
+sign_ed25519 = true
+
+[header]
+packet_type = "Identify"
+
+[body]
+timestamp = "2026-01-01T00:00:00+00:00"
+
+[[body.signatures]]
+Ed25519 = "46wfjNJEaxr4S9Jk0mfLDR00Vt_0Qv_jQQQDAuPKJzzMs9oQ3ySqjNT1s2yCNgcMnu-eaBUlhaIJ3Zr8OrYX2A"
+
+[[body.certificates]]
+full_cert = false
+id = "nRJh5IWAQYQA0czZqIntNw"
+uri = "plabble:plabble.org/certs/@maus"
+```
+
+### Identify response
+Empty response body on success.
+
+## Custom
+- **Goal**: _Allow for custom packet types_ that are not defined in the Plabble specification but still follow the general packet structure and can be encrypted and signed. This packets are used by so-called **sub-protocols**.
+- Implementation: [custom.rs](./src/packets/body/custom.rs)
+
+> The server should reject unknown sub-protocols with an `UnsupportedSubProtocol` [error](#errors). Sub-protocols are expected to define their own packet structure and semantics within the `body` field, but they must still adhere to the overall Plabble packet format and can leverage encryption and signing as usual.
+
+### Custom request
+Request header flags:
+- **flag1**: application-defined flag for sub-protocol (boolean)
+- **flag2**: application-defined flag for sub-protocol (boolean)
+- **flag3**: application-defined flag for sub-protocol (boolean)
+- **flag4**: application-defined flag for sub-protocol (boolean)
+
+Request header:
+- **packet_type**: `Custom`
+
+Request body:
+- **protocol**: `u16` — numeric protocol identifier that selects the sub-protocol handler on the server. REQUIRED.
+- **data**: `Vec<u8>` — raw binary payload for the chosen sub-protocol. Represented as base64url (no padding) in TOML/JSON; interpretation is protocol-specific.
+
+Behaviour:
+- The server SHOULD route the request to the registered handler for the given `protocol` id. If the protocol is unknown the server MUST return an `UnsupportedSubProtocol` error (see `Errors`).
+- Sub-protocol handlers are responsible for validating, authenticating and safely parsing `data`. The server MUST NOT execute untrusted code embedded in `data`.
+
+Example (request):
+```toml
+version = 1
+
+[header]
+packet_type = "Custom"
+flag1 = true
+flag2 = false
+flag3 = true
+flag4 = false
+
+[body]
+protocol = 42
+data = "AQIDBAU"
+```
+
+### Custom response
+Response header flags:
+- **request_counter**: standard response counter when replying in a session
+
+Response body:
+- **protocol**: `u16` — the protocol id echoed back (optional, handlers may include it)
+- **data**: `Vec<u8>` — protocol-specific response bytes
+
+Example (response):
+```toml
+version = 1
+
+[header]
+packet_type = "Custom"
+request_counter = 7
+
+[body]
+protocol = 42
+data = [1, 2, 3, 4, 5]
+```
+
 ## Errors
 - Implementation: [error.rs](./src/packets/body/error.rs)
 
 0. **UnsupportedVersion**: Requested Plabble protocol version not supported by server. Body: `min_version` (min supported version by server), `max_version` (max supported version by server). _Occurence_: every request Plabble packet.
 1. **UnsupportedAlgorithm**: Requested algotithm (in cryptography settings) is not supported by the server. Body: `name` The name of the algorithm(s) that is not supported, UTF-8 [dynint](#plabble-dynamic-int) length encoded. _Occurence_: any packet, but especially [Session](#session), [Certificate](#certificate) and other packets that use cryptography settings. 
+2. **UnsupportedSubProtocol**: Requested [subprotocol](#custom) is not supported. _Occurence_: only in [Custom](#custom) packets.
 10. **BucketNotFound**: Requested bucket was not found
 11. **BucketAlreadyExists**: Bucket with that ID already exists. _Occurence_: [Post](#post)
 110. **CertificateNotFound**: Requested certificate (by id) was not found. _Occurence_: [Certificate](#certificate-request)
@@ -799,3 +969,11 @@ As a Plabble Client programmer, you need to include the root certificate in the 
 
 #### Certificate ID
 Every certificate has a unique 16-byte certificate ID. The ID is created by hashing the fields `valid_from`, `valid_to`, `issuer_uri`, `data` together using `blake2b-128` (in incremental mode). The data field thus MUST be unique.
+
+### Identity
+A Plabble Identity is a certificate containing some information about a person (for instance a username) and is signed by the user's home server.
+When refered to a **user id**, actually the 16-byte certificate ID of the identity certificate is meant. This ID is unqiue per server.
+
+It is needed to have identity certificates to be able to verify if someone is authorized to have access to certain functionalities on a bucket when the bucket permissions are set to protected.
+
+A user can request as many identities as they want using the [Register](#register) request. When a [Session](#session) is established, the client can use the [Identify](#identify) request to prove ownership of an identity by sending a certificate chain and signatures. The server will verify the signatures and if they are valid, the identity will be bound to the session so that the user can access protected functionalities on buckets where they are on the ACL.
