@@ -170,7 +170,10 @@ pub enum Opcode {
     REVERSE = 141, // Reverse bytes of top item
     SLICE = 142, // Slice bytes from existing byte array (copy). Takes 2 numbers, one for offset, one for length.
     SPLICE = 143, // Splice bytes from existing byte array (modifies). Takes 2 numbers, one for range offset, one for range length, then bytes to put, then bytes to splice into
-    // 144 - 149
+    INDEXOF = 144, // Takes a value to search for and a byte array to search in, returns index of first occurrence or -1 if not found
+    SPLIT = 145, // Take a value to search for and a byte array to split, splits byte array into N at every occurrence of value and pushes the results back.
+    SCOUNT = 146, // Take a value to search for and a byte array to count, counts occurrences of value in byte array and pushes count back
+    // 147 - 149
 
     // Crypto operations
     HASH = 150,    // Take byte for algorithm, hashes bytes and put them back on stack
@@ -179,9 +182,6 @@ pub enum Opcode {
     ENCRYPT = 153, // Takes byte for algorithm, key, data and puts encrypted data back
     DECRYPT = 154, // Takes byte for algorithm, key, ciphertext and puts plain data back
     // 155 - 159
-
-    // TODO: missing (slice) operations for modifying strings/byte arrays
-    // (INDEXOF, SPLIT, CONTAINS, STARTSWITH?(can be done with slice), ENDSWITH, JOIN)
 
     // Special: 200+
     TIME = 200, // Push the current time as a Plabble numeric timestamp to the stack

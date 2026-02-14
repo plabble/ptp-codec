@@ -237,7 +237,9 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Register => todo!(),
             RequestPacketType::Identify => todo!(),
             RequestPacketType::Proxy { .. } => todo!(),
-            RequestPacketType::Custom { .. } => todo!(),
+            RequestPacketType::Custom { .. } => {
+                PlabbleRequestBody::Custom(raw.body.deserialize_into().unwrap())
+            },
             RequestPacketType::Opcode { .. } => todo!(),
         };
 

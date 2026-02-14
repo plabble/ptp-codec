@@ -1,7 +1,8 @@
 use std::{cmp, ops::Neg};
 
-use binary_codec::BinaryDeserializer;
+use binary_codec::{BinaryDeserializer, FromBytes, ToBytes};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     core::PlabbleDateTime,
@@ -28,10 +29,10 @@ pub struct ScriptInterpreter {
     memory_peak: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, FromBytes, ToBytes)]
 pub enum ScriptError {
     /// When the stack is empty while n items are required
-    StackUnderflow(usize),
+    StackUnderflow(u32),
 
     /// When an operation expected a number but got something else
     NotANumber,
@@ -205,7 +206,9 @@ impl ScriptInterpreter {
     /// Ensure the stack has at least `size` items, otherwise return a StackUnderflow error with the required size
     fn ensure_stack_size(&mut self, size: usize) -> Result<(), ScriptError> {
         if self.stack().len() < size {
-            return Err(ScriptError::StackUnderflow(size - self.stack().len()));
+            return Err(ScriptError::StackUnderflow(
+                (size - self.stack().len()) as u32,
+            ));
         }
         Ok(())
     }
@@ -898,6 +901,64 @@ impl ScriptInterpreter {
 
                 bytes.splice((offset as usize)..((offset + length) as usize), splice_data);
                 self.push(StackData::Buffer(bytes))?;
+            }
+            Opcode::INDEXOF => {
+                self.ensure_stack_size(2)?;
+                let needle = self.pop().unwrap();
+                let haystack = self.pop().unwrap();
+
+                let needle_bytes = needle.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let haystack_bytes = haystack.as_buffer().ok_or(ScriptError::InvalidType)?;
+
+                let position = haystack_bytes
+                    .windows(needle_bytes.len())
+                    .position(|window| window == needle_bytes)
+                    .map(|pos| pos as i128)
+                    .unwrap_or(-1);
+
+                self.push(StackData::Number(position))?;
+            }
+            Opcode::SPLIT => {
+                self.ensure_stack_size(2)?;
+                let separator = self.pop().unwrap();
+                let item = self.pop().unwrap();
+
+                let mut parts: Vec<StackData> = Vec::new();
+
+                let separator_bytes = separator.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let item_bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
+
+                let mut start = 0;
+
+                while let Some(pos) = item_bytes[start..]
+                    .windows(separator_bytes.len())
+                    .position(|w| w == separator_bytes)
+                {
+                    let abs = start + pos;
+                    parts.push(StackData::Buffer(item_bytes[start..abs].to_vec()));
+                    start = abs + separator_bytes.len();
+                }
+
+                parts.push(StackData::Buffer(item_bytes[start..].to_vec()));
+
+                for part in parts.into_iter().rev() {
+                    self.push(part)?;
+                }
+            }
+            Opcode::SCOUNT => {
+                self.ensure_stack_size(2)?;
+                let needle = self.pop().unwrap();
+                let haystack = self.pop().unwrap();
+
+                let needle_bytes = needle.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let haystack_bytes = haystack.as_buffer().ok_or(ScriptError::InvalidType)?;
+
+                let count = haystack_bytes
+                    .windows(needle_bytes.len())
+                    .filter(|window| window == &needle_bytes)
+                    .count() as i128;
+
+                self.push(StackData::Number(count))?;
             }
             Opcode::HASH => todo!(),
             Opcode::SIGN => todo!(),
@@ -2784,5 +2845,119 @@ mod tests {
 
         let mut i = ScriptInterpreter::new(script, None);
         assert_eq!(i.exec(), Ok(None));
+    }
+
+    #[test]
+    fn can_find_index_of_subslice() {
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 20, 2, 3, 4, 2, 3],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![2, 3],
+            },
+            Opcode::INDEXOF,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
+        // should find the first occurrence of [2,3] at index 2
+        assert_eq!(i.main_stack.last(), Some(&StackData::Number(2)));
+    }
+
+    #[test]
+    fn return_min_one_when_indexof_not_found() {
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 20, 2, 3, 4],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![5, 6],
+            },
+            Opcode::INDEXOF,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
+        // should not find [5,6], return -1
+        assert_eq!(i.main_stack.last(), Some(&StackData::Number(-1)));
+    }
+
+    #[test]
+    fn can_split_on_subslice() {
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 20, 2, 3, 4, 2, 3],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![2, 3],
+            },
+            Opcode::SPLIT,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
+        // should split into [1,20], [4], [ ] (because of trailing [2,3])
+        assert_eq!(
+            i.main_stack.last(),
+            Some(&StackData::Buffer(vec![1, 20]))
+        );
+        assert_eq!(
+            i.main_stack.get(i.main_stack.len() - 2),
+            Some(&StackData::Buffer(vec![4]))
+        );
+        assert_eq!(
+            i.main_stack.get(i.main_stack.len() - 3),
+            Some(&StackData::Buffer(vec![]))
+        );
+    }
+
+    #[test]
+    fn will_not_split_if_subslice_not_found() {
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 20, 2, 3, 4],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![5, 6],
+            },
+            Opcode::SPLIT,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
+        // should not split because [5,6] not found, return original buffer as single part
+        assert_eq!(
+            i.main_stack.last(),
+            Some(&StackData::Buffer(vec![1, 20, 2, 3, 4]))
+        );
+    }
+
+    #[test]
+    fn can_count_occurence_of_subslice() {
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![1, 20, 2, 3, 4, 2, 3],
+            },
+            Opcode::PUSHL1 {
+                len: 0,
+                data: vec![2, 3],
+            },
+            Opcode::SCOUNT,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
+        // should count two occurrences of [2,3]
+        assert_eq!(i.main_stack.last(), Some(&StackData::Number(2)));
     }
 }
