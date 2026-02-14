@@ -86,7 +86,7 @@ impl BinarySerializer<PlabbleConnectionContext, SerializationError> for PlabbleR
         {
             let mac_key = ctx
                 .create_key(Some(&self.base), 0xFF, true)
-                .expect("Failed to create MAC key from context");
+                .ok_or(SerializationError::NoKeyAvailable)?;
 
             let mac = calculate_mac(
                 ctx.use_blake3(),
@@ -159,11 +159,11 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
             let expected: [u8; 16] = stream
                 .slice_end()
                 .try_into()
-                .expect("A 16-byte MAC on the end");
+                .map_err(|_| DeserializationError::UnexpectedLength(16, stream.slice_end().len()))?;
 
             let mac_key = ctx
                 .create_key(Some(&base), 0xFF, true)
-                .expect("Failed to create MAC key from context");
+                .ok_or(DeserializationError::NoKeyAvailable)?;
 
             let mac1 = calculate_mac(
                 ctx.use_blake3(),

@@ -54,6 +54,9 @@ pub enum ScriptError {
     /// When an assertion fails
     AssertionFailed,
 
+    /// Failed to cast a value to the expected type
+    InvalidType,
+
     ControlFlowMalformed,
     ClearNotAllowed,
     ControlFlowNotAllowed,
@@ -285,8 +288,8 @@ impl ScriptInterpreter {
             (StackData::Boolean(a), StackData::Byte(b)) => Ok((if a { 1 } else { 0 }) == b),
             (StackData::Byte(a), StackData::Boolean(b)) => Ok(a == (if b { 1 } else { 0 })),
             (a, b) => {
-                let a = a.as_buffer().expect("Failed to convert to buffer");
-                let b = b.as_buffer().expect("Failed to convert to buffer");
+                let a = a.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let b = b.as_buffer().ok_or(ScriptError::InvalidType)?;
 
                 Ok(a == b)
             }
@@ -683,7 +686,7 @@ impl ScriptInterpreter {
             Opcode::RETURN => {
                 let mut stack_data = Vec::new();
                 for item in self.stack().drain(..) {
-                    let buffer = item.as_buffer().expect("Failed to convert to buffer");
+                    let buffer = item.as_buffer().ok_or(ScriptError::InvalidType)?;
                     stack_data.extend_from_slice(&buffer);
                 }
                 return Ok(Some(stack_data));
@@ -820,8 +823,8 @@ impl ScriptInterpreter {
                 let b = self.pop().unwrap();
                 let a = self.pop().unwrap();
 
-                let a_bytes = a.as_buffer().expect("Failed to convert to buffer");
-                let b_bytes = b.as_buffer().expect("Failed to convert to buffer");
+                let a_bytes = a.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let b_bytes = b.as_buffer().ok_or(ScriptError::InvalidType)?;
 
                 let mut combined = a_bytes;
                 combined.extend_from_slice(&b_bytes);
@@ -851,14 +854,14 @@ impl ScriptInterpreter {
             Opcode::LEN => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
-                let bytes = item.as_buffer().expect("Failed to convert to buffer");
+                let bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
                 let length = bytes.len() as i128;
                 self.push(StackData::Number(length))?;
             }
             Opcode::REVERSE => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
-                let mut bytes = item.as_buffer().expect("Failed to convert to buffer");
+                let mut bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
                 bytes.reverse();
                 self.push(StackData::Buffer(bytes))?;
             }
@@ -867,7 +870,7 @@ impl ScriptInterpreter {
                 let length = self.pop_number()?;
                 let offset = self.pop_number()?;
                 let item = self.pop().unwrap();
-                let bytes = item.as_buffer().expect("Failed to convert to buffer");
+                let bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
 
                 if offset < 0 || length < 0 || (offset as usize) + (length as usize) > bytes.len() {
                     return Err(ScriptError::OutOfBounds);
@@ -885,9 +888,9 @@ impl ScriptInterpreter {
                 let offset = self.pop_number()?;
                 let length = self.pop_number()?;
                 let item = self.pop().unwrap();
-                let splice_data = item.as_buffer().expect("Failed to convert to buffer");
+                let splice_data = item.as_buffer().ok_or(ScriptError::InvalidType)?;
                 let item = self.pop().unwrap();
-                let mut bytes = item.as_buffer().expect("Failed to convert to buffer");
+                let mut bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
 
                 if offset < 0 || length < 0 || (offset as usize) + (length as usize) > bytes.len() {
                     return Err(ScriptError::OutOfBounds);
@@ -908,7 +911,7 @@ impl ScriptInterpreter {
             Opcode::EVALSUB => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
-                let bytes = item.as_buffer().expect("Failed to convert to buffer");
+                let bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
 
                 let config: Option<&mut binary_codec::SerializerConfig> = None;
                 let script = OpcodeScript::from_bytes(&bytes, config)
@@ -944,7 +947,7 @@ impl ScriptInterpreter {
             Opcode::EVAL => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
-                let bytes = item.as_buffer().expect("Failed to convert to buffer");
+                let bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
 
                 let config: Option<&mut binary_codec::SerializerConfig> = None;
                 let script = OpcodeScript::from_bytes(&bytes, config)

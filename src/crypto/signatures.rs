@@ -44,7 +44,7 @@ impl VerificationKey {
                 if let CryptoSignature::Ed25519(signature) = signature {
                     use ed25519_dalek::{Verifier, VerifyingKey, ed25519::Signature};
 
-                    let key = VerifyingKey::from_bytes(key).expect("a valid ed25519 key");
+                    let key = VerifyingKey::from_bytes(key).ok()?;
                     let signature = Signature::from_bytes(signature);
                     Some(key.verify(data, &signature).is_ok())
                 } else {

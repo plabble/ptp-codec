@@ -18,6 +18,9 @@ pub enum SerializationError {
 
     /// Encryption failed
     EncryptionFailed,
+
+    /// No encryption/MAC key available
+    NoKeyAvailable,
 }
 
 impl From<BinarySerializationError> for SerializationError {
@@ -60,6 +63,9 @@ pub enum DeserializationError {
 
     /// MAC verification failed (e.g. due to wrong key or corrupted data)
     IntegrityFailed,
+
+    /// No decryption/MAC key available
+    NoKeyAvailable,
 }
 
 impl From<BinaryDeserializationError> for DeserializationError {
