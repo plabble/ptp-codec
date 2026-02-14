@@ -211,3 +211,94 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
 }
 
 // Tests for the request and response packets are in the type-specific files
+#[cfg(test)]
+mod tests {
+    use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+
+    use crate::{errors::DeserializationError, packets::{context::PlabbleConnectionContext, response::PlabbleResponsePacket}};
+
+    #[test]
+    fn can_encrypt_and_decrypt_response_packet() {
+        let response: PlabbleResponsePacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Error"
+            request_counter = 1
+
+            [body]
+            type = "UnsupportedVersion"
+            min_version = 1
+            max_version = 3
+        "#,
+        )
+        .unwrap();
+
+        let mut context = PlabbleConnectionContext::new();
+        context.session_key = Some([0u8; 64]);
+        let mut config = SerializerConfig::new(Some(context));
+
+        let plain = "410f0001000103";
+        let cipher = response.to_bytes(Some(&mut config)).unwrap();
+        assert_ne!(plain, hex::encode(&cipher));
+        assert_eq!(7 + 16, cipher.len()); // 7 bytes of base+header, 16 bytes of ciphertext
+
+        let decrypted = PlabbleResponsePacket::from_bytes(&cipher, Some(&mut config)).unwrap();
+        assert_eq!(response, decrypted);
+
+        // Invalid byte in ciphertext MAC should fail decryption
+        let mut wrong = cipher.clone();
+        wrong[cipher.len() - 1] ^= 0xFF; // Flip a byte in the ciphertext
+        assert_eq!(Err(DeserializationError::DecryptionFailed), PlabbleResponsePacket::from_bytes(&wrong, Some(&mut config)));
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_response_packet_with_mac() {
+        let response: PlabbleResponsePacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = false
+
+            [header]
+            packet_type = "Error"
+            request_counter = 1
+
+            [body]
+            type = "UnsupportedVersion"
+            min_version = 1
+            max_version = 3
+        "#,
+        )
+        .unwrap();
+
+        let plain = "010f0001000103";
+        let mac = "b7fbd584e891fc4af0499fbfdbfda11c";
+
+        let mut context = PlabbleConnectionContext::new();
+        context.session_key = Some([0u8; 64]);
+        let mut config = SerializerConfig::new(Some(context));
+
+        let serialized = response.to_bytes(Some(&mut config)).unwrap();
+        assert_eq!(format!("{}{}", plain, mac), hex::encode(&serialized));
+
+        let deserialized = PlabbleResponsePacket::from_bytes(&serialized, Some(&mut config)).unwrap();
+        assert_eq!(response, deserialized);
+
+        // Invalid MAC should fail integrity check
+        let mut wrong = serialized.clone();
+        wrong[serialized.len() - 1] ^= 0xFF; // Flip a byte in the MAC
+        assert_eq!(Err(DeserializationError::IntegrityFailed), PlabbleResponsePacket::from_bytes(&wrong, Some(&mut config)));
+
+        // Full packet encryption should encrypt the MAC as well
+        let context = config.data.as_mut().unwrap();
+        context.full_encryption = true;
+
+        let encrypted = response.to_bytes(Some(&mut config)).unwrap();
+        assert_ne!(format!("{}{}", plain, mac), hex::encode(&encrypted));
+        assert_eq!("971df7105b2bc21db879f2f1d469a99882647b66676f2b", hex::encode(&encrypted));
+        let decrypted = PlabbleResponsePacket::from_bytes(&encrypted, Some(&mut config)).unwrap();
+        assert_eq!(response, decrypted);
+    }
+}

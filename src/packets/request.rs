@@ -289,6 +289,24 @@ mod tests {
             hex::encode(decrypted.to_bytes(None).unwrap())
         );
         assert_eq!(packet, decrypted);
+
+        // When encrypted with BucketId in AAD, decryption is different
+        let context = config.data.as_mut().unwrap();
+        context.get_bucket_key = Some(|_| Some([0u8; 32]));
+        context.include_bucket_key_in_auth_data = true;
+
+        let without_bucket_key = hex::encode(&encrypted);
+        let encrypted = packet.to_bytes(Some(&mut config)).unwrap();
+        let with_bucket_key = hex::encode(&encrypted);
+
+        // Ciphertext should be the same, but the poly1305 mac is different because the AAD is different
+        assert_ne!(without_bucket_key, with_bucket_key);
+        assert!(with_bucket_key.starts_with("419400c34723ba6a67ac52aaa34c12862beae91764d9"));
+        assert!(without_bucket_key.starts_with("419400c34723ba6a67ac52aaa34c12862beae91764d9"));
+
+        // Should automatically fall back on the bucket key if first decryption fails
+        let decrypted = PlabbleRequestPacket::from_bytes(&encrypted, Some(&mut config)).unwrap();
+        assert_eq!(packet, decrypted);
     }
 
     #[test]
@@ -355,9 +373,32 @@ mod tests {
 
         assert_eq!(Err(DeserializationError::IntegrityFailed), wrong);
 
+        // MAC is different when bucket key is included in AAD
+        let context = config.data.as_mut().unwrap();
+        context.get_bucket_key = Some(|_| Some([0u8; 32]));
+        context.include_bucket_key_in_auth_data = true;
+
+        let serialized = packet.to_bytes(Some(&mut config)).unwrap();
+        assert_ne!(format!("{}{}", packet_b, mac), hex::encode(&serialized));
+        let mac2 = "fe808fa93a6457bcd7e690db8de49ead";
+        assert_eq!(format!("{}{}", packet_b, mac2), hex::encode(&serialized));
+
+        let deserialized =
+            PlabbleRequestPacket::from_bytes(&serialized, Some(&mut config)).unwrap();
+        assert_eq!(packet, deserialized);
+
+        // Deserialization fails if bucket key getter is not provided and bucket key is included in AAD
+        let context = config.data.as_mut().unwrap();
+        context.get_bucket_key = None;
+        context.include_bucket_key_in_auth_data = false;
+
+        let wrong = PlabbleRequestPacket::from_bytes(&serialized, Some(&mut config));
+        assert_eq!(Err(DeserializationError::IntegrityFailed), wrong);
+
         // With full packet encryption, the header and MAC are encrypted (this example uses double cipher)
         let context = config.data.as_mut().unwrap();
         context.full_encryption = true;
+
         let mut settings = CryptoSettings::default();
         settings.encrypt_with_aes = true;
         context.crypto_settings = Some(settings);
