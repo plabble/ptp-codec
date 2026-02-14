@@ -9,3 +9,4 @@ pub mod response_body;
 pub mod session;
 pub mod register;
 pub mod identify;
+pub mod opcode;

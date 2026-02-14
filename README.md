@@ -30,8 +30,8 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **11** [IDENTIFY](#identify)
 - **12** PROXY
 - **13** [CUSTOM](#custom)
-- **14** OPCODE
-- **15** ERROR
+- **14** [OPCODE](#opcode)
+- **15** [ERROR](#error)
 
 ## Plabble packet base
 - Every packet extends the Plabble **packet base**.
@@ -413,7 +413,7 @@ public_read = true # this is one of the defaults
 ### Post response
 Empty response without flags.
 
-### PATCH
+## PATCH
 - **Goal**: _Update bucket permissions or modify ACL entries_
 - Implementation: [patch.rs](./src/packets/body/patch.rs)
 
@@ -486,7 +486,7 @@ acl_del = ["AAAAAAAAAAAAAAAAAAAAAAAAAAA"]
 Empty response without flags.
 
 
-### PUT
+## PUT
 - **Goal**: _Add or append data to one or more slots in a bucket._
 - Implementation: [bucket.rs](./src/packets/body/bucket.rs)
 
@@ -539,7 +539,7 @@ body.Binary = { name = "AAAA", alias = "AAAAAA" }
 ### PUT response
 Empty response without flags.
 
-### DELETE
+## DELETE
 - **Goal**: _Remove entries from a bucket or delete the entire bucket._
 - Implementation: [bucket.rs](./src/packets/body/bucket.rs)
 
@@ -825,7 +825,103 @@ request_counter = 7
 
 [body]
 protocol = 42
-data = [1, 2, 3, 4, 5]
+data = "AQIDBAU"
+```
+
+## OPCODE
+- **Goal**: Execute a small, sandboxed server-side script (an OPCODE) and return its result.
+- Implementation: [opcode.rs](./src/packets/body/opcode.rs)
+
+> Warning: OPCODE execution can be dangerous. Servers MUST enforce strict limits (CPU, memory, allowed operations) and only enable `allow_eval` or `allow_bucket_operations` when explicitly permitted by policy.
+
+### OPCODE flow
+1. The client sends an `Opcode` request containing a script to execute and optional flags requesting capabilities.
+2. The server validates the script and requested flags, enforces execution limits and permissions, then executes the script in a sandboxed environment.
+3. The server returns an `Opcode` response containing an optional binary `result` produced by the script or an [Error](#error) packet on failure.
+
+### Opcode request
+Request header flags:
+- **allow_bucket_operations**: boolean — allow the script to perform bucket operations (read/write/append) if the server permits it.
+- **allow_eval**: boolean — allow evaluation operations inside the script; this can be dangerous and servers may disallow it.
+
+Request header:
+- **packet_type**: `Opcode`
+
+Request body:
+- **script**: `OpcodeScript` — the script to run (sequence of opcodes). See `src/scripting/opcode_script.rs` for structure.
+
+Example (request):
+```toml
+version = 1
+
+[header]
+packet_type = "Opcode"
+allow_bucket_operations = false
+allow_eval = false
+
+[body.script]
+instructions = [{ PUSHINT = 5 }, { PUSHINT = 2 }, { PUSHINT = 3 }, "ADD", "EQ", { PUSH2 = "0102" }]
+```
+
+### Opcode response
+Response header flags:
+- **request_counter**: present when replying in a session to correlate the response.
+
+Response body:
+- **result**: `Option<Vec<u8>>` — optional binary result of the script execution. In TOML/JSON this is represented as a hex string.
+
+Example (response):
+```toml
+version = 1
+
+[header]
+packet_type = "Opcode"
+request_counter = 7
+
+[body]
+result = "0102030405"
+```
+
+## Error
+- **Goal**: communicate a failure or rejection for a previously received request. The `Error` packet is response-only and is used to signal protocol, authentication or application-level problems.
+- Implementation: [error.rs](./src/packets/body/error.rs)
+
+> Note: see the consolidated error code list under [Errors](#errors) for human-readable descriptions and the numeric codes.
+
+### Error flow
+1. When a server encounters a problem processing a request (invalid format, unsupported algorithm, missing resource, permission denied, etc.), it replies with an `Error` response packet.
+2. The client should interpret the `type` field and any accompanying fields to determine the cause and whether retry, authentication or other remediation is required.
+
+### Error request
+This packet type is response-only; there is no request variant.
+
+### Error response
+Response header flags:
+- **request_counter**: present when replying inside a session to correlate with the originating request.
+
+Response body:
+- **type**: an enum discriminator indicating the error variant (see implementation in `error.rs`).
+
+Variant-specific fields (examples):
+- `UnsupportedVersion`: `min_version` (u8), `max_version` (u8).
+- `UnsupportedAlgorithm`: `name` (string) — name of the unsupported algorithm.
+- `UnsupportedSubProtocol`: no additional fields (sub-protocol not implemented).
+- `BucketNotFound`, `BucketAlreadyExists`, `CertificateNotFound`, `CertificateInvalid`: no extra fields beyond the type (see `## Errors` list for contextual meaning).
+- `OpcodeScriptError(ScriptError)`: `ScriptError` is a error from the opcode script execution engine, see [interpreter.rs](./src/scripting/interpreter.rs) for details.
+
+Example (UnsupportedVersion response):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Error"
+request_counter = 1
+
+[body]
+type = "UnsupportedVersion"
+min_version = 1
+max_version = 3
 ```
 
 ## Errors
@@ -838,6 +934,7 @@ data = [1, 2, 3, 4, 5]
 11. **BucketAlreadyExists**: Bucket with that ID already exists. _Occurence_: [Post](#post)
 110. **CertificateNotFound**: Requested certificate (by id) was not found. _Occurence_: [Certificate](#certificate-request)
 111. **CertificateInvalid**: Requested certificate was not valid. _Occurence_: [Certificate](#certificate)
+210. **OpcodeScriptError**: An error occurred during OPCODE script execution. Body: `ScriptError` (see `interpreter.rs` for details). _Occurence_: [OPCODE](#opcode)
 
 ## Concepts
 

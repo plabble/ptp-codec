@@ -1,6 +1,8 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
+use crate::scripting::interpreter::ScriptError;
+
 /// Plabble error code body
 /// The length is prefixed by a u8 in the packet body.
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
@@ -32,6 +34,11 @@ pub enum PlabbleError {
     CertificateNotFound = 110,
     /// Requested certificate is not valid (according to server)
     CertificateInvalid = 111,
+
+    // ...
+
+    /// OPCODE script execution error
+    OpcodeScriptError(ScriptError) = 210
 }
 
 #[cfg(test)]

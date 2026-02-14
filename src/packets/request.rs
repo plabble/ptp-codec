@@ -244,7 +244,9 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Custom { .. } => {
                 PlabbleRequestBody::Custom(raw.body.deserialize_into().unwrap())
             },
-            RequestPacketType::Opcode { .. } => todo!(),
+            RequestPacketType::Opcode { .. } => {
+                PlabbleRequestBody::Opcode(raw.body.deserialize_into().unwrap())
+            },
         };
 
         Ok(PlabbleRequestPacket {

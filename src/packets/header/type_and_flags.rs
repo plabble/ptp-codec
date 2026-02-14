@@ -198,7 +198,7 @@ pub enum RequestPacketType {
     } = 13,
     /// Execute a server-side opcode script
     /// - allow_bucket_operations: Allow the script to perform bucket operations.
-    /// - allow_eval: Allow the script to use eval functionality (can be dangerous).
+    /// - allow_eval: Allow the script to use eval functionality (can be dangerous). Only if the server allows it too.
     Opcode {
         #[serde(default)]
         allow_bucket_operations: bool,

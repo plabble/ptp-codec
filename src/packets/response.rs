@@ -200,7 +200,9 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Custom { .. } => {
                 PlabbleResponseBody::Custom(raw.body.deserialize_into().unwrap())
             },
-            ResponsePacketType::Opcode => todo!(),
+            ResponsePacketType::Opcode => {
+                PlabbleResponseBody::Opcode(raw.body.deserialize_into().unwrap())
+            },
             ResponsePacketType::Error => {
                 PlabbleResponseBody::Error(raw.body.deserialize_into().unwrap())
             }

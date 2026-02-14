@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
 use binary_codec::{FromBytes, ToBytes};
+use serde_with::formats::Lowercase;
+use serde_with::hex::Hex;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, TryFromInto};
 
 use crate::scripting::interpreter::ScriptError;
 
@@ -12,20 +16,22 @@ use crate::scripting::interpreter::ScriptError;
  * If a number is expected but bytes are provided, the engine will try to read a dynint.
  */
 #[repr(u8)]
-#[derive(Debug, Clone, PartialEq, ToBytes, FromBytes)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, ToBytes, FromBytes, Serialize, Deserialize)]
 pub enum Opcode {
     FALSE = 0, // Push 0x00 to the stack
     TRUE = 1,  // Push 0x01 to the stack
 
     PUSH1(u8) = 2,      // Push next byte to the stack
-    PUSH2([u8; 2]) = 3, // Push next 2 bytes to the stack
-    PUSH4([u8; 4]) = 4, // Push next 4 bytes to the stack
+    PUSH2(#[serde_as(as = "Hex<Lowercase>")] [u8; 2]) = 3, // Push next 2 bytes to the stack
+    PUSH4(#[serde_as(as = "Hex<Lowercase>")] [u8; 4]) = 4, // Push next 4 bytes to the stack
 
     // Push n bytes to the stack, where n is u8 value directly following the operator
     PUSHL1 {
         #[length_for = "l1"]
         len: u8,
         #[length_by("l1")]
+        #[serde_as(as = "Hex<Lowercase>")]
         data: Vec<u8>,
     } = 5,
 
@@ -34,6 +40,7 @@ pub enum Opcode {
         #[length_for = "l2"]
         len: u16,
         #[length_by("l2")]
+        #[serde_as(as = "Hex<Lowercase>")]
         data: Vec<u8>,
     } = 6,
 
@@ -42,11 +49,12 @@ pub enum Opcode {
         #[length_for = "l4"]
         len: u32,
         #[length_by("l4")]
+        #[serde_as(as = "Hex<Lowercase>")]
         data: Vec<u8>,
     } = 7,
 
     // Push dynamic int to the stack
-    PUSHINT(#[dyn_int] i128) = 8,
+    PUSHINT(#[dyn_int] #[serde_as(as = "TryFromInto<i64>")] i128) = 8,
 
     // Push floating point number to the stack. Floats are 64-bit IEEE 754 binary64
     PUSHFLOAT(f64) = 9,
@@ -264,8 +272,10 @@ impl Default for ScriptSettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToBytes, FromBytes)]
+/// OPCODE script consisting of a list of instructions (opcodes)
+#[derive(Debug, Clone, PartialEq, ToBytes, FromBytes, Serialize, Deserialize)]
 pub struct OpcodeScript {
+    /// Script instructions
     pub instructions: Vec<Opcode>,
 }
 

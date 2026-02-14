@@ -54,6 +54,21 @@ pub struct PlabblePacketBase {
     pub psk_salt: Option<[u8; 16]>,
 }
 
+impl Default for PlabblePacketBase {
+    fn default() -> Self {
+        PlabblePacketBase {
+            version: 1,
+            fire_and_forget: false,
+            pre_shared_key: false,
+            use_encryption: false,
+            specify_crypto_settings: false,
+            crypto_settings: None,
+            psk_id: None,
+            psk_salt: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
