@@ -102,7 +102,19 @@ pub enum RequestPacketType {
         do_not_persist: bool,
     } = 4,
     /// Update bucket settings
-    Patch = 5,
+    Patch {
+        #[serde(default)]
+        #[toggles("update_perm")]
+        update_permissions: bool,
+
+        #[serde(default)]
+        #[toggles("acl_add")]
+        add_to_acl: bool,
+
+        #[serde(default)]
+        #[toggles("acl_del")]
+        remove_from_acl: bool,
+    } = 5,
     /// Insert or update values in a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - subscribe: Subscribe to changes on the inserted/updated keys.

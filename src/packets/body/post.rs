@@ -72,7 +72,17 @@ pub struct BucketPermissions {
     /// If public read is off and a user queries this bucket, let the server tell
     /// them this bucket does not exist
     #[serde(default)]
-    deny_existence: bool, // 6 reserved flags (total: 20 = 5 bytes)
+    deny_existence: bool,
+
+    // If set, permissions cannot be updated
+    #[serde(default)]
+    lock_permissions: bool,
+
+    // If set, ACL cannot be updated
+    #[serde(default)]
+    lock_acl: bool,
+
+    // 4 reserved flags (total: 20/24 = 3 bytes)
 }
 
 /// Bucket settings
@@ -135,6 +145,8 @@ mod tests {
             private_append = false
             private_bucket_delete = false
             deny_existence = true
+            lock_acl = false
+            lock_permissions = true
         "#,
         )
         .unwrap();
@@ -169,7 +181,7 @@ mod tests {
                 // settings.permissions, 3 byte//
                 0b0010_0101, // wars_dwar
                 0b0110_1001, // sdwa_rbsd
-                0b0000_0010, // xxxx_xxdb
+                0b0000_0110, // xxxx_pldb
                 1,           // ACL length
                 // 20-byte ID(s)
                 0,

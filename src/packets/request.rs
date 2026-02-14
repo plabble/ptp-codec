@@ -156,10 +156,9 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
             && let Some(ctx) = &config.data
             && (!header.is_session_packet() || base.pre_shared_key)
         {
-            let expected: [u8; 16] = stream
-                .slice_end()
-                .try_into()
-                .map_err(|_| DeserializationError::UnexpectedLength(16, stream.slice_end().len()))?;
+            let expected: [u8; 16] = stream.slice_end().try_into().map_err(|_| {
+                DeserializationError::UnexpectedLength(16, stream.slice_end().len())
+            })?;
 
             let mac_key = ctx
                 .create_key(Some(&base), 0xFF, true)
@@ -220,11 +219,21 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Post { .. } => {
                 PlabbleRequestBody::Post(raw.body.deserialize_into().unwrap())
             }
-            RequestPacketType::Patch => todo!(),
-            RequestPacketType::Put { .. } => todo!(),
-            RequestPacketType::Delete { .. } => todo!(),
-            RequestPacketType::Subscribe { .. } => todo!(),
-            RequestPacketType::Unsubscribe { .. } => todo!(),
+            RequestPacketType::Patch { .. } => {
+                PlabbleRequestBody::Patch(raw.body.deserialize_into().unwrap())
+            },
+            RequestPacketType::Put { .. } => {
+                PlabbleRequestBody::Put(raw.body.deserialize_into().unwrap())
+            }
+            RequestPacketType::Delete { .. } => {
+                PlabbleRequestBody::Delete(raw.body.deserialize_into().unwrap())
+            },
+            RequestPacketType::Subscribe { .. } => {
+                PlabbleRequestBody::Subscribe(raw.body.deserialize_into().unwrap())
+            },
+            RequestPacketType::Unsubscribe { .. } => {
+                PlabbleRequestBody::Unsubscribe(raw.body.deserialize_into().unwrap())
+            },
             RequestPacketType::Register => todo!(),
             RequestPacketType::Identify => todo!(),
             RequestPacketType::Proxy { .. } => todo!(),

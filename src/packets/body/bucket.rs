@@ -430,4 +430,129 @@ mod tests {
         let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();
         assert_eq!(packet, deserialized);
     }
+
+    #[test]
+    fn can_serialize_and_deserialize_put_request_numeric() {
+        let packet: PlabbleRequestPacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Put"
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+            [body]
+            body.Numeric = { 5 = "AAAAAA" }
+        "#,
+        )
+        .unwrap();
+
+        let serialized = packet.to_bytes(None).unwrap();
+        assert_eq!(
+            "41060000000000000000000000000000000000050400000000",
+            hex::encode(&serialized)
+        );
+        let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
+
+        assert_eq!(packet, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_put_request_binary() {
+        let packet: PlabbleRequestPacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Put"
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
+            binary_keys = true
+
+            [body]
+            body.Binary = { name = "AAAA", alias = "AAAAAA" }
+        "#,
+        )
+        .unwrap();
+
+        let serialized = packet.to_bytes(None).unwrap();
+        let hexed = hex::encode(&serialized);
+        let expected1 = "411600000000000000000000000000000000046e616d650300000005616c6961730400000000";
+        let expected2 = "41160000000000000000000000000000000005616c6961730400000000046e616d6503000000";
+        assert!(hexed == expected1 || hexed == expected2, "got {}", hexed);
+        let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
+
+        assert_eq!(packet, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_delete_request_numeric() {
+        let packet: PlabbleRequestPacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Delete"
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+            [body]
+            range.Numeric = [5, 25]
+        "#,
+        )
+        .unwrap();
+
+        let serialized = packet.to_bytes(None).unwrap();
+        assert_eq!("41070000000000000000000000000000000000050019", hex::encode(&serialized));
+        let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
+
+        assert_eq!(packet, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_subscribe_request_numeric() {
+        let packet: PlabbleRequestPacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Subscribe"
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+            [body]
+            range.Numeric = [5, 25]
+        "#,
+        )
+        .unwrap();
+
+        let serialized = packet.to_bytes(None).unwrap();
+        let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
+
+        assert_eq!(packet, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_unsubscribe_request_numeric() {
+        let packet: PlabbleRequestPacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Unsubscribe"
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+            [body]
+            range.Numeric = [5, 25]
+        "#,
+        )
+        .unwrap();
+
+        let serialized = packet.to_bytes(None).unwrap();
+        let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
+
+        assert_eq!(packet, deserialized);
+    }
 }

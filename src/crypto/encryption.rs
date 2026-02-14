@@ -50,7 +50,7 @@ impl CryptoStream for StreamCipherCryptoStream {
             &self.modified
         }
     }
-    
+
     fn replace(&mut self, other: &Box<dyn CryptoStream>) {
         self.original = other.get_cached(true).to_vec();
         self.modified = other.get_cached(false).to_vec();

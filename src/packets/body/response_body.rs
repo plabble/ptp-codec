@@ -2,8 +2,8 @@ use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::body::{
-    bucket::BucketBody, certificate::CertificateResponseBody, error::PlabbleError,
-    session::SessionResponseBody,
+    bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody,
+    error::PlabbleError, session::SessionResponseBody,
 };
 
 /// An enumeration representing the different types of response bodies
@@ -46,7 +46,7 @@ pub enum PlabbleResponseBody {
     Register = 10,
     Identity = 11,
     Proxy = 12,
-    Custom = 13,
+    Custom(CustomBody) = 13,
     Opcode = 14,
     Error(PlabbleError) = 15,
 }

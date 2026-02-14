@@ -21,11 +21,11 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **2** [GET](#get)
 - **3** STREAM
 - **4** [POST](#post)
-- **5** PATCH
-- **6** PUT
-- **7** DELETE
-- **8** SUBSCRIBE
-- **9** UNSUBSCRIBE
+- **5** [PATCH](#patch)
+- **6** [PUT](#put)
+- **7** [DELETE](#delete)
+- **8** [SUBSCRIBE](#subscribe)
+- **9** [UNSUBSCRIBE](#unsubscribe)
 - **10** REGISTER
 - **11** IDENTIFY
 - **12** PROXY
@@ -99,6 +99,7 @@ version = 1
 # ... and other base properties/flags
 
 [header]
+id = "..." # bucket ID if applicable
 packet_type = "Session" # the packet type in PascalCase
 # ... type-specific header fields/flags. See type_and_flags.rs
 
@@ -314,10 +315,12 @@ Ed25519 = "..."
 3. If the `subscribe` flag is set, the server may continue to send updates for the requested keys/slots until the subscription is cancelled.
 
 ### Get request
-Request header:
+Request header flags:
 - **binary_keys**: keys in the request/response are UTF-8 strings instead of numeric slot indexes.
 - **subscribe**: request a subscription for changes on the requested keys/range.
 - **range_mode_until**: treat a single provided range value as an "until" (end-only) bound.
+
+Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64/URL-safe when using the TOML representation).
 
 Request body:
@@ -379,8 +382,11 @@ Request header flags:
 - **range_mode_until**: Use "until" range mode when subscribing to the bucket
 - **do_not_persist**: Create a **Memory bucket** instead, not persisting the bucket to the server storage but keeping it in RAM (not all servers will allow this)
 
-Request body:
+Request header
 - **id**: the [Bucket ID](#bucket-id) you would like to use for this bucket. If it already exists you'll get an [error](#errors).
+
+
+Request body:
 - **settings**: The [bucket settings](#bucket-permissions) and permissions you want to use
 - **range**: Range if you want to subscribe to the bucket, REQUIRED if _subscribe_ is set.
 
@@ -405,6 +411,252 @@ public_read = true # this is one of the defaults
 ```
 
 ### Post response
+Empty response without flags.
+
+### PATCH
+- **Goal**: _Update bucket permissions or modify ACL entries_
+- Implementation: [patch.rs](./src/packets/body/patch.rs)
+
+### PATCH flow
+1. The client sends a `Patch` request targeting a bucket and specifying which parts to update (permissions and/or ACL changes).
+2. The server applies the requested changes, avoiding duplicates when adding and ignoring non-existent entries when removing.
+
+### PATCH request
+Request header flags:
+- **update_permissions**: when set, the `permissions` object in the body will be applied to the bucket.
+- **add_to_acl**: when set, entries in `acl_add` in the body will be appended to the ACL (duplicates ignored).
+- **remove_from_acl**: when set, entries in `acl_del` in the body will be removed from the ACL (non-existent entries ignored).
+
+Request header:
+- **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
+
+Request body:
+- **permissions**: Optional `BucketPermissions` object describing permission flags to set (see [post.rs](./src/packets/body/post.rs)).
+- **acl_add**: Optional list of base64url (no padding) encoded 20-byte user IDs to add to the ACL.
+- **acl_del**: Optional list of base64url (no padding) encoded 20-byte user IDs to remove from the ACL.
+
+Example (update permissions):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Patch"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+update_permissions = true
+
+[body]
+[body.permissions]
+public_read = true
+public_write = true
+protected_delete = true
+```
+
+Example (add ACL entries):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Patch"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+add_to_acl = true
+
+[body]
+acl_add = ["AAAAAAAAAAAAAAAAAAAAAAAAAAA"]
+```
+
+Example (add and remove ACL entries):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Patch"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+add_to_acl = true
+remove_from_acl = true
+
+[body]
+acl_add = ["AAAAAAAAAAAAAAAAAAAAAAAAAAA"]
+acl_del = ["AAAAAAAAAAAAAAAAAAAAAAAAAAA"]
+```
+
+### PATCH response
+Empty response without flags.
+
+
+### PUT
+- **Goal**: _Add or append data to one or more slots in a bucket._
+- Implementation: [bucket.rs](./src/packets/body/bucket.rs)
+
+### PUT flow
+1. The client selects the target bucket by `id` and prepares the data to write or append.
+2. The client sends a `PUT` request describing the keys/slots and their new contents.
+3. The server updates or appends the provided slots and returns an empty success response or an error.
+
+### PUT request
+Request header flags:
+- **binary_keys**: Use string keys instead of numeric slot indexes.
+- **subscribe**: Also subscribe to updates for the provided keys after the write.
+- **assert_keys**: Fail if any provided keys already exist (useful for insert-only semantics).
+- **append**: Append to existing slot values instead of overwriting.
+
+Request header:
+- **id**: the [Bucket ID](#bucket-id) identifying the target bucket.
+
+Request body:
+- **body**: the `BucketBody` to write; use `Numeric` for u16 slot indexes or `Binary` for string keys.
+
+Example (numeric keys, overwrite):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Put"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+[body]
+body.Numeric = { 5 = "AAAAAA", 7 = "AAAAAAAA" }
+```
+
+Example (binary keys, append):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Put"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+binary_keys = true
+append = true
+
+[body]
+body.Binary = { name = "AAAA", alias = "AAAAAA" }
+```
+
+### PUT response
+Empty response without flags.
+
+### DELETE
+- **Goal**: _Remove entries from a bucket or delete the entire bucket._
+- Implementation: [bucket.rs](./src/packets/body/bucket.rs)
+
+### DELETE flow
+1. The client specifies the target bucket by `id` and the range or keys to remove.
+2. The client sends a `DELETE` request describing the keys/slot range to delete.
+3. The server removes matching slots (or the whole bucket) and returns an empty success response or an error.
+
+### DELETE request
+Request header flags:
+- **binary_keys**: Use string keys instead of numeric slot indexes.
+- **range_mode_until**: Treat a single provided range value as an end-only bound (until).
+
+Request header:
+- **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
+
+Request body:
+- **range**: a `BucketQuery` describing which slots to delete. Use `Numeric(start?, end?)` for u16 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets. If the range is empty, the entire bucket will be deleted.
+
+Example (numeric range):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Delete"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+[body]
+range.Numeric = [0, 20]
+```
+
+Example (binary range):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Delete"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+binary_keys = true
+
+[body]
+range.Binary = ["old_key_start", "old_key_end"]
+```
+
+### DELETE response
+Empty response without flags.
+
+## Subscribe
+- **Goal**: _Subscribe to updates_ for one or more keys or a key range inside a bucket.
+- Implementation: [bucket.rs](./src/packets/body/bucket.rs)
+
+### Subscribe flow
+1. The client sends a `Subscribe` request targeting a bucket and a range of keys.
+2. The server acknowledges and, depending on server semantics, starts delivering update messages for matching keys until the subscription is cancelled with an `Unsubscribe` request or the session ends.
+
+### Subscribe request
+Request header flags:
+- **binary_keys**: keys in the request/response are UTF-8 strings instead of numeric slot indexes.
+- **range_mode_until**: treat a single provided range value as an "until" (end-only) bound.
+
+Request header:
+- **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
+
+Request body:
+- **range**: a `BucketQuery` describing which keys to subscribe to. Use `Numeric(start?, end?)` for u16 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets.
+
+Example (numeric range):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Subscribe"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+[body]
+range.Numeric = [5, 25]
+```
+
+### Subscribe response
+Empty response without flags (server-specific subscription messages follow on updates).
+
+## Unsubscribe
+- **Goal**: _Cancel an active subscription_ for a bucket range or keys.
+- Implementation: [bucket.rs](./src/packets/body/bucket.rs)
+
+### Unsubscribe flow
+1. The client sends an `Unsubscribe` request for the previously subscribed bucket/range.
+2. The server stops sending update messages for that subscription and returns an empty response.
+
+### Unsubscribe request
+Request header flags:
+- **binary_keys**: keys in the request/response are UTF-8 strings instead of numeric slot indexes.
+- **range_mode_until**: treat a single provided range value as an "until" bound.
+
+Request header:
+- **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
+
+Request body:
+- **range**: a `BucketQuery` describing which keys to stop subscribing to.
+
+Example (numeric range):
+```toml
+version = 1
+use_encryption = true
+
+[header]
+packet_type = "Unsubscribe"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+[body]
+range.Numeric = [5, 25]
+```
+
+### Unsubscribe response
 Empty response without flags.
 
 ## Errors

@@ -135,11 +135,10 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
             && let Some(ctx) = &config.data
             && (!header.is_session_packet() || base.pre_shared_key)
         {
-            let expected: [u8; 16] = stream
-                .slice_end()
-                .try_into()
-                .map_err(|_| DeserializationError::UnexpectedLength(16, stream.slice_end().len()))?;
-            
+            let expected: [u8; 16] = stream.slice_end().try_into().map_err(|_| {
+                DeserializationError::UnexpectedLength(16, stream.slice_end().len())
+            })?;
+
             let mac_key = ctx
                 .create_key(Some(&base), 0xFF, false)
                 .ok_or(DeserializationError::NoKeyAvailable)?;
@@ -188,11 +187,11 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             }
             ResponsePacketType::Stream => todo!(),
             ResponsePacketType::Post => PlabbleResponseBody::Post,
-            ResponsePacketType::Patch => todo!(),
-            ResponsePacketType::Put => todo!(),
-            ResponsePacketType::Delete => todo!(),
-            ResponsePacketType::Subscribe => todo!(),
-            ResponsePacketType::Unsubscribe => todo!(),
+            ResponsePacketType::Patch => PlabbleResponseBody::Patch,
+            ResponsePacketType::Put => PlabbleResponseBody::Put,
+            ResponsePacketType::Delete => PlabbleResponseBody::Delete,
+            ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
+            ResponsePacketType::Unsubscribe => PlabbleResponseBody::Unsubscribe,
             ResponsePacketType::Register => todo!(),
             ResponsePacketType::Identify => todo!(),
             ResponsePacketType::Proxy { .. } => todo!(),
@@ -216,7 +215,10 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
 mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
-    use crate::{errors::DeserializationError, packets::{context::PlabbleConnectionContext, response::PlabbleResponsePacket}};
+    use crate::{
+        errors::DeserializationError,
+        packets::{context::PlabbleConnectionContext, response::PlabbleResponsePacket},
+    };
 
     #[test]
     fn can_encrypt_and_decrypt_response_packet() {
@@ -252,7 +254,10 @@ mod tests {
         // Invalid byte in ciphertext MAC should fail decryption
         let mut wrong = cipher.clone();
         wrong[cipher.len() - 1] ^= 0xFF; // Flip a byte in the ciphertext
-        assert_eq!(Err(DeserializationError::DecryptionFailed), PlabbleResponsePacket::from_bytes(&wrong, Some(&mut config)));
+        assert_eq!(
+            Err(DeserializationError::DecryptionFailed),
+            PlabbleResponsePacket::from_bytes(&wrong, Some(&mut config))
+        );
     }
 
     #[test]
@@ -284,13 +289,17 @@ mod tests {
         let serialized = response.to_bytes(Some(&mut config)).unwrap();
         assert_eq!(format!("{}{}", plain, mac), hex::encode(&serialized));
 
-        let deserialized = PlabbleResponsePacket::from_bytes(&serialized, Some(&mut config)).unwrap();
+        let deserialized =
+            PlabbleResponsePacket::from_bytes(&serialized, Some(&mut config)).unwrap();
         assert_eq!(response, deserialized);
 
         // Invalid MAC should fail integrity check
         let mut wrong = serialized.clone();
         wrong[serialized.len() - 1] ^= 0xFF; // Flip a byte in the MAC
-        assert_eq!(Err(DeserializationError::IntegrityFailed), PlabbleResponsePacket::from_bytes(&wrong, Some(&mut config)));
+        assert_eq!(
+            Err(DeserializationError::IntegrityFailed),
+            PlabbleResponsePacket::from_bytes(&wrong, Some(&mut config))
+        );
 
         // Full packet encryption should encrypt the MAC as well
         let context = config.data.as_mut().unwrap();
@@ -298,7 +307,10 @@ mod tests {
 
         let encrypted = response.to_bytes(Some(&mut config)).unwrap();
         assert_ne!(format!("{}{}", plain, mac), hex::encode(&encrypted));
-        assert_eq!("971df7105b2bc21db879f2f1d469a99882647b66676f2b", hex::encode(&encrypted));
+        assert_eq!(
+            "971df7105b2bc21db879f2f1d469a99882647b66676f2b",
+            hex::encode(&encrypted)
+        );
         let decrypted = PlabbleResponsePacket::from_bytes(&encrypted, Some(&mut config)).unwrap();
         assert_eq!(response, decrypted);
     }

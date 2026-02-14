@@ -12,6 +12,9 @@
 Request header flags:
 - **flag_name**: description
 
+Request header:
+- **id**: ... (only if applicable to the packet type)
+
 Request body:
 - **field_name**: description, how many bytes, REQUIRED or not
 

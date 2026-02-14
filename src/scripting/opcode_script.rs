@@ -202,7 +202,7 @@ pub enum Opcode {
 */
 
 /// Settings for the script engine, such as limits and allowed operations.
-/// 
+///
 /// # Properties
 /// - `memory_limit`: The maximum memory usage of the script, in memory points
 /// - `executions_limit`: The maximum number of opcode executions allowed for the script
