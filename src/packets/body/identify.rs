@@ -34,7 +34,11 @@ mod tests {
         let sig = "e3ac1f8cd2446b1af84bd264d267cb0d1d3456dff442ffe341040302e3ca273cccb3da10df24aa8cd4f5b36c8236070c9eef9e68152585a209dd9afc3ab617d8";
         let uid = "9d1261e48580418400d1ccd9a889ed37";
         let uri = hex::encode(b"plabble:plabble.org/certs/@maus");
-        let timestamp = hex::encode(PlabbleDateTime(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()).timestamp().to_be_bytes()); 
+        let timestamp = hex::encode(
+            PlabbleDateTime(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap())
+                .timestamp()
+                .to_be_bytes(),
+        );
 
         let request: PlabbleRequestPacket = toml::from_str(r#"
             version = 1
@@ -59,7 +63,10 @@ mod tests {
         "#).unwrap();
 
         let bytes = request.to_bytes(None).unwrap();
-        assert_eq!(format!("81310b{}{}00{}1f{}", timestamp, sig, uid, uri), hex::encode(&bytes));
+        assert_eq!(
+            format!("81310b{}{}00{}1f{}", timestamp, sig, uid, uri),
+            hex::encode(&bytes)
+        );
 
         let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(request, deserialized);

@@ -25,7 +25,8 @@ mod tests {
 
     #[test]
     fn can_serialize_and_deserialize_custom_request() {
-        let packet: PlabbleRequestPacket = toml::from_str(r#"
+        let packet: PlabbleRequestPacket = toml::from_str(
+            r#"
             version = 1
             
             [header]
@@ -38,7 +39,9 @@ mod tests {
             [body]
             protocol = 42
             data = "AQIDBAU"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let serialized = packet.to_bytes(None).unwrap();
         assert_eq!("01011101", format!("{:08b}", serialized[1]));
@@ -50,7 +53,8 @@ mod tests {
 
     #[test]
     fn can_serialize_and_deserialize_custom_response() {
-        let packet: PlabbleResponsePacket = toml::from_str(r#"
+        let packet: PlabbleResponsePacket = toml::from_str(
+            r#"
             version = 1
             
             [header]
@@ -64,7 +68,9 @@ mod tests {
             [body]
             protocol = 42
             data = "AQIDBAU"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let serialized = packet.to_bytes(None).unwrap();
         assert_eq!("01011101", format!("{:08b}", serialized[1]));

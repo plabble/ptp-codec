@@ -81,7 +81,6 @@ pub struct BucketPermissions {
     // If set, ACL cannot be updated
     #[serde(default)]
     lock_acl: bool,
-
     // 4 reserved flags (total: 20/24 = 3 bytes)
 }
 

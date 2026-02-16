@@ -215,38 +215,40 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Get { .. } => {
                 PlabbleRequestBody::Get(raw.body.deserialize_into().unwrap())
             }
-            RequestPacketType::Stream { .. } => todo!(),
+            RequestPacketType::Stream { .. } => {
+                PlabbleRequestBody::Stream(raw.body.deserialize_into().unwrap())
+            }
             RequestPacketType::Post { .. } => {
                 PlabbleRequestBody::Post(raw.body.deserialize_into().unwrap())
             }
             RequestPacketType::Patch { .. } => {
                 PlabbleRequestBody::Patch(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Put { .. } => {
                 PlabbleRequestBody::Put(raw.body.deserialize_into().unwrap())
             }
             RequestPacketType::Delete { .. } => {
                 PlabbleRequestBody::Delete(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Subscribe { .. } => {
                 PlabbleRequestBody::Subscribe(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Unsubscribe { .. } => {
                 PlabbleRequestBody::Unsubscribe(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Register => {
                 PlabbleRequestBody::Register(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Identify => {
                 PlabbleRequestBody::Identify(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Proxy { .. } => todo!(),
             RequestPacketType::Custom { .. } => {
                 PlabbleRequestBody::Custom(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Opcode { .. } => {
                 PlabbleRequestBody::Opcode(raw.body.deserialize_into().unwrap())
-            },
+            }
         };
 
         Ok(PlabbleRequestPacket {

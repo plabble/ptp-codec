@@ -2904,10 +2904,7 @@ mod tests {
         let mut i = ScriptInterpreter::new(script, None);
         assert_eq!(i.exec(), Ok(None));
         // should split into [1,20], [4], [ ] (because of trailing [2,3])
-        assert_eq!(
-            i.main_stack.last(),
-            Some(&StackData::Buffer(vec![1, 20]))
-        );
+        assert_eq!(i.main_stack.last(), Some(&StackData::Buffer(vec![1, 20])));
         assert_eq!(
             i.main_stack.get(i.main_stack.len() - 2),
             Some(&StackData::Buffer(vec![4]))

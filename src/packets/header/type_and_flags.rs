@@ -64,9 +64,9 @@ pub enum RequestPacketType {
     } = 2,
     /// Start a data stream from or to a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
-    /// - subscribe: Subscribe to changes on the requested keys.
+    /// - subscribe: Subscribe to changes on the requested range.
     /// - range_mode_until: Use range mode until a specified key/index for the subscription
-    /// - stream_append: Write/append mode instead of read mode
+    /// - write_mode: Write/append mode instead of read mode
     Stream {
         #[serde(default)]
         #[toggles("binary_keys")]
@@ -79,7 +79,8 @@ pub enum RequestPacketType {
         range_mode_until: bool,
 
         #[serde(default)]
-        stream_append: bool,
+        #[toggles("write_mode")]
+        write_mode: bool,
     } = 3,
     /// Create a new bucket
     /// - binary_keys: Indicate that the bucket (or at least the subscribe range) has binary keys
@@ -236,7 +237,12 @@ pub enum ResponsePacketType {
         binary_keys: bool,
     } = 2,
     /// Response to a stream request.
-    Stream = 3,
+    /// - write_mode: Indicates a write response (so no data returned)
+    Stream {
+        #[serde(default)]
+        #[toggles("write_mode")]
+        write_mode: bool,
+    } = 3,
     /// Response to a post request.
     Post = 4,
     /// Response to a patch request.

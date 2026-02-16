@@ -36,9 +36,8 @@ pub enum PlabbleError {
     CertificateInvalid = 111,
 
     // ...
-
     /// OPCODE script execution error
-    OpcodeScriptError(ScriptError) = 210
+    OpcodeScriptError(ScriptError) = 210,
 }
 
 #[cfg(test)]

@@ -478,8 +478,10 @@ mod tests {
 
         let serialized = packet.to_bytes(None).unwrap();
         let hexed = hex::encode(&serialized);
-        let expected1 = "411600000000000000000000000000000000046e616d650300000005616c6961730400000000";
-        let expected2 = "41160000000000000000000000000000000005616c6961730400000000046e616d6503000000";
+        let expected1 =
+            "411600000000000000000000000000000000046e616d650300000005616c6961730400000000";
+        let expected2 =
+            "41160000000000000000000000000000000005616c6961730400000000046e616d6503000000";
         assert!(hexed == expected1 || hexed == expected2, "got {}", hexed);
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
 
@@ -504,7 +506,10 @@ mod tests {
         .unwrap();
 
         let serialized = packet.to_bytes(None).unwrap();
-        assert_eq!("41070000000000000000000000000000000000050019", hex::encode(&serialized));
+        assert_eq!(
+            "41070000000000000000000000000000000000050019",
+            hex::encode(&serialized)
+        );
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
 
         assert_eq!(packet, deserialized);

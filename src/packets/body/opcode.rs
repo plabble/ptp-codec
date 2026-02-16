@@ -31,7 +31,8 @@ mod tests {
             base::PlabblePacketBase,
             body::{opcode::OpCodeRequestBody, request_body::PlabbleRequestBody},
             header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
-            request::PlabbleRequestPacket, response::PlabbleResponsePacket,
+            request::PlabbleRequestPacket,
+            response::PlabbleResponsePacket,
         },
         scripting::opcode_script::{Opcode, OpcodeScript},
     };
@@ -44,7 +45,7 @@ mod tests {
             Opcode::PUSHINT(3),
             Opcode::ADD,
             Opcode::EQ,
-            Opcode::PUSH2([1,2])
+            Opcode::PUSH2([1, 2]),
         ]);
 
         let body = OpCodeRequestBody { script };
@@ -71,7 +72,7 @@ mod tests {
             [body.script]
             instructions = [{ PUSHINT = 5 }, { PUSHINT = 2 }, { PUSHINT = 3 }, "ADD", "EQ", { PUSH2 = "0102" }]
         "#).unwrap();
-        
+
         assert_eq!(request, packet);
 
         let serialized = packet.to_bytes(None).unwrap();
@@ -83,7 +84,8 @@ mod tests {
 
     #[test]
     fn can_serialize_and_deserialize_opcode_response() {
-        let packet: PlabbleResponsePacket = toml::from_str(r#"
+        let packet: PlabbleResponsePacket = toml::from_str(
+            r#"
             version = 1
             
             [header]
@@ -92,7 +94,9 @@ mod tests {
 
             [body]
             result = "0102030405"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let serialized = packet.to_bytes(None).unwrap();
         assert_eq!("010e00070102030405", hex::encode(&serialized));

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use binary_codec::{FromBytes, ToBytes};
+use serde::{Deserialize, Serialize};
 use serde_with::formats::Lowercase;
 use serde_with::hex::Hex;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, TryFromInto};
+use serde_with::{TryFromInto, serde_as};
 
 use crate::scripting::interpreter::ScriptError;
 
@@ -22,7 +22,7 @@ pub enum Opcode {
     FALSE = 0, // Push 0x00 to the stack
     TRUE = 1,  // Push 0x01 to the stack
 
-    PUSH1(u8) = 2,      // Push next byte to the stack
+    PUSH1(u8) = 2, // Push next byte to the stack
     PUSH2(#[serde_as(as = "Hex<Lowercase>")] [u8; 2]) = 3, // Push next 2 bytes to the stack
     PUSH4(#[serde_as(as = "Hex<Lowercase>")] [u8; 4]) = 4, // Push next 4 bytes to the stack
 
@@ -54,7 +54,11 @@ pub enum Opcode {
     } = 7,
 
     // Push dynamic int to the stack
-    PUSHINT(#[dyn_int] #[serde_as(as = "TryFromInto<i64>")] i128) = 8,
+    PUSHINT(
+        #[dyn_int]
+        #[serde_as(as = "TryFromInto<i64>")]
+        i128,
+    ) = 8,
 
     // Push floating point number to the stack. Floats are 64-bit IEEE 754 binary64
     PUSHFLOAT(f64) = 9,

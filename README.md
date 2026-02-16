@@ -364,6 +364,95 @@ Notes:
 - Values in the TOML examples are typically encoded as base64 when represented in text (see `BucketBody` in the crate).
 - When `subscribe` is set the server semantics for update delivery are implementation-dependent (push over the current connection or via separate subscription messages) but should follow the protocol's subscription guarantees.
 
+## Stream
+- **Goal**: _Read from or write (stream) bytes to a slot_ inside a bucket.
+- Implementation: [stream.rs](./src/packets/body/stream.rs)
+
+> Note: Streams operate on a single bucket slot and may require session authentication or bucket permissions depending on the server implementation.
+
+### Stream flow
+1. The client opens a `Stream` request targeting a bucket and a slot (numeric or binary key).
+2. For reads the server returns either the requested byte range or a stream of bytes (implementation-dependent).
+3. For writes the client includes `data` and the server applies/append the bytes and returns the new slot size.
+4. If a `subscribe` flag is set, the server may send updates for the slot until the subscription is cancelled.
+
+### Stream request
+Request header flags:
+- **binary_keys**: Keys in the request are UTF-8 strings instead of numeric slot indices.
+- **subscribe**: Subscribe to changes on the requested slot/range.
+- **range_mode_until**: Treat a single provided range value as an "until" bound.
+- **write_mode**: When set, the request contains `data` to write/append instead of a read.
+
+Request header:
+- **id**: 16-byte bucket identifier (base64url when using TOML).
+
+Request body:
+- **data**: Optional bytes to write (Base64 URL-safe, no padding). Present only when `write_mode` is set.
+- **range**: Either `Numeric(start, from?, to?)` or `Binary(key, from?, to?)` to select the byte range.
+
+Examples (read):
+```toml
+version = 1
+
+[header]
+packet_type = "Stream"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+
+[body]
+# bucket with id AAA.. at slot 7, from byte 08 to byte 0f
+range.Numeric = [7, 8, 0x0f]
+```
+
+Examples (write):
+```toml
+version = 1
+
+[header]
+packet_type = "Stream"
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+binary_keys = true
+write_mode = true
+
+[body]
+data = "1KKeSJOs"     # base64url (no padding)
+range.Binary = ["test"]
+```
+
+### Stream response
+Response header flags:
+- **write_mode**: Indicates this is a write response (no `data` returned, but `new_size`).
+
+Response body:
+- **data**: Present for read responses. Encoded as Base64 URL-safe (no padding).
+- **new_size**: Present for write responses, new slot size as integer.
+
+Example (read response):
+```toml
+version = 1
+
+[header]
+packet_type = "Stream"
+request_counter = 2
+
+[body]
+data = "1KKeSJOs"
+```
+
+Example (write response):
+```toml
+version = 1
+
+[header]
+packet_type = "Stream"
+request_counter = 2
+write_mode = true
+
+[body]
+new_size = 7
+```
+
+> When `data` is present in TOML examples it is the Base64 URL-safe (unpadded) representation used by the codec.
+
 ## Post
 - **Goal**: _Create a new bucket on the server_ ...
 - Implementation: [post.rs](./src/packets/body/post.rs)
@@ -966,27 +1055,27 @@ The bucket key is a 64-byte secret that is derived from the [session key](#sessi
 Every bucket has permissions which are set when creating the bucket (altough they can be changed later).
 Bucket Permissions come in 3 flavours:
 - **public**: everyone on the internet who knows your bucket ID can do this
-- **protected**: only people who are authenticated using [Identity](#TODO) and are on the *access_control_list* can do this
+- **protected**: only people who are authenticated using [Identify](#identify) and are on the *access_control_list* can do this
 - **private**: only people who know the [bucket key](#bucket-key) can do this
 
 The following list of settings/permissions with their default values is supported:
 - **public_read**: (default _true_), allow _everyone_ to [read](#get) slots from this bucket
-- **public_append**: (default _false_), allow _everyone_ to [append](#TODO) a slot to the bucket
-- **public_write**: (default _false_), allow _everyone_ to [update](#TODO) a slot
-- **public_delete**: (default _false_), allow _everyone_ to [delete](#TODO) a slot
-- **public_script_execution**: (default _false_), allow _everyone_ to execute [opcode](#TODO) scripts interacting with this bucket (read/write/append/delete)
+- **public_append**: (default _false_), allow _everyone_ to [append](#put) a slot to the bucket
+- **public_write**: (default _false_), allow _everyone_ to [update](#put) a slot
+- **public_delete**: (default _false_), allow _everyone_ to [delete](#delete) a slot
+- **public_script_execution**: (default _false_), allow _everyone_ to execute [opcode](#opcode) scripts interacting with this bucket (read/write/append/delete)
 - **protected_read**: (default _true_), allow _users on the ACL_ to [read](#get) slots from this bucket
-- **protected_append**: (default _false_), allow _users on the ACL_ to [append](#TODO) a slot to the bucket
-- **protected_write**: (default _false_), allow _users on the ACL_ to [update](#TODO) a slot
-- **protected_delete**: (default _false_), allow _users on the ACL_ to [remove](#TODO) a slot
-- **protected_script_execution**: (default _false_), allow _users on the ACL_ to execute [opcode](#TODO) scripts interacting with this bucket (read/write/append/delete)
-- **protected_bucket_delete**: (default _false_), allow _users on the ACL_ to [delete](#TODO) this bucket
+- **protected_append**: (default _false_), allow _users on the ACL_ to [append](#put) a slot to the bucket
+- **protected_write**: (default _false_), allow _users on the ACL_ to [update](#put) a slot
+- **protected_delete**: (default _false_), allow _users on the ACL_ to [remove](#delete) a slot
+- **protected_script_execution**: (default _false_), allow _users on the ACL_ to execute [opcode](#opcode) scripts interacting with this bucket (read/write/append/delete)
+- **protected_bucket_delete**: (default _false_), allow _users on the ACL_ to [delete](#delete) this bucket
 - **private_read**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [read](#get) slots from this bucket
-- **private_append**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [append](#TODO) a slot to the bucket
-- **private_write**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [update](#TODO) a slot
-- **private_delete**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [remove](#TODO) a slot
-- **private_script_execution**: (default _false_), allow _users owning the [bucket key](#bucket-key)_ to execute [opcode](#TODO) scripts interacting with this bucket (read/write/append/delete)
-- **private_bucket_delete**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [delete](#TODO) this bucket
+- **private_append**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [append](#put) a slot to the bucket
+- **private_write**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [update](#put) a slot
+- **private_delete**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [remove](#delete) a slot
+- **private_script_execution**: (default _false_), allow _users owning the [bucket key](#bucket-key)_ to execute [opcode](#opcode) scripts interacting with this bucket (read/write/append/delete)
+- **private_bucket_delete**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [delete](#delete) this bucket
 - **deny_existence**: (default: _false_) If public read is off and a user queries this bucket, let the server tell them this bucket does not exist
 
 ### Plabble-over-HTTPS (PoH)
