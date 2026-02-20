@@ -1,4 +1,4 @@
-use crate::default_true;
+use crate::core::default_true;
 use binary_codec::{FromBytes, SerializerConfig, ToBytes};
 use serde::{Deserialize, Serialize};
 

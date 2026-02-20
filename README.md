@@ -1318,3 +1318,129 @@ When refered to a **user id**, actually the 16-byte certificate ID of the identi
 It is needed to have identity certificates to be able to verify if someone is authorized to have access to certain functionalities on a bucket when the bucket permissions are set to protected.
 
 A user can request as many identities as they want using the [Register](#register) request. When a [Session](#session) is established, the client can use the [Identify](#identify) request to prove ownership of an identity by sending a certificate chain and signatures. The server will verify the signatures and if they are valid, the identity will be bound to the session so that the user can access protected functionalities on buckets where they are on the ACL.
+
+## FFI examples
+
+```csharp
+using System.Runtime.InteropServices;
+using System.Text;
+// ReSharper disable InconsistentNaming
+
+namespace FfiDemo;
+
+public static partial class PlabbleCodec
+{
+    internal enum FfiStatus : int
+    {
+        Ok = 0,
+        NullPointer = 1,
+        InvalidInput = 2,
+        InputParsingFailed = 3,
+        Error = 255
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct FfiBytes
+    {
+        public IntPtr buff;
+        public UIntPtr len;
+        
+        public byte[] GetBytes()
+        {
+            if (buff == IntPtr.Zero || len == 0) return Array.Empty<byte>();
+            var arr = new byte[len];
+            Marshal.Copy(buff, arr, 0, (int)len);
+            free_bytes(this);
+            return arr;
+        }
+
+        public string GetString()
+        {
+            return Encoding.UTF8.GetString(GetBytes());
+        }
+
+        public static FfiBytes Create(byte[] data)
+        {
+            var ptr = Marshal.AllocHGlobal(data.Length);
+            Marshal.Copy(data, 0, ptr, data.Length);
+            return new FfiBytes { buff = ptr, len = (UIntPtr)data.Length };
+        }
+
+        public void Free()
+        {
+            Marshal.FreeHGlobal(buff);
+        }
+    }
+    
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct FfiBytesOutput
+    {
+        public FfiStatus status;
+        public FfiBytes data;
+    }
+    
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct FfiStringOutput
+    {
+        public FfiStatus status;
+        public IntPtr data;
+
+        public string? GetString()
+        {
+            if (data == IntPtr.Zero) return null;
+            var str = Marshal.PtrToStringUTF8(data);
+            free_string(data);
+            return str;
+        }
+    }
+    
+    private const string LIB = "plabble_codec";
+
+    [LibraryImport(LIB, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial string version();
+
+    [LibraryImport(LIB, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial FfiBytesOutput encode_packet(
+        string input,
+        [MarshalAs(UnmanagedType.Bool)] bool is_request
+    );
+    
+    [LibraryImport(LIB, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial FfiStringOutput decode_packet(
+        FfiBytes input,
+        [MarshalAs(UnmanagedType.Bool)] bool is_request
+    );
+
+    [LibraryImport(LIB)]
+    internal static partial void free_bytes(FfiBytes data);
+
+    [LibraryImport(LIB)]
+    internal static partial void free_string(IntPtr s);
+
+    public static string Version => version();
+
+    public static byte[] EncodePacket(string toml, bool isRequest)
+    {
+        var res = encode_packet(toml, isRequest);
+        return res.status != FfiStatus.Ok
+            ? throw new Exception($"{res.status}: {res.data.GetString()}") 
+            : res.data.GetBytes();
+    }
+    
+    public static string DecodePacket(byte[] data, bool isRequest)
+    {
+        var bytes = FfiBytes.Create(data);
+        try
+        {
+            var res = decode_packet(bytes, isRequest);
+            return res.status != FfiStatus.Ok
+                ? throw new Exception($"{res.status}: {res.GetString()}")
+                : res.GetString()!;
+        }
+        finally
+        {
+            bytes.Free();
+        }
+    }
+}
+```

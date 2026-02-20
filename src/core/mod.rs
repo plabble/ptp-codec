@@ -3,3 +3,8 @@ mod datetime;
 
 pub use bucket_id::BucketId;
 pub use datetime::PlabbleDateTime;
+
+/// Default to true for serde boolean fields
+pub fn default_true() -> bool {
+    true
+}

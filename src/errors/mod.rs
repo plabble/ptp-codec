@@ -1,8 +1,9 @@
 use binary_codec::DeserializationError as BinaryDeserializationError;
 use binary_codec::SerializationError as BinarySerializationError;
+use serde::Serialize;
 
 /// Plabble Serialization Error (based on binary_codec errors)
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum SerializationError {
     /// Value is out of bounds (value, min, max)
     ValueOutOfBounds(i32, i32, i32),
@@ -41,7 +42,7 @@ impl From<BinarySerializationError> for SerializationError {
 }
 
 /// Plabble Deserialization Error (based on binary_codec errors)
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum DeserializationError {
     /// Not enough bytes (bytes missing)
     NotEnoughBytes(usize),
