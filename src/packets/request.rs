@@ -242,7 +242,9 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Identify => {
                 PlabbleRequestBody::Identify(raw.body.deserialize_into().unwrap())
             }
-            RequestPacketType::Proxy { .. } => todo!(),
+            RequestPacketType::Proxy { .. } => {
+                PlabbleRequestBody::Proxy(raw.body.deserialize_into().unwrap())
+            },
             RequestPacketType::Custom { .. } => {
                 PlabbleRequestBody::Custom(raw.body.deserialize_into().unwrap())
             }

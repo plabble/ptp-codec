@@ -19,7 +19,7 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **0** [CERTIFICATE](#certificate)
 - **1** [SESSION](#session)
 - **2** [GET](#get)
-- **3** STREAM
+- **3** [STREAM](#stream)
 - **4** [POST](#post)
 - **5** [PATCH](#patch)
 - **6** [PUT](#put)
@@ -28,7 +28,7 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **9** [UNSUBSCRIBE](#unsubscribe)
 - **10** [REGISTER](#register)
 - **11** [IDENTIFY](#identify)
-- **12** PROXY
+- **12** [PROXY](#proxy)
 - **13** [CUSTOM](#custom)
 - **14** [OPCODE](#opcode)
 - **15** [ERROR](#error)
@@ -856,6 +856,161 @@ uri = "plabble:plabble.org/certs/@maus"
 ### Identify response
 Empty response body on success.
 
+## Proxy
+- **Goal**: _Establish secure proxy tunnels_ with layered encryption through multiple hops or send packets through existing tunnels.
+- Implementation: [proxy.rs](./src/packets/body/proxy.rs)
+
+> Warning: Proxy connections use onion-style layered encryption. Each hop only knows the previous and next hop. The server MUST validate signatures from intermediate hops during tunnel initialization to prevent man-in-the-middle attacks.
+
+### Proxy flow
+
+**Initialize a new tunnel:**
+1. The client sends a `Proxy` request with `init_session=true` to the first server, containing `target`, `hop_count`, optional `via` addresses, and public/encapsulation keys for each algorithm in `crypto_settings`.
+2. The first server performs key exchange with the client, decrements `hop_count` by 1 (removing itself from the route), and forwards the request to the next hop.
+3. If `select_random_hops=true`, each server selects a random next hop; if `false`, the next hop is taken from the `via` list.
+4. Each subsequent hop repeats this process: perform key exchange, decrement hop count, forward to next hop.
+5. When the target is reached (hop_count = 0), it generates a `tunnel_id` and sends the response back through the same route.
+6. Each hop adds its key exchange response and signature to the response as it travels back.
+7. The client receives the complete response with a `tunnel_id` and information about all hops (keys and signatures).
+8. The client now has shared secrets with each hop and can send layered-encrypted (onion) packets through the tunnel.
+
+**Send packets through an existing tunnel:**
+1. The client encrypts the packet in layers (once for each hop, innermost for target) and sends it in a `Proxy` request with the `tunnel_id`.
+2. Each hop decrypts one layer and forwards the packet to the next hop.
+3. The target server decrypts the final layer, processes the packet, and sends a response.
+4. The response travels back through the tunnel, with each hop adding one encryption layer.
+5. The client receives the layered-encrypted response and decrypts all layers to read the final response.
+
+### Proxy request (initialize tunnel)
+Request header flags:
+- **init_session**: REQUIRED, set to `true` to initialize a new tunnel.
+- **keep_connection**: request that the server keeps the tunnel connection alive for future packets.
+- **select_random_hops**: if `true`, the server selects random intermediate hops. If `false`, the client specifies hops in the `via` field.
+
+Request body (Initialize variant):
+- **target**: `String` — target server/service to connect to. REQUIRED.
+- **hop_count**: `u8` — number of intermediate hops to use for the tunnel (length selector for `via` array). REQUIRED.
+- **via**: `Vec<String>` — addresses of specific hops to use in the route. REQUIRED when `select_random_hops=false`, omitted otherwise.
+- **keys**: `Vec<KeyExhangeRequest>` — public keys or encapsulation keys for creating shared secrets with each hop (multi-enum). Algorithms follow `crypto_settings`. REQUIRED.
+
+Example (with specific hops):
+```toml
+version = 1
+
+[header]
+packet_type = "Proxy"
+init_session = true
+keep_connection = true
+select_random_hops = false
+
+[body.Initialize]
+target = "chat.plabble.org"
+hop_count = 2
+via = ["relay1.plabble.org", "relay2.plabble.org"]
+
+[[body.Initialize.keys]]
+X25519 = "gsJkReF4u6V_XUSrsjZoj_j_WorHelUUt-s4Se0-0Mk"
+```
+
+Example (with random hops):
+```toml
+version = 1
+
+[header]
+packet_type = "Proxy"
+init_session = true
+select_random_hops = true
+
+[body.Initialize]
+target = "chat.plabble.org"
+hop_count = 3
+
+[[body.Initialize.keys]]
+X25519 = "gsJkReF4u6V_XUSrsjZoj_j_WorHelUUt-s4Se0-0Mk"
+```
+
+### Proxy response (initialize tunnel)
+Response header flags:
+- **init_session**: set to `true` to indicate this is a response to tunnel initialization.
+
+Response body (Initialize variant):
+- **tunnel_id**: `u32` — unique identifier for the newly created tunnel. Use this to send packets through the tunnel.
+- **hops**: `HashMap<String, HopInfo>` — information about each hop in the route, mapping hop address to `HopInfo`.
+
+**HopInfo structure:**
+- **keys**: `Vec<KeyExhangeResponse>` — public keys or encapsulated secrets from the hop for deriving shared secrets (multi-enum).
+- **signatures**: `Vec<CryptoSignature>` — signatures from the hop signing the request public key (multi-enum).
+
+Example:
+```toml
+version = 1
+
+[header]
+packet_type = "Proxy"
+init_session = true
+request_counter = 1
+
+[body.Initialize]
+tunnel_id = 42
+
+[[body.Initialize.hops.relay1.keys]]
+X25519 = "EMDdCLfuUPWbJPo-V0PaVKu6X7-hkHT8LNKkNSs-L4w"
+
+[[body.Initialize.hops.relay1.signatures]]
+Ed25519 = "Ov9hsf9Fua0sR7IvO_D5liZq1l2sRomv6hEymxpZn_RFVfiF3aXjLwKCA9RKrY-KPbvvvRTEYKUEMDUIQ2iOow"
+
+[[body.Initialize.hops.relay2.keys]]
+X25519 = "ftN8VagVNUBnazUHWMwz2A7fANme6lrHmxg82jQw-L8"
+
+[[body.Initialize.hops.relay2.signatures]]
+Ed25519 = "5vER2UMQqnamSe8hTt-91snRO34KE51f4-ijBgcGiR6PmvFDwEF9nbgUj9JqkrpGMbPsq_-H-XULsGu06XUonw"
+```
+
+### Proxy request (send through tunnel)
+Request header flags:
+- **init_session**: NOT set (or `false`) for sending packets through an existing tunnel.
+- **keep_connection**: request that the server keeps the tunnel connection alive after this packet.
+
+Request body (Tunnel variant):
+- **tunnel_id**: `u32` — identifier of the tunnel to use. REQUIRED.
+- **packet**: `Vec<u8>` — encrypted raw packet data to send through the tunnel. Represented as base64url (no padding) in TOML. REQUIRED.
+
+Example:
+```toml
+version = 1
+
+[header]
+packet_type = "Proxy"
+keep_connection = true
+
+[body.Tunnel]
+tunnel_id = 42
+packet = "9V0FzpQiAQIDBAU"
+```
+
+### Proxy response (send through tunnel)
+Response header flags:
+- **init_session**: NOT set (or `false`) to indicate this is a response to a tunneled packet.
+- **request_counter**: standard response counter when replying in a session.
+
+Response body (Tunnel variant):
+- **tunnel_id**: `u32` — identifier of the tunnel the packet was sent through.
+- **packet**: `Vec<u8>` — encrypted raw response data from the target server. Represented as base64url (no padding) in TOML.
+
+Example:
+```toml
+version = 1
+
+[header]
+packet_type = "Proxy"
+request_counter = 5
+
+[body.Tunnel]
+tunnel_id = 42
+packet = "9V0FzpQiZm9vYmFy"
+```
+
+
 ## Custom
 - **Goal**: _Allow for custom packet types_ that are not defined in the Plabble specification but still follow the general packet structure and can be encrypted and signed. This packets are used by so-called **sub-protocols**.
 - Implementation: [custom.rs](./src/packets/body/custom.rs)
@@ -917,13 +1072,13 @@ protocol = 42
 data = "AQIDBAU"
 ```
 
-## OPCODE
+## Opcode
 - **Goal**: Execute a small, sandboxed server-side script (an OPCODE) and return its result.
 - Implementation: [opcode.rs](./src/packets/body/opcode.rs)
 
 > Warning: OPCODE execution can be dangerous. Servers MUST enforce strict limits (CPU, memory, allowed operations) and only enable `allow_eval` or `allow_bucket_operations` when explicitly permitted by policy.
 
-### OPCODE flow
+### Opcode flow
 1. The client sends an `Opcode` request containing a script to execute and optional flags requesting capabilities.
 2. The server validates the script and requested flags, enforces execution limits and permissions, then executes the script in a sandboxed environment.
 3. The server returns an `Opcode` response containing an optional binary `result` produced by the script or an [Error](#error) packet on failure.

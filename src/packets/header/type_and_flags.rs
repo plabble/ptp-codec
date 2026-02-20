@@ -178,12 +178,14 @@ pub enum RequestPacketType {
     /// - select_random_hops: Request that the server selects random hops for the proxy route.
     Proxy {
         #[serde(default)]
+        #[toggles("init_session")]
         init_session: bool,
 
         #[serde(default)]
         keep_connection: bool,
 
         #[serde(default)]
+        #[toggles("random_hops")]
         select_random_hops: bool,
     } = 12,
     /// Custom packet type for supporting sub-protocols
@@ -260,10 +262,11 @@ pub enum ResponsePacketType {
     /// Response to an identify request.
     Identify = 11,
     /// Response to a proxy request.
-    /// - include_hop_info: Response includes information about the selected hops.
+    /// - init_session: Indicates that this is a response to an initial proxy session setup request.
     Proxy {
         #[serde(default)]
-        include_hop_info: bool,
+        #[toggles("init_session")]
+        init_session: bool
     } = 12,
     /// Custom packet type for supporting sub-protocols
     Custom {

@@ -2,16 +2,7 @@ use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::body::{
-    bucket::{BucketQuery, PutRequestBody},
-    certificate::CertificateRequestBody,
-    custom::CustomBody,
-    identify::IdentifyRequestBody,
-    opcode::OpCodeRequestBody,
-    patch::PatchRequestBody,
-    post::PostRequestBody,
-    register::RegisterRequestBody,
-    session::SessionRequestBody,
-    stream::StreamRequestBody,
+    bucket::{BucketQuery, PutRequestBody}, certificate::CertificateRequestBody, custom::CustomBody, identify::IdentifyRequestBody, opcode::OpCodeRequestBody, patch::PatchRequestBody, post::PostRequestBody, proxy::ProxyRequestBody, register::RegisterRequestBody, session::SessionRequestBody, stream::StreamRequestBody
 };
 
 /// An enumeration representing the different types of request bodies
@@ -52,7 +43,7 @@ pub enum PlabbleRequestBody {
     Unsubscribe(BucketQuery) = 9,
     Register(RegisterRequestBody) = 10,
     Identify(IdentifyRequestBody) = 11,
-    Proxy = 12,
+    Proxy(#[variant_by = "init_session"] ProxyRequestBody) = 12,
     Custom(CustomBody) = 13,
     Opcode(OpCodeRequestBody) = 14,
 }

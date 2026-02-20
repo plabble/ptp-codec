@@ -198,7 +198,9 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
                 PlabbleResponseBody::Register(raw.body.deserialize_into().unwrap())
             }
             ResponsePacketType::Identify => PlabbleResponseBody::Identity,
-            ResponsePacketType::Proxy { .. } => todo!(),
+            ResponsePacketType::Proxy { .. } => {
+                PlabbleResponseBody::Proxy(raw.body.deserialize_into().unwrap())
+            },
             ResponsePacketType::Custom { .. } => {
                 PlabbleResponseBody::Custom(raw.body.deserialize_into().unwrap())
             }
