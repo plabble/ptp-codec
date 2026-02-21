@@ -1,3 +1,4 @@
 /target
 /build
+/pkg
 out.rs

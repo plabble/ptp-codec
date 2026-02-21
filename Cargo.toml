@@ -37,13 +37,21 @@ x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 
 # Dependency fuckup with rand...
 rand_core_064 = { package = "rand_core", version = "0.6.4", features = ["getrandom"]}
+getrandom = { version = "0.2", optional = true, features = ["js"] }
+
+# WASM dependencies
+wasm-bindgen = { version = "0.2.110", optional = true }
+js-sys = { version = "0.3.87", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [features]
-default = ["blake-3", "pqc-lite", "pqc-heavy", "with-toml"]
+default = ["blake-3", "pqc-lite", "pqc-heavy", "with-toml", "wasm"]
 blake-3 = ["blake3"]
 pqc-lite = ["ml-dsa", "ml-kem"]
 with-json = ["serde_json"]
 with-toml = ["toml"]
+wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook", "getrandom", "with-json"]
+ffi = []
 pqc-heavy = []
 
 [dev-dependencies]
@@ -54,3 +62,5 @@ env_logger = "^0.11"
 
 [profile.release]
 panic = "abort"
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"

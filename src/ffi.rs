@@ -1,9 +1,9 @@
 use std::{
     ffi::{CStr, CString},
+    fmt::Debug,
     os::raw::c_char,
     slice,
     sync::Mutex,
-    fmt::Debug,
 };
 
 use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
@@ -19,7 +19,7 @@ use crate::{
 
 pub type LookupBytesCallback = unsafe extern "C" fn(*const u8, *mut u8) -> bool;
 
-// Global callback storage
+// Global storage/settings
 static GLOBAL_GET_BUCKET_KEY: Mutex<Option<LookupBytesCallback>> = Mutex::new(None);
 static GLOBAL_GET_PSK: Mutex<Option<LookupBytesCallback>> = Mutex::new(None);
 
@@ -162,8 +162,22 @@ pub extern "C" fn encode_packet(
         match cstr.to_str() {
             Ok(s) => {
                 let packet_result = if is_request {
+                    #[cfg(feature = "with-json")]
+                    {
+                        serde_json::from_str::<PlabbleRequestPacket>(s)
+                            .map(|p| p.to_bytes(config.as_mut()))
+                    }
+
+                    #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
                     toml::from_str::<PlabbleRequestPacket>(s).map(|p| p.to_bytes(config.as_mut()))
                 } else {
+                    #[cfg(feature = "with-json")]
+                    {
+                        serde_json::from_str::<PlabbleResponsePacket>(s)
+                            .map(|p| p.to_bytes(config.as_mut()))
+                    }
+
+                    #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
                     toml::from_str::<PlabbleResponsePacket>(s).map(|p| p.to_bytes(config.as_mut()))
                 };
 
@@ -181,15 +195,12 @@ pub extern "C" fn encode_packet(
 
     // Increment counter on the owned Box and return ownership
     if let Some(mut ctx) = context {
-        if is_request {
-            ctx.client_counter += 1;
-        } else {
-            ctx.server_counter += 1;
+        if result.is_ok() {
+            ctx.increment(is_request);
         }
-
         std::mem::forget(ctx);
     }
-    
+
     result
 }
 
@@ -215,8 +226,20 @@ pub extern "C" fn decode_packet(
 
     let bytes = unsafe { slice::from_raw_parts(input.buff, input.len) };
     let packet_result = if is_request {
+        #[cfg(feature = "with-json")]
+        {
+            PlabbleRequestPacket::from_bytes(bytes, config.as_mut()).map(|p| serde_json::to_string(&p))
+        }
+
+        #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
         PlabbleRequestPacket::from_bytes(bytes, config.as_mut()).map(|p| toml::to_string(&p))
     } else {
+        #[cfg(feature = "with-json")]
+        {
+            PlabbleResponsePacket::from_bytes(bytes, config.as_mut()).map(|p| serde_json::to_string(&p))
+        }
+        
+        #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
         PlabbleResponsePacket::from_bytes(bytes, config.as_mut()).map(|p| toml::to_string(&p))
     };
 
@@ -230,12 +253,9 @@ pub extern "C" fn decode_packet(
 
     // Return ownership back to the same pointer address
     if let Some(mut ctx) = context {
-        if is_request {
-            ctx.client_counter += 1;
-        } else {
-            ctx.server_counter += 1;
+        if result.is_ok() {
+            ctx.increment(is_request);
         }
-
         std::mem::forget(ctx);
     }
 

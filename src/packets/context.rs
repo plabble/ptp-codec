@@ -55,6 +55,15 @@ impl PlabbleConnectionContext {
         }
     }
 
+    /// Increment client/server counter based on packet type
+    pub fn increment(&mut self, is_request: bool) {
+        if is_request {
+            self.client_counter = self.client_counter.wrapping_add(1);
+        } else {
+            self.server_counter = self.server_counter.wrapping_add(1);
+        }
+    }
+
     /// Indicates if current context crypto settings require blake3 hashing (for MAC and key derivation)
     pub fn use_blake3(&self) -> bool {
         self.crypto_settings.as_ref().is_some_and(|s| s.use_blake3)
