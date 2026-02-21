@@ -142,6 +142,11 @@ pub fn decode_packet(
 }
 
 #[wasm_bindgen]
+pub fn free_context(_context: ConnectionContext) {
+    // Context will be dropped when this function is called, freeing resources
+}
+
+#[wasm_bindgen]
 pub fn set_get_bucket_key_callback(cb: Function) {
     *GLOBAL_GET_BUCKET_KEY.lock().unwrap() = Some(cb);
 }
