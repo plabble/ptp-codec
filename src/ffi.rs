@@ -1,12 +1,51 @@
 use std::{
     ffi::{CStr, CString},
     os::raw::c_char,
+    slice,
+    sync::Mutex,
+    fmt::Debug,
 };
 
-use binary_codec::{BinaryDeserializer, BinarySerializer};
+use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 use serde::Serialize;
 
-use crate::packets::{request::PlabbleRequestPacket, response::PlabbleResponsePacket};
+use crate::{
+    core::BucketId,
+    packets::{
+        context::PlabbleConnectionContext, request::PlabbleRequestPacket,
+        response::PlabbleResponsePacket,
+    },
+};
+
+pub type LookupBytesCallback = unsafe extern "C" fn(*const u8, *mut u8) -> bool;
+
+// Global callback storage
+static GLOBAL_GET_BUCKET_KEY: Mutex<Option<LookupBytesCallback>> = Mutex::new(None);
+static GLOBAL_GET_PSK: Mutex<Option<LookupBytesCallback>> = Mutex::new(None);
+
+// Wrapper functions that call the global callbacks
+fn call_global_bucket_key(id: &BucketId) -> Option<[u8; 32]> {
+    let guard = GLOBAL_GET_BUCKET_KEY.lock().unwrap();
+    if let Some(cb) = *guard {
+        let bytes = id.to_bytes(None::<&mut SerializerConfig<()>>).unwrap();
+        let mut output = [0u8; 32];
+        let res = unsafe { cb(bytes.as_ptr(), output.as_mut_ptr()) };
+        if res { Some(output) } else { None }
+    } else {
+        None
+    }
+}
+
+fn call_global_psk(id: &[u8; 12]) -> Option<[u8; 64]> {
+    let guard = GLOBAL_GET_PSK.lock().unwrap();
+    if let Some(cb) = *guard {
+        let mut output = [0u8; 64];
+        let res = unsafe { cb(id.as_ptr(), output.as_mut_ptr()) };
+        if res { Some(output) } else { None }
+    } else {
+        None
+    }
+}
 
 #[repr(C)]
 pub enum FfiStatus {
@@ -46,13 +85,25 @@ impl FfiBytesOutput {
         }
     }
 
-    pub fn error<T: Serialize>(data: T) -> Self {
-        let mut bytes = toml::to_string(&data).unwrap();
+    pub fn error<T: Serialize + Debug>(data: T) -> Self {
+        let mut bytes = format!("{:?}", data).into_bytes();
         let len = bytes.len();
         let buff = bytes.as_mut_ptr();
         std::mem::forget(bytes);
         Self {
             status: FfiStatus::Error,
+            data: FfiBytes { buff, len },
+        }
+    }
+
+    pub fn new(mut data: Vec<u8>) -> Self {
+        let buff = data.as_mut_ptr();
+        let len = data.len();
+
+        std::mem::forget(data);
+
+        FfiBytesOutput {
+            status: FfiStatus::Ok,
             data: FfiBytes { buff, len },
         }
     }
@@ -66,10 +117,16 @@ impl FfiStringOutput {
         }
     }
 
-    pub fn error<T: Serialize>(data: T) -> Self {
-        let s = toml::to_string(&data).unwrap();
+    pub fn error<T: Serialize + Debug>(data: T) -> Self {
         Self {
             status: FfiStatus::Error,
+            data: CString::new(format!("{:?}", &data)).unwrap().into_raw(),
+        }
+    }
+
+    pub fn new(s: String) -> Self {
+        Self {
+            status: FfiStatus::Ok,
             data: CString::new(s).unwrap().into_raw(),
         }
     }
@@ -81,34 +138,38 @@ pub extern "C" fn version() -> *const c_char {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn encode_packet(input: *const c_char, is_request: bool) -> FfiBytesOutput {
+pub extern "C" fn encode_packet(
+    input: *const c_char,
+    is_request: bool,
+    context: *mut PlabbleConnectionContext,
+) -> FfiBytesOutput {
     if input.is_null() {
         return FfiBytesOutput::fail(FfiStatus::NullPointer);
     }
 
-    unsafe {
+    let context = if context.is_null() {
+        None
+    } else {
+        Some(unsafe { Box::from_raw(context) })
+    };
+
+    let mut config = context
+        .as_ref()
+        .map(|ctx| SerializerConfig::new(Some(*ctx.clone())));
+
+    let result = unsafe {
         let cstr = CStr::from_ptr(input);
         match cstr.to_str() {
             Ok(s) => {
                 let packet_result = if is_request {
-                    toml::from_str::<PlabbleRequestPacket>(s).map(|p| p.to_bytes(None))
+                    toml::from_str::<PlabbleRequestPacket>(s).map(|p| p.to_bytes(config.as_mut()))
                 } else {
-                    toml::from_str::<PlabbleResponsePacket>(s).map(|p| p.to_bytes(None))
+                    toml::from_str::<PlabbleResponsePacket>(s).map(|p| p.to_bytes(config.as_mut()))
                 };
 
                 match packet_result {
                     Ok(serialization_result) => match serialization_result {
-                        Ok(mut bytes) => {
-                            let buff = bytes.as_mut_ptr();
-                            let len = bytes.len();
-
-                            std::mem::forget(bytes);
-
-                            FfiBytesOutput {
-                                status: FfiStatus::Ok,
-                                data: FfiBytes { buff, len },
-                            }
-                        }
+                        Ok(bytes) => FfiBytesOutput::new(bytes),
                         Err(e) => FfiBytesOutput::error(e),
                     },
                     Err(_) => FfiBytesOutput::fail(FfiStatus::InputParsingFailed),
@@ -116,36 +177,63 @@ pub extern "C" fn encode_packet(input: *const c_char, is_request: bool) -> FfiBy
             }
             Err(_) => FfiBytesOutput::fail(FfiStatus::InvalidInput),
         }
+    };
+
+    // Increment counter on the owned Box and return ownership
+    if let Some(mut ctx) = context {
+        if is_request {
+            ctx.client_counter += 1;
+        } else {
+            ctx.server_counter += 1;
+        }
+
+        std::mem::forget(ctx);
     }
+    
+    result
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn decode_packet(input: FfiBytes, is_request: bool) -> FfiStringOutput {
+pub extern "C" fn decode_packet(
+    input: FfiBytes,
+    is_request: bool,
+    context: *mut PlabbleConnectionContext,
+) -> FfiStringOutput {
     if input.buff.is_null() || input.len == 0 {
         return FfiStringOutput::fail(FfiStatus::NullPointer);
     }
 
-    unsafe {
-        let bytes = std::slice::from_raw_parts(input.buff, input.len);
-        let packet_result = if is_request {
-            PlabbleRequestPacket::from_bytes(bytes, None).map(|p| toml::to_string(&p))
-        } else {
-            PlabbleResponsePacket::from_bytes(bytes, None).map(|p| toml::to_string(&p))
-        };
+    let context = if context.is_null() {
+        None
+    } else {
+        Some(unsafe { Box::from_raw(context) })
+    };
 
-        match packet_result {
-            Ok(serialization_result) => match serialization_result {
-                Ok(str) => {
-                    FfiStringOutput {
-                        status: FfiStatus::Ok,
-                        data: CString::new(str).unwrap().into_raw(),
-                    }
-                }
-                Err(_) => FfiStringOutput::fail(FfiStatus::InputParsingFailed),
-            },
-            Err(e) => FfiStringOutput::error(e),
-        }
+    let mut config = context
+        .as_ref()
+        .map(|ctx| SerializerConfig::new(Some(*ctx.clone())));
+
+    let bytes = unsafe { slice::from_raw_parts(input.buff, input.len) };
+    let packet_result = if is_request {
+        PlabbleRequestPacket::from_bytes(bytes, config.as_mut()).map(|p| toml::to_string(&p))
+    } else {
+        PlabbleResponsePacket::from_bytes(bytes, config.as_mut()).map(|p| toml::to_string(&p))
+    };
+
+    let result = match packet_result {
+        Ok(serialization_result) => match serialization_result {
+            Ok(str) => FfiStringOutput::new(str),
+            Err(_) => FfiStringOutput::fail(FfiStatus::InputParsingFailed),
+        },
+        Err(e) => FfiStringOutput::error(e),
+    };
+
+    // Return ownership back to the same pointer address
+    if let Some(ctx) = context {
+        std::mem::forget(ctx);
     }
+
+    result
 }
 
 #[unsafe(no_mangle)]
@@ -168,5 +256,41 @@ pub extern "C" fn free_string(s: *mut c_char) {
     unsafe {
         // Reconstruct the CString and drop it to free the memory.
         let _ = CString::from_raw(s);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn new_connection_context(
+    get_bucket_key: Option<LookupBytesCallback>,
+    get_psk: Option<LookupBytesCallback>,
+) -> *mut PlabbleConnectionContext {
+    // Set global callbacks
+    if let Some(cb) = get_bucket_key {
+        *GLOBAL_GET_BUCKET_KEY.lock().unwrap() = Some(cb);
+    }
+    if let Some(cb) = get_psk {
+        *GLOBAL_GET_PSK.lock().unwrap() = Some(cb);
+    }
+
+    let mut ffi_context = PlabbleConnectionContext::new();
+
+    // Set function pointers that call the global callbacks
+    if get_bucket_key.is_some() {
+        ffi_context.get_bucket_key = Some(call_global_bucket_key);
+    }
+    if get_psk.is_some() {
+        ffi_context.get_psk = Some(call_global_psk);
+    }
+
+    Box::into_raw(Box::new(ffi_context))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn free_connection_context(ctx: *mut PlabbleConnectionContext) {
+    if ctx.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = Box::from_raw(ctx);
     }
 }

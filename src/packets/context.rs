@@ -6,7 +6,7 @@ use crate::{
 
 /// Connection context for cryptography, counters, session etc.
 /// This object is used for handling MAC, encryption, key derivation etc.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PlabbleConnectionContext {
     /// Get bucket key by bucket ID
     pub get_bucket_key: Option<fn(&BucketId) -> Option<[u8; 32]>>,
