@@ -229,7 +229,13 @@ pub extern "C" fn decode_packet(
     };
 
     // Return ownership back to the same pointer address
-    if let Some(ctx) = context {
+    if let Some(mut ctx) = context {
+        if is_request {
+            ctx.client_counter += 1;
+        } else {
+            ctx.server_counter += 1;
+        }
+
         std::mem::forget(ctx);
     }
 
@@ -260,29 +266,11 @@ pub extern "C" fn free_string(s: *mut c_char) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn new_connection_context(
-    get_bucket_key: Option<LookupBytesCallback>,
-    get_psk: Option<LookupBytesCallback>,
-) -> *mut PlabbleConnectionContext {
-    // Set global callbacks
-    if let Some(cb) = get_bucket_key {
-        *GLOBAL_GET_BUCKET_KEY.lock().unwrap() = Some(cb);
-    }
-    if let Some(cb) = get_psk {
-        *GLOBAL_GET_PSK.lock().unwrap() = Some(cb);
-    }
-
-    let mut ffi_context = PlabbleConnectionContext::new();
-
-    // Set function pointers that call the global callbacks
-    if get_bucket_key.is_some() {
-        ffi_context.get_bucket_key = Some(call_global_bucket_key);
-    }
-    if get_psk.is_some() {
-        ffi_context.get_psk = Some(call_global_psk);
-    }
-
-    Box::into_raw(Box::new(ffi_context))
+pub extern "C" fn new_connection_context() -> *mut PlabbleConnectionContext {
+    let mut context = PlabbleConnectionContext::new();
+    context.get_bucket_key = Some(call_global_bucket_key);
+    context.get_psk = Some(call_global_psk);
+    Box::into_raw(Box::new(context))
 }
 
 #[unsafe(no_mangle)]
@@ -293,4 +281,14 @@ pub extern "C" fn free_connection_context(ctx: *mut PlabbleConnectionContext) {
     unsafe {
         let _ = Box::from_raw(ctx);
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn set_get_bucket_key_callback(cb: LookupBytesCallback) {
+    *GLOBAL_GET_BUCKET_KEY.lock().unwrap() = Some(cb);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn set_get_psk_callback(cb: LookupBytesCallback) {
+    *GLOBAL_GET_PSK.lock().unwrap() = Some(cb);
 }
