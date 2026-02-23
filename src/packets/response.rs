@@ -5,11 +5,10 @@ use crate::{
     crypto::calculate_mac,
     errors::{DeserializationError, SerializationError},
     packets::{
-        base::PlabblePacketBase,
+        base::{PlabblePacketBase, read_base_packet, write_base_packet},
         body::response_body::PlabbleResponseBody,
         context::PlabbleConnectionContext,
-        header::{response_header::PlabbleResponseHeader, type_and_flags::ResponsePacketType},
-        read_base_packet, write_base_packet,
+        header::{response_header::PlabbleResponseHeader, type_and_flags::ResponsePacketType}
     },
 };
 

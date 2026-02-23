@@ -75,7 +75,6 @@ impl ConnectionContext {
         let mut context = PlabbleConnectionContext::new();
         context.get_bucket_key = Some(call_global_bucket_key);
         context.get_psk = Some(call_global_psk);
-        
         Self(context)
     }
 }
@@ -140,6 +139,8 @@ pub fn decode_packet(
 
     res
 }
+
+/* TODO: both here and in FFI code, key_exchange methods with KeyExchange object and bindings */
 
 #[wasm_bindgen]
 pub fn free_context(_context: ConnectionContext) {
