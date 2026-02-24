@@ -6,7 +6,7 @@ use serde_with::serde_as;
 
 /// Request body for stream operations, which can be either read or write (append) operations on a slot.
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct StreamRequestBody {
     /// Optional data to be written/appended to the slot, present only in write mode
     #[serde(default)]
@@ -23,7 +23,7 @@ pub struct StreamRequestBody {
 
 /// Response body for stream operations, which can include either the new size of the slot (for writes) or the data read from the slot (for reads).
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct StreamResponseBody {
     /// Optional new size of the slot after a write operation, present only in write mode
     #[serde(default)]
@@ -39,7 +39,7 @@ pub struct StreamResponseBody {
 }
 
 /// Range of bytes within a slot to be streamed. Can be binary or numeric depending on the slot type
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 #[no_discriminator]
 pub enum SlotRange {
     Numeric(

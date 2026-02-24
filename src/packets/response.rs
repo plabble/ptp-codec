@@ -19,7 +19,7 @@ use crate::{
 /// - `base`: The base packet information common to all Plabble packets (both requests and responses).
 /// - `header`: The request-specific header containing metadata.
 /// - `body`: The response-specific body, whose structure depends on the packet type.
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct PlabbleResponsePacket {
     /// The base packet information common to all Plabble packets.
     #[serde(flatten)]
@@ -288,7 +288,7 @@ mod tests {
         )
         .unwrap();
 
-        let plain = "010f0001000103";
+        let plain = "010f0001010103";
         let mac = "b7fbd584e891fc4af0499fbfdbfda11c";
 
         let mut context = PlabbleConnectionContext::new();
@@ -317,7 +317,7 @@ mod tests {
         let encrypted = response.to_bytes(Some(&mut config)).unwrap();
         assert_ne!(format!("{}{}", plain, mac), hex::encode(&encrypted));
         assert_eq!(
-            "971df7105b2bc21db879f2f1d469a99882647b66676f2b",
+            "971df7105a2bc21db879f2f1d469a99882647b66676f2b",
             hex::encode(&encrypted)
         );
         let decrypted = PlabbleResponsePacket::from_bytes(&encrypted, Some(&mut config)).unwrap();

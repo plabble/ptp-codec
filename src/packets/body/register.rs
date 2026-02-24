@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::crypto::algorithm::VerificationKey;
 
 /// Register a new identity on the server, which can be used for authentication in future sessions.
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RegisterRequestBody {
     /// Public keys (new generated) for all algorithms specified in `crypto_settings` in the packet base.
     #[multi_enum]

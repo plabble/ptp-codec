@@ -7,7 +7,7 @@ use serde_with::serde_as;
 use crate::scripting::opcode_script::OpcodeScript;
 
 /// Execute OPCODE script on server
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OpCodeRequestBody {
     /// The script to run
     script: OpcodeScript,
@@ -15,7 +15,7 @@ pub struct OpCodeRequestBody {
 
 /// OPCODE script response from server
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OpCodeResponseBody {
     /// The result of the script execution, if any
     #[serde_as(as = "Option<Hex<Lowercase>>")]

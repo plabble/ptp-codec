@@ -9,7 +9,7 @@ use crate::crypto::algorithm::{CryptoSignature, KeyExhangeRequest, KeyExhangeRes
 
 /// Session request body
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SessionRequestBody {
     /// PSK expiration Plabble timestamp. Filled if request flag persist_key is set.
     #[toggled_by = "persist_key"]
@@ -27,7 +27,7 @@ pub struct SessionRequestBody {
 
 /// Session response body
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SessionResponseBody {
     /// Pre-shared key identifier. Filled if request flag with_psk is set.
     #[toggled_by = "key_persisted"]

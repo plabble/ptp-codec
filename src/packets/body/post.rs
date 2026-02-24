@@ -13,7 +13,7 @@ use crate::packets::body::bucket::BucketRange;
 /// - `protected`: only people who are authenticated using IDENTITY and are on the *access_control_list* can do this
 /// - `private`: only people who know the _bucket key_ can do this
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct BucketPermissions {
     /// Allow everyone to read slots from this bucket
     #[serde(default = "default_true")]
@@ -86,7 +86,7 @@ pub struct BucketPermissions {
 
 /// Bucket settings
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct BucketSettings {
     /// Permissions
     permissions: BucketPermissions,
@@ -98,7 +98,7 @@ pub struct BucketSettings {
 }
 
 /// Bucket create request body
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PostRequestBody {
     /// The ID the user wants to assign to the bucket
     id: BucketId,

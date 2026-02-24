@@ -5,22 +5,24 @@ use crate::scripting::interpreter::ScriptError;
 
 /// Plabble error code body
 /// The length is prefixed by a u8 in the packet body.
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type")]
 #[repr(u8)]
 pub enum PlabbleError {
-    /* generic errors: 0-10 */
+    /* 0 = no error, but it is NOT used */
+
+    /* generic errors: 1-10 */
     /// The requested protocol version is not supported by this implementation.
     /// Contains the min and max version the server supports.
-    UnsupportedVersion { min_version: u8, max_version: u8 } = 0,
+    UnsupportedVersion { min_version: u8, max_version: u8 } = 1,
     /// The requested algorithm in crypto settings is not supported by the server
     UnsupportedAlgorithm {
         #[dyn_length]
         name: String,
-    } = 1,
+    } = 2,
 
     /// The requested CUSTOM packet type is not supported by the server
-    UnsupportedSubProtocol = 2,
+    UnsupportedSubProtocol = 3,
 
     /* bucket errors: 10-100 */
     /// Bucket by ID not found (or existence denied)
@@ -38,6 +40,9 @@ pub enum PlabbleError {
     // ...
     /// OPCODE script execution error
     OpcodeScriptError(ScriptError) = 210,
+
+    /// Internal server error / unknown error
+    InternalServerError = 255,
 }
 
 #[cfg(test)]
@@ -68,8 +73,8 @@ mod tests {
         let serialized = response.to_bytes(None).unwrap();
         let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();
 
-        // Version = 0001, flags = 0100 Packet type: 15 = 1111, flags = 0000. Counter = 01, Error type = 0, min version = 1, max version = 3
-        assert_eq!(vec![0b0100_0001, 0b0000_1111, 0, 1, 0, 1, 3], serialized);
+        // Version = 0001, flags = 0100 Packet type: 15 = 1111, flags = 0000. Counter = 01, Error type = 1, min version = 1, max version = 3
+        assert_eq!(vec![0b0100_0001, 0b0000_1111, 0, 1, 1, 1, 3], serialized);
         assert_eq!(response, deserialized);
     }
 
@@ -94,14 +99,14 @@ mod tests {
         let serialized = response.to_bytes(None).unwrap();
         let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();
 
-        // Version = 0001, flags = 0100 Packet type: 15 = 1111, flags = 0000. Counter = 01, Error type = 1, name length = 7, name = "Ed25519"
+        // Version = 0001, flags = 0100 Packet type: 15 = 1111, flags = 0000. Counter = 01, Error type = 2, name length = 7, name = "Ed25519"
         assert_eq!(
             vec![
                 0b0100_0001,
                 0b0000_1111,
                 0,
                 1,
-                1,
+                2,
                 7,
                 b'E',
                 b'd',

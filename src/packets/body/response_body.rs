@@ -30,7 +30,7 @@ use crate::{
 /// - `Custom`: Represents a custom response body (for sub-protocols).
 /// - `Opcode`: Represents an opcode response body.
 /// - `Error`: Represents an error response body.
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(untagged)]
 #[no_discriminator]
 #[repr(u8)]

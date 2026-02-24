@@ -8,7 +8,7 @@ use crate::packets::body::post::BucketPermissions;
 
 /// Change bucket permissions or ACL entries.
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PatchRequestBody {
     /// If toggled by flags, update the permissions of the bucket
     #[toggled_by = "update_perm"]

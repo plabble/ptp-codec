@@ -9,7 +9,7 @@ use crate::crypto::certificate::Certificate;
 
 /// Certificate request body
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateRequestBody {
     /// Id of the certificate to query
     #[toggled_by = "query_mode"]
@@ -23,7 +23,7 @@ pub struct CertificateRequestBody {
 }
 
 /// Certificate response body
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateResponseBody {
     /// Signatures of the server to prove its identity and authenticity of the message
     /// For each algorithm in the crypto settings header, generate a signature of the challenge (optionally) + all full certificates (in order)

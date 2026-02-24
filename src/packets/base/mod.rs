@@ -13,7 +13,7 @@ pub mod settings;
 
 /// Plabble Protocol Packet base
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
 #[codec_ser_error("crate::errors::SerializationError")]
 #[codec_de_error("crate::errors::DeserializationError")]
 pub struct PlabblePacketBase {

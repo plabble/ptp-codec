@@ -12,7 +12,7 @@ use crate::{
 
 /// Plabble Certificate
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, FromBytes, ToBytes, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Certificate {
     /// If set to true, this is a full certificate
     #[toggles("full_cert")]
@@ -42,7 +42,7 @@ pub struct Certificate {
 }
 
 /// Plabble Certificate body
-#[derive(Debug, FromBytes, ToBytes, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, FromBytes, ToBytes, PartialEq, Serialize, Deserialize, Clone)]
 pub struct CertificateBody {
     /// From when the certificate was valid
     valid_from: PlabbleDateTime,

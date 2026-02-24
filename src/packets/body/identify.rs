@@ -6,7 +6,7 @@ use crate::crypto::algorithm::CryptoSignature;
 use crate::crypto::certificate::Certificate;
 
 /// Prove identity to server (based on certificate obtained from earlier REGISTER)
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct IdentifyRequestBody {
     /// The timestamp, the server will check if it is within an acceptible range (e.g. a few minutes) to prevent replay attacks
     timestamp: PlabbleDateTime,

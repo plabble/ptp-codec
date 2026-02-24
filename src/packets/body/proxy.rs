@@ -10,7 +10,7 @@ use crate::crypto::algorithm::{CryptoSignature, KeyExhangeRequest, KeyExhangeRes
 
 /// Proxy request body
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 #[no_discriminator]
 pub enum ProxyRequestBody {
     /// Send a packet through an existing tunnel
@@ -47,7 +47,7 @@ pub enum ProxyRequestBody {
 
 /// Proxy response body
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 #[no_discriminator]
 pub enum ProxyResponseBody {
     /// Response to a packet sent through an existing tunnel
@@ -73,7 +73,7 @@ pub enum ProxyResponseBody {
 }
 
 /// Hop information
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct HopInfo {
     /// Public keys or encapsulated secret for creating a shared secret
     #[multi_enum]

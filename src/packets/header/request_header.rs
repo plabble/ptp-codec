@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{core::BucketId, packets::header::type_and_flags::RequestPacketType};
 
 /// Plabble Packet request header
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct PlabbleRequestHeader {
     /// Internal packet type field for binary serialization/deserialization
     #[serde(skip_serializing, skip_deserializing)]

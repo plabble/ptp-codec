@@ -29,7 +29,7 @@ pub struct ScriptInterpreter {
     memory_peak: usize,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, FromBytes, ToBytes)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, FromBytes, ToBytes, Clone)]
 pub enum ScriptError {
     /// When the stack is empty while n items are required
     StackUnderflow(u32),

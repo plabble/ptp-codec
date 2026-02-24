@@ -15,7 +15,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 aes = "0.8.4"
 aes-gcm = "0.10.3"
 base64 = "0.22.1"
-binary-codec = "0.6.0"
+binary-codec = "0.6.1"
 # binary-codec = { path = "../Binary-Codec/binary-codec" }
 blake2 = "0.10.6"
 blake3 = { version = "1.8.2", optional = true }

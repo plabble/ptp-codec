@@ -26,7 +26,7 @@ use crate::packets::body::{
 /// - `Proxy`: Represents a proxy request body.
 /// - `Custom`: Represents a custom request body (for sub-protocols).
 /// - `Opcode`: Represents an opcode request body.
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(untagged)]
 #[no_discriminator]
 #[repr(u8)]

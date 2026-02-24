@@ -6,7 +6,7 @@ use serde_with::serde_as;
 
 /// Custom request/response body for sub-protocols, containing a protocol ID and raw data
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct CustomBody {
     /// Protocol ID to identify the sub-protocol this body belongs to
     pub protocol: u16,

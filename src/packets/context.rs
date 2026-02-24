@@ -133,8 +133,13 @@ impl PlabbleConnectionContext {
             (*session_key, b"PLABBLE.PROTOCOL")
         } else {
             // If it is not given, use a PSK. If that won't resolve, this function will return none
-            let pre_shared_key = (self.get_psk?)(&base?.psk_id?)?;
-            (pre_shared_key, &base?.psk_salt?)
+            // Try from base packet first if pre_shared_key is set, otherwise try session PSK
+            if let Some(base) = base && base.pre_shared_key {
+                let psk = (self.get_psk?)(&base.psk_id?)?;
+                (psk, &base.psk_salt?)
+            } else {
+                (self.session_psk?, &self.session_salt?)
+            }
         };
 
         // Context/persona is: `plabble.req.c`/`plabble.res.c` (ASCII) + client/server counter + (alt byte) = 16 bytes
@@ -155,7 +160,8 @@ impl PlabbleConnectionContext {
         context.push(alt_byte);
 
         let context: &[u8; 16] = &context.try_into().unwrap();
-        derive_key(settings.use_blake3, &session_key, salt, context, None)
+        let key = derive_key(settings.use_blake3, &session_key, salt, context, None);
+        Some(key)
     }
 }
 

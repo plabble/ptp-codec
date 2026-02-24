@@ -1171,9 +1171,9 @@ max_version = 3
 ## Errors
 - Implementation: [error.rs](./src/packets/body/error.rs)
 
-0. **UnsupportedVersion**: Requested Plabble protocol version not supported by server. Body: `min_version` (min supported version by server), `max_version` (max supported version by server). _Occurence_: every request Plabble packet.
-1. **UnsupportedAlgorithm**: Requested algotithm (in cryptography settings) is not supported by the server. Body: `name` The name of the algorithm(s) that is not supported, UTF-8 [dynint](#plabble-dynamic-int) length encoded. _Occurence_: any packet, but especially [Session](#session), [Certificate](#certificate) and other packets that use cryptography settings. 
-2. **UnsupportedSubProtocol**: Requested [subprotocol](#custom) is not supported. _Occurence_: only in [Custom](#custom) packets.
+1. **UnsupportedVersion**: Requested Plabble protocol version not supported by server. Body: `min_version` (min supported version by server), `max_version` (max supported version by server). _Occurence_: every request Plabble packet.
+2. **UnsupportedAlgorithm**: Requested algotithm (in cryptography settings) is not supported by the server. Body: `name` The name of the algorithm(s) that is not supported, UTF-8 [dynint](#plabble-dynamic-int) length encoded. _Occurence_: any packet, but especially [Session](#session), [Certificate](#certificate) and other packets that use cryptography settings. 
+3. **UnsupportedSubProtocol**: Requested [subprotocol](#custom) is not supported. _Occurence_: only in [Custom](#custom) packets.
 10. **BucketNotFound**: Requested bucket was not found
 11. **BucketAlreadyExists**: Bucket with that ID already exists. _Occurence_: [Post](#post)
 110. **CertificateNotFound**: Requested certificate (by id) was not found. _Occurence_: [Certificate](#certificate-request)

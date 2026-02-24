@@ -21,7 +21,7 @@ use crate::{
 /// - `base`: The base packet information common to all Plabble packets (both requests and responses).
 /// - `header`: The request-specific header containing metadata.
 /// - `body`: The request-specific body, whose structure depends on the packet type.
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct PlabbleRequestPacket {
     /// The base packet information common to all Plabble packets.
     #[serde(flatten)]

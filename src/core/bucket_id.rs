@@ -10,7 +10,7 @@ use crate::crypto::hash_128;
 
 /// Bucket Identifier
 #[serde_as]
-#[derive(Debug, Serialize, ToBytes, FromBytes, PartialEq)]
+#[derive(Debug, Serialize, ToBytes, FromBytes, PartialEq, Clone)]
 #[serde(transparent)]
 pub struct BucketId {
     #[serde_as(as = "Base64<UrlSafe, Unpadded>")]

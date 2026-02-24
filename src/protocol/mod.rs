@@ -1,6 +1,8 @@
-use std::cell::RefCell;
+use async_channel::{Receiver, Sender};
+use binary_codec::SerializerConfig;
+pub mod error;
 
-use crate::packets::{base::settings::CryptoSettings, context::PlabbleConnectionContext};
+use crate::{packets::{context::PlabbleConnectionContext, request::PlabbleRequestPacket, response::PlabbleResponsePacket}};
 
 #[cfg(feature = "server")]
 pub mod server;
@@ -9,6 +11,10 @@ pub mod server;
 pub mod client;
 
 pub struct PlabbleConnection {
-    context: RefCell<PlabbleConnectionContext>,
-    crypto_settings: Option<CryptoSettings>
+    config: SerializerConfig<PlabbleConnectionContext>,
+    req_sender: Sender<PlabbleRequestPacket>,
+    req_receiver: Receiver<PlabbleRequestPacket>,
+    res_sender: Sender<PlabbleResponsePacket>,
+    res_receiver: Receiver<PlabbleResponsePacket>,
 }
+

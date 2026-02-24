@@ -13,7 +13,7 @@ use serde_with::{DisplayFromStr, serde_as};
 /// # Members
 /// - `range`: A `BucketRange` enum representing the range of data to query within the bucket.
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BucketQuery {
     #[variant_by = "binary_keys"]
     range: BucketRange,
@@ -25,7 +25,7 @@ pub struct BucketQuery {
 /// # Members
 /// - `body`: A `BucketBody` enum representing the data to be inserted into the bucket.
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct PutRequestBody {
     #[variant_by = "binary_keys"]
     body: BucketBody,
@@ -42,7 +42,7 @@ pub struct PutRequestBody {
 /// - `Binary`: A hashmap where the key is a `String` representing the slot identifier,
 ///   and the value is a vector of bytes representing the data stored in that slot.
 #[serde_as]
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 #[no_discriminator]
 pub enum BucketBody {
     Numeric(
@@ -67,7 +67,7 @@ pub enum BucketBody {
 ///  the start and/or end of the numeric range
 /// - `Binary`: A tuple containing two optional `String` values representing optionally
 ///  the start and/or end of the binary range.
-#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 #[no_discriminator]
 pub enum BucketRange {
     Numeric(#[serde(default)] Option<u16>, #[serde(default)] Option<u16>),

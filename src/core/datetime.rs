@@ -3,7 +3,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Plabble DateTime since epoch (01-01-2025T00:00:00Z)
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(transparent)]
 pub struct PlabbleDateTime(pub DateTime<Utc>);
 

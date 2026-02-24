@@ -48,17 +48,17 @@ pub struct KeyExchange {
 /// - `context`: 16-byte context
 /// - `extra_key`: optional 64-byte extra key to put into the hash
 ///
-/// Returns None if blake3 is not supported or hash function failed
+/// Panics if blake3 is not supported or hash function failed
 pub fn derive_key(
     blake3: bool,
     ikm: &[u8; 64],
     salt: &[u8; 16],
     context: &[u8; 16],
     extra_key: Option<&[u8; 64]>,
-) -> Option<[u8; 64]> {
+) -> [u8; 64] {
     #[cfg(not(feature = "blake-3"))]
     if blake3 {
-        return None;
+        panic!("Blake3 is not supported when the 'blake-3' feature is not enabled");
     }
 
     #[cfg(feature = "blake-3")]
@@ -77,16 +77,17 @@ pub fn derive_key(
 
         let mut out = [0u8; 64];
         kdf.finalize_xof().fill(&mut out);
-        return Some(out);
+        return out;
     }
 
     // This is called Mac, but is actually useful for key derivation because of salt/personalization
-    let mut kdf = Blake2bMac512::new_with_salt_and_personal(ikm, salt, context).ok()?;
+    let mut kdf = Blake2bMac512::new_with_salt_and_personal(ikm, salt, context)
+        .expect("Failed to create KDF hasher");
     if let Some(extra_key) = extra_key {
         kdf.update(extra_key);
     }
 
-    Some(kdf.finalize().into_bytes().into())
+    kdf.finalize().into_bytes().into()
 }
 
 /// Calculate a 128-bit hash using Blake2b-128 or Blake3-128
@@ -212,7 +213,7 @@ mod tests {
         let personal = [2u8; 16];
         let salt = [3u8; 16];
 
-        let res = derive_key(false, &ikm, &salt, &personal, None).unwrap();
+        let res = derive_key(false, &ikm, &salt, &personal, None);
 
         // This hash is exactly the same as Geralt (for .NET) produces, which is a wrapper around libsodium
         // https://www.geralt.xyz/key-derivation
