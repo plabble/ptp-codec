@@ -43,18 +43,19 @@ getrandom = { version = "0.2", optional = true, features = ["js"] }
 wasm-bindgen = { version = "0.2.110", optional = true }
 js-sys = { version = "0.3.87", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
+wasm-bindgen-futures = { version = "0.4.63", optional = true }
 
 # Protocol implementation dependencies
 async-channel = { version = "2.5.0", optional = true }
 rand = "0.10.0"
 
 [features]
-default = ["blake-3", "pqc-lite", "pqc-heavy", "with-toml", "client"]
+default = ["blake-3", "pqc-lite", "pqc-heavy", "with-toml", "wasm"]
 blake-3 = ["blake3"]
 pqc-lite = ["ml-dsa", "ml-kem"]
 with-json = ["serde_json"]
 with-toml = ["toml"]
-wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook", "getrandom", "with-json"]
+wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook", "getrandom", "wasm-bindgen-futures", "with-json", "client"]
 ffi = []
 pqc-heavy = []
 protocol = ["async-channel"]
@@ -71,3 +72,4 @@ env_logger = "^0.11"
 panic = "abort"
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
+lto = true

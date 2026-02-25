@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use async_channel::{Receiver, Sender};
 use binary_codec::SerializerConfig;
 pub mod error;
 
-use crate::{packets::{context::PlabbleConnectionContext, request::PlabbleRequestPacket, response::PlabbleResponsePacket}};
+use crate::packets::{context::PlabbleConnectionContext, response::PlabbleResponsePacket};
 
 #[cfg(feature = "server")]
 pub mod server;
@@ -11,10 +13,8 @@ pub mod server;
 pub mod client;
 
 pub struct PlabbleConnection {
-    config: SerializerConfig<PlabbleConnectionContext>,
-    req_sender: Sender<PlabbleRequestPacket>,
-    req_receiver: Receiver<PlabbleRequestPacket>,
-    res_sender: Sender<PlabbleResponsePacket>,
-    res_receiver: Receiver<PlabbleResponsePacket>,
+    hooks: HashMap<u16, Sender<PlabbleResponsePacket>>,
+    pub config: SerializerConfig<PlabbleConnectionContext>,
+    pub tx: Sender<Vec<u8>>,
+    pub rx: Receiver<Vec<u8>>,
 }
-

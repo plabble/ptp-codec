@@ -1,7 +1,9 @@
 use std::sync::Mutex;
+use async_channel::{Receiver, Sender};
 use wasm_bindgen::prelude::*;
 use js_sys::{Function, Uint8Array};
 use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     core::BucketId,
@@ -10,6 +12,7 @@ use crate::{
         request::PlabbleRequestPacket,
         response::PlabbleResponsePacket,
     },
+    protocol::{PlabbleConnection as InnerPlabbleConnection, error::PlabbleStatusCode}
 };
 
 // Global callback storage
@@ -64,6 +67,53 @@ pub fn set_panic_hook() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 }
+
+#[wasm_bindgen]
+pub struct PlabbleConnection {
+    inner: InnerPlabbleConnection,
+    rx: Sender<Vec<u8>>,
+}
+
+#[wasm_bindgen]
+impl PlabbleConnection {
+    #[wasm_bindgen(constructor)]
+    pub fn new(handle_send: Function) -> Self {
+        let (rx, recv) = async_channel::unbounded();
+        let (send, tx) = async_channel::unbounded();
+        let mut inner = InnerPlabbleConnection::new(send, recv);
+        let data = inner.config.data.as_mut().unwrap();
+        data.get_bucket_key = Some(call_global_bucket_key);
+        data.get_psk = Some(call_global_psk);
+
+        spawn_local(async move {
+            while let Ok(res) = tx.recv().await {
+                let array = Uint8Array::from(&res[..]);
+                let _ = handle_send.call1(&JsValue::NULL, &array.into());
+            }
+        });
+
+        Self {
+            inner,
+            rx,
+        }
+    }
+
+    /**
+     * Send a request packet without waiting for response.
+     */
+    pub async fn send(&mut self, packet: &str) -> Result<(), JsValue> {
+        let request = serde_json::from_str::<PlabbleRequestPacket>(packet)
+            .map_err(|e| JsValue::from_str(&format!("Parse error: {:?}", e)))?;
+        
+        self.inner.send(request).await.map_err(|e| JsValue::from_str(&format!("{:?}", PlabbleStatusCode::from(e))))?;
+        Ok(())
+    }
+
+    pub fn on_recv(&self, data: Vec<u8>) {
+        let _ = self.rx.try_send(data);
+    }
+}
+
 
 #[wasm_bindgen]
 pub struct ConnectionContext(PlabbleConnectionContext);

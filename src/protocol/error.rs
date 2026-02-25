@@ -3,10 +3,13 @@ use crate::{errors::{DeserializationError, SerializationError}, packets::body::e
 pub enum PlabbleProtocolError {
     SerializationError(SerializationError),
     DeserializationError(DeserializationError),
-    ProtocolError(PlabbleError)
+    ProtocolError(PlabbleError),
+    SenderError,
+    ReceiverError
 }
 
 #[repr(u16)]
+#[derive(Debug)]
 pub enum PlabbleStatusCode {
     Ok = 0,
     
@@ -18,6 +21,8 @@ pub enum PlabbleStatusCode {
     EncryptionFailed = 258,
     DecryptionFailed = 259,
     IntegrityCheckFailed = 260,
+
+    TransportError = 300
 }
 
 impl From<PlabbleProtocolError> for PlabbleStatusCode {
@@ -42,7 +47,8 @@ impl From<PlabbleProtocolError> for PlabbleStatusCode {
                 match e {
                     _ => PlabbleStatusCode::InternalServerError
                 }
-            }
+            },
+            PlabbleProtocolError::SenderError | PlabbleProtocolError::ReceiverError => PlabbleStatusCode::TransportError
         }
     }
 }
