@@ -2,13 +2,12 @@ use std::collections::HashMap;
 
 use async_channel::{Receiver, Sender};
 use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+use chrono::{DateTime, Utc};
 
 use crate::{
-    packets::{
-        context::PlabbleConnectionContext, request::PlabbleRequestPacket,
-        response::PlabbleResponsePacket,
-    },
-    protocol::{PlabbleConnection, error::PlabbleProtocolError},
+    core::PlabbleDateTime, crypto::{KeyExchange, KeyExchangeAlgorithm}, packets::{
+        base::PlabblePacketBase, body::{request_body::PlabbleRequestBody, response_body::PlabbleResponseBody, session::SessionRequestBody}, context::PlabbleConnectionContext, header::{request_header::PlabbleRequestHeader, type_and_flags::{RequestPacketType, ResponsePacketType}}, request::PlabbleRequestPacket, response::PlabbleResponsePacket
+    }, protocol::{PlabbleConnection, error::PlabbleProtocolError}
 };
 
 /**
@@ -80,5 +79,50 @@ impl PlabbleConnection {
         }
 
         Ok(packet)
+    }
+
+    pub async fn start_session(&mut self, enable_full_encryption: bool, psk_expiration: Option<DateTime<Utc>>) -> Result<Option<[u8; 12]>, PlabbleProtocolError> {
+        // TODO: support multiple algorithms and keys
+        let mut kx = KeyExchange::new(KeyExchangeAlgorithm::X25519);
+
+        // TODO: support client salt and server salt
+        let client_salt = None;
+        let req = PlabbleRequestPacket {
+            base: PlabblePacketBase::default(),
+            header: PlabbleRequestHeader::new(RequestPacketType::Session { 
+                persist_key: psk_expiration.is_some(), 
+                enable_encryption: enable_full_encryption, 
+                with_salt: false, 
+                request_salt: false 
+            }, None),
+            body: PlabbleRequestBody::Session(SessionRequestBody {
+                psk_expiration: psk_expiration.map(|d|PlabbleDateTime(d)),
+                salt: None,
+                keys: vec![kx.make_request().ok_or(PlabbleProtocolError::SenderError)?]
+            })
+        };
+
+        let res = self.send_and_recv(req).await?;
+        if let ResponsePacketType::Session { with_psk, .. } = res.header.packet_type {
+            if let PlabbleResponseBody::Session(body) = res.body {
+                // TODO: multiple algorithms and keys
+                let key = body.keys.first().ok_or(PlabbleProtocolError::UnexpectedResponse)?;
+                let ss = kx.process_response(&key).ok_or(PlabbleProtocolError::FailedToProcessResponse)?;
+
+                let context = self.config.data.as_mut().unwrap();
+                // TODO: support blake3
+                context.create_session_key(false, client_salt, body.salt, vec![ss]);
+
+                if with_psk {
+                    let psk_id = body.psk_id.expect("Expected PSK ID");
+                    // TODO: store PSK with ID and expiration
+                    return Ok(Some(psk_id));
+                } else {
+                    return Ok(None);
+                }
+            }
+        }
+
+        Err(PlabbleProtocolError::UnexpectedResponse)
     }
 }

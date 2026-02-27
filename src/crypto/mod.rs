@@ -14,8 +14,36 @@ mod signatures;
 
 type Blake2b128 = Blake2b<U16>;
 type Blake2b256 = Blake2b<U32>;
+type Blake2b512 = Blake2b<U64>;
 type Blake2bMac128 = Blake2bMac<U16>;
 type Blake2bMac512 = Blake2bMac<U64>;
+
+macro_rules! impl_hash {
+    ($name:ident, $size:expr, $blake2_type:ty, $blake3_finalize:expr) => {
+        pub fn $name(blake3: bool, data: Vec<&[u8]>) -> [u8; $size] {
+            #[cfg(not(feature = "blake-3"))]
+            if blake3 {
+                panic!("Blake3 is not supported when the 'blake-3' feature is not enabled");
+            }
+
+            #[cfg(feature = "blake-3")]
+            if blake3 {
+                use blake3::Hasher;
+                let mut hasher = Hasher::new();
+                for d in data {
+                    hasher.update(d);
+                }
+                return $blake3_finalize(hasher);
+            }
+
+            let mut hasher = <$blake2_type>::new();
+            for d in data {
+                hasher.update(d);
+            }
+            hasher.finalize().into()
+        }
+    };
+}
 
 /// Supported key-exchange algorithms.
 ///
@@ -51,8 +79,8 @@ pub struct KeyExchange {
 /// Panics if blake3 is not supported or hash function failed
 pub fn derive_key(
     blake3: bool,
-    ikm: &[u8; 64],
-    salt: &[u8; 16],
+    ikm: &[u8],
+    salt: &[u8],
     context: &[u8; 16],
     extra_key: Option<&[u8; 64]>,
 ) -> [u8; 64] {
@@ -90,72 +118,21 @@ pub fn derive_key(
     kdf.finalize().into_bytes().into()
 }
 
-/// Calculate a 128-bit hash using Blake2b-128 or Blake3-128
-///
-/// # Parameters
-/// - `blake3`: whether to use Blake3 or Blake2b
-/// - `data`: The data to hash
-///
-/// Returns a 128-bit hash
-pub fn hash_128(blake3: bool, data: Vec<&[u8]>) -> [u8; 16] {
-    #[cfg(not(feature = "blake-3"))]
-    if blake3 {
-        panic!("Blake3 is not supported when the 'blake-3' feature is not enabled");
-    }
+impl_hash!(hash_128, 16, Blake2b128, |h: blake3::Hasher| {
+    let mut out = [0u8; 16];
+    h.finalize_xof().fill(&mut out);
+    out
+});
 
-    #[cfg(feature = "blake-3")]
-    if blake3 {
-        use blake3::Hasher;
-        let mut hasher = Hasher::new();
-        for d in data {
-            hasher.update(d);
-        }
+impl_hash!(hash_256, 32, Blake2b256, |h: blake3::Hasher| {
+    *h.finalize().as_bytes()
+});
 
-        let mut data = [0u8; 16];
-        let mut reader = hasher.finalize_xof();
-        reader.fill(&mut data);
-        return data;
-    }
-
-    let mut hasher = Blake2b128::new();
-    for d in data {
-        hasher.update(d);
-    }
-
-    hasher.finalize().into()
-}
-
-/// Calculate a 256-bit hash using Blake2b-256 or Blake3
-///
-/// # Parameters
-/// - `blake3`: whether to use Blake3 or Blake2b-256
-/// - `data`: The data to hash
-///
-/// Returns a 256-bit hash
-pub fn hash_256(blake3: bool, data: Vec<&[u8]>) -> [u8; 32] {
-    #[cfg(not(feature = "blake-3"))]
-    if blake3 {
-        panic!("Blake3 is not supported when the 'blake-3' feature is not enabled");
-    }
-
-    #[cfg(feature = "blake-3")]
-    if blake3 {
-        use blake3::Hasher;
-        let mut hasher = Hasher::new();
-        for d in data {
-            hasher.update(d);
-        }
-
-        return *hasher.finalize().as_bytes();
-    }
-
-    let mut hasher = Blake2b256::new();
-    for d in data {
-        hasher.update(d);
-    }
-
-    hasher.finalize().into()
-}
+impl_hash!(hash_512, 64, Blake2b512, |h: blake3::Hasher| {
+    let mut out = [0u8; 64];
+    h.finalize_xof().fill(&mut out);
+    out
+});
 
 /// Calculate a MAC (Message Authentication Code) using keyed Blake2b-128 or Blake3
 ///

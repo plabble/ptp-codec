@@ -216,6 +216,7 @@ request_counter = 1
 6. The server returns a [session response](#session-response).
 7. The client checks the signatures the server returned using the public keys in the **server certificates** it already SHOULD know. This step is optional, but strongly recommended for integrity.
 8. The client also generates a shared secret and derives the [session key](#session-key) from it.
+9. The client and server reset the request counters and optionally switch to full encrypted encryption if `enable_encryption` was set in the request.
 
 ### Session request
 Request header flags:

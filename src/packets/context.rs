@@ -1,6 +1,6 @@
 use crate::{
     core::BucketId,
-    crypto::{derive_key, hash_256},
+    crypto::{derive_key, hash_256, hash_512},
     packets::base::{PlabblePacketBase, settings::CryptoSettings},
 };
 
@@ -162,6 +162,15 @@ impl PlabbleConnectionContext {
         let context: &[u8; 16] = &context.try_into().unwrap();
         let key = derive_key(settings.use_blake3, &session_key, salt, context, None);
         Some(key)
+    }
+
+    /// Create session key from shared secrets and salts, and store it in the context
+    pub fn create_session_key(&mut self, blake_3: bool, client_salt: Option<[u8; 16]>, server_salt: Option<[u8; 16]>, shared_secrets: Vec<[u8; 32]>) {
+        let salt = client_salt.or(server_salt).unwrap_or(*b"PLABBLE-PROTOCOL");
+        let context = server_salt.unwrap_or(*b"PROTOCOL.PLABBLE");
+        let ikm = hash_512(blake_3, shared_secrets.iter().map(|s| s.as_slice()).collect());
+        let session_key = derive_key(blake_3, &ikm, &salt, &context, None);
+        self.session_key = Some(session_key);
     }
 }
 

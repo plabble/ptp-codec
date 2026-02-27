@@ -5,7 +5,9 @@ pub enum PlabbleProtocolError {
     DeserializationError(DeserializationError),
     ProtocolError(PlabbleError),
     SenderError,
-    ReceiverError
+    ReceiverError,
+    UnexpectedResponse,
+    FailedToProcessResponse
 }
 
 #[repr(u16)]
@@ -22,7 +24,9 @@ pub enum PlabbleStatusCode {
     DecryptionFailed = 259,
     IntegrityCheckFailed = 260,
 
-    TransportError = 300
+    TransportError = 300,
+    UnexpectedResponse = 301,
+    FailedToProcessResponse = 302,
 }
 
 impl From<PlabbleProtocolError> for PlabbleStatusCode {
@@ -48,7 +52,9 @@ impl From<PlabbleProtocolError> for PlabbleStatusCode {
                     _ => PlabbleStatusCode::InternalServerError
                 }
             },
-            PlabbleProtocolError::SenderError | PlabbleProtocolError::ReceiverError => PlabbleStatusCode::TransportError
+            PlabbleProtocolError::SenderError | PlabbleProtocolError::ReceiverError => PlabbleStatusCode::TransportError,
+            PlabbleProtocolError::UnexpectedResponse => PlabbleStatusCode::UnexpectedResponse,
+            PlabbleProtocolError::FailedToProcessResponse => PlabbleStatusCode::FailedToProcessResponse,
         }
     }
 }

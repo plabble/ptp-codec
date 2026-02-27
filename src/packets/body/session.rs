@@ -32,19 +32,19 @@ pub struct SessionResponseBody {
     /// Pre-shared key identifier. Filled if request flag with_psk is set.
     #[toggled_by = "key_persisted"]
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
-    psk_id: Option<[u8; 12]>,
+    pub psk_id: Option<[u8; 12]>,
 
     /// Server-generated salt for key derivation. Filled if request flag with_salt is set.
     #[toggled_by = "server_salt"]
-    salt: Option<[u8; 16]>,
+    pub salt: Option<[u8; 16]>,
 
     /// Public keys or encapsulated secret for creating a shared secret
     #[multi_enum]
-    keys: Vec<KeyExhangeResponse>,
+    pub keys: Vec<KeyExhangeResponse>,
 
     /// Signatures of the request
     #[multi_enum]
-    signatures: Vec<CryptoSignature>,
+    pub signatures: Vec<CryptoSignature>,
 }
 
 #[cfg(test)]

@@ -12,6 +12,7 @@ pub mod server;
 #[cfg(feature = "client")]
 pub mod client;
 
+/// Plabble Connection
 pub struct PlabbleConnection {
     hooks: HashMap<u16, Sender<PlabbleResponsePacket>>,
     pub config: SerializerConfig<PlabbleConnectionContext>,
