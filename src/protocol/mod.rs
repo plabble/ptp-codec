@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use async_channel::{Receiver, Sender};
 use binary_codec::SerializerConfig;
+
 pub mod error;
 
 use crate::packets::{context::PlabbleConnectionContext, response::PlabbleResponsePacket};

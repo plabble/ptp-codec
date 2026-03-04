@@ -20,6 +20,10 @@ impl PlabbleDateTime {
     pub fn new(timestamp: u32) -> Self {
         Self(epoch() + Duration::seconds(timestamp as i64))
     }
+
+    pub fn from_now(seconds: u32) -> Self {
+        Self(Utc::now() + Duration::seconds(seconds as i64))
+    }
 }
 
 impl<T: Clone> BinarySerializer<T> for PlabbleDateTime {
