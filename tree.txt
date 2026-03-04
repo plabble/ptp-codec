@@ -1,0 +1,263 @@
+plabble-codec v0.1.0 (/home/user/dev/Prive/ptp-codec)
+├── aes v0.9.0-rc.4
+│   ├── cipher v0.5.1
+│   │   ├── block-buffer v0.12.0
+│   │   │   └── hybrid-array v0.4.7
+│   │   │       └── typenum v1.19.0
+│   │   ├── crypto-common v0.2.1
+│   │   │   ├── getrandom v0.4.2
+│   │   │   │   ├── cfg-if v1.0.3
+│   │   │   │   ├── libc v0.2.175
+│   │   │   │   └── rand_core v0.10.0
+│   │   │   ├── hybrid-array v0.4.7 (*)
+│   │   │   └── rand_core v0.10.0
+│   │   └── inout v0.2.2
+│   │       └── hybrid-array v0.4.7 (*)
+│   ├── cpubits v0.1.0
+│   └── cpufeatures v0.2.17
+├── aes-gcm v0.11.0-rc.3
+│   ├── aead v0.6.0-rc.10
+│   │   ├── crypto-common v0.2.1 (*)
+│   │   └── inout v0.2.2 (*)
+│   ├── aes v0.9.0-rc.4 (*)
+│   ├── cipher v0.5.1 (*)
+│   ├── ctr v0.10.0-rc.4
+│   │   └── cipher v0.5.1 (*)
+│   ├── ghash v0.6.0
+│   │   └── polyval v0.7.1
+│   │       ├── cpubits v0.1.0
+│   │       ├── cpufeatures v0.3.0
+│   │       └── universal-hash v0.6.1
+│   │           ├── crypto-common v0.2.1 (*)
+│   │           └── ctutils v0.4.0
+│   │               └── cmov v0.5.2
+│   └── subtle v2.6.1
+├── async-channel v2.5.0
+│   ├── concurrent-queue v2.5.0
+│   │   └── crossbeam-utils v0.8.21
+│   ├── event-listener-strategy v0.5.4
+│   │   ├── event-listener v5.4.1
+│   │   │   ├── concurrent-queue v2.5.0 (*)
+│   │   │   ├── parking v2.2.1
+│   │   │   └── pin-project-lite v0.2.16
+│   │   └── pin-project-lite v0.2.16
+│   ├── futures-core v0.3.32
+│   └── pin-project-lite v0.2.16
+├── base64 v0.22.1
+├── binary-codec v0.6.1
+│   └── binary-codec-derive v0.6.0 (proc-macro)
+│       ├── proc-macro2 v1.0.101
+│       │   └── unicode-ident v1.0.19
+│       ├── quote v1.0.40
+│       │   └── proc-macro2 v1.0.101 (*)
+│       └── syn v2.0.106
+│           ├── proc-macro2 v1.0.101 (*)
+│           ├── quote v1.0.40 (*)
+│           └── unicode-ident v1.0.19
+├── blake2 v0.10.6
+│   └── digest v0.10.7
+│       ├── block-buffer v0.10.4
+│       │   └── generic-array v0.14.7
+│       │       └── typenum v1.19.0
+│       │       [build-dependencies]
+│       │       └── version_check v0.9.5
+│       ├── crypto-common v0.1.7
+│       │   ├── generic-array v0.14.7 (*)
+│       │   └── typenum v1.19.0
+│       └── subtle v2.6.1
+├── blake3 v1.8.2
+│   ├── arrayref v0.3.9
+│   ├── arrayvec v0.7.6
+│   ├── cfg-if v1.0.3
+│   └── constant_time_eq v0.3.1
+│   [build-dependencies]
+│   └── cc v1.2.37
+│       ├── find-msvc-tools v0.1.1
+│       └── shlex v1.3.0
+├── chacha20 v0.10.0
+│   ├── cfg-if v1.0.3
+│   ├── cipher v0.5.1 (*)
+│   └── cpufeatures v0.3.0
+├── chacha20poly1305 v0.11.0-rc.3
+│   ├── aead v0.6.0-rc.10 (*)
+│   ├── chacha20 v0.10.0 (*)
+│   ├── cipher v0.5.1 (*)
+│   └── poly1305 v0.9.0-rc.6
+│       ├── cpufeatures v0.3.0
+│       └── universal-hash v0.6.1 (*)
+├── chrono v0.4.42
+│   ├── iana-time-zone v0.1.64
+│   ├── num-traits v0.2.19
+│   │   [build-dependencies]
+│   │   └── autocfg v1.5.0
+│   └── serde v1.0.225
+│       ├── serde_core v1.0.225
+│       └── serde_derive v1.0.225 (proc-macro)
+│           ├── proc-macro2 v1.0.101 (*)
+│           ├── quote v1.0.40 (*)
+│           └── syn v2.0.106 (*)
+├── cipher v0.5.1 (*)
+├── console_error_panic_hook v0.1.7
+│   ├── cfg-if v1.0.3
+│   └── wasm-bindgen v0.2.113
+│       ├── cfg-if v1.0.3
+│       ├── once_cell v1.21.3
+│       ├── wasm-bindgen-macro v0.2.113 (proc-macro)
+│       │   ├── quote v1.0.40 (*)
+│       │   └── wasm-bindgen-macro-support v0.2.113
+│       │       ├── bumpalo v3.19.0
+│       │       ├── proc-macro2 v1.0.101 (*)
+│       │       ├── quote v1.0.40 (*)
+│       │       ├── syn v2.0.106 (*)
+│       │       └── wasm-bindgen-shared v0.2.113
+│       │           └── unicode-ident v1.0.19
+│       └── wasm-bindgen-shared v0.2.113 (*)
+│       [build-dependencies]
+│       └── rustversion v1.0.22 (proc-macro)
+├── ctr v0.9.2
+│   └── cipher v0.4.4
+│       ├── crypto-common v0.1.7 (*)
+│       └── inout v0.1.4
+│           └── generic-array v0.14.7 (*)
+├── ed25519-dalek v2.2.0
+│   ├── curve25519-dalek v4.1.3
+│   │   ├── cfg-if v1.0.3
+│   │   ├── cpufeatures v0.2.17
+│   │   ├── curve25519-dalek-derive v0.1.1 (proc-macro)
+│   │   │   ├── proc-macro2 v1.0.101 (*)
+│   │   │   ├── quote v1.0.40 (*)
+│   │   │   └── syn v2.0.106 (*)
+│   │   ├── digest v0.10.7 (*)
+│   │   ├── subtle v2.6.1
+│   │   └── zeroize v1.8.2
+│   │       └── zeroize_derive v1.4.3 (proc-macro)
+│   │           ├── proc-macro2 v1.0.101 (*)
+│   │           ├── quote v1.0.40 (*)
+│   │           └── syn v2.0.106 (*)
+│   │   [build-dependencies]
+│   │   └── rustc_version v0.4.1
+│   │       └── semver v1.0.27
+│   ├── ed25519 v2.2.3
+│   │   └── signature v2.2.0
+│   │       └── rand_core v0.6.4
+│   │           └── getrandom v0.2.16
+│   │               ├── cfg-if v1.0.3
+│   │               └── libc v0.2.175
+│   ├── sha2 v0.10.9
+│   │   ├── cfg-if v1.0.3
+│   │   ├── cpufeatures v0.2.17
+│   │   └── digest v0.10.7 (*)
+│   ├── subtle v2.6.1
+│   └── zeroize v1.8.2 (*)
+├── getrandom v0.2.16 (*)
+├── js-sys v0.3.90
+│   ├── once_cell v1.21.3
+│   └── wasm-bindgen v0.2.113 (*)
+├── log v0.4.29
+├── ml-dsa v0.0.4
+│   ├── const-oid v0.9.6
+│   ├── hybrid-array v0.3.1
+│   │   └── typenum v1.19.0
+│   ├── num-traits v0.2.19 (*)
+│   ├── pkcs8 v0.10.2
+│   │   ├── der v0.7.10
+│   │   │   ├── const-oid v0.9.6
+│   │   │   └── zeroize v1.8.2 (*)
+│   │   └── spki v0.7.3
+│   │       └── der v0.7.10 (*)
+│   ├── rand_core v0.6.4 (*)
+│   ├── sha3 v0.10.8
+│   │   ├── digest v0.10.7 (*)
+│   │   └── keccak v0.1.5
+│   └── signature v2.2.0 (*)
+├── ml-kem v0.2.1
+│   ├── hybrid-array v0.2.3
+│   │   └── typenum v1.19.0
+│   ├── kem v0.3.0-pre.0
+│   │   ├── rand_core v0.6.4 (*)
+│   │   └── zeroize v1.8.2 (*)
+│   ├── rand_core v0.6.4 (*)
+│   └── sha3 v0.10.8 (*)
+├── rand_core v0.6.4 (*)
+├── serde v1.0.225 (*)
+├── serde-value v0.7.0
+│   ├── ordered-float v2.10.1
+│   │   └── num-traits v0.2.19 (*)
+│   └── serde v1.0.225 (*)
+├── serde_json v1.0.148
+│   ├── itoa v1.0.15
+│   ├── memchr v2.7.5
+│   ├── serde_core v1.0.225
+│   └── zmij v1.0.5
+├── serde_with v3.16.1
+│   ├── base64 v0.22.1
+│   ├── hex v0.4.3
+│   ├── serde_core v1.0.225
+│   └── serde_with_macros v3.16.1 (proc-macro)
+│       ├── darling v0.21.3
+│       │   ├── darling_core v0.21.3
+│       │   │   ├── fnv v1.0.7
+│       │   │   ├── ident_case v1.0.1
+│       │   │   ├── proc-macro2 v1.0.101 (*)
+│       │   │   ├── quote v1.0.40 (*)
+│       │   │   ├── strsim v0.11.1
+│       │   │   └── syn v2.0.106 (*)
+│       │   └── darling_macro v0.21.3 (proc-macro)
+│       │       ├── darling_core v0.21.3 (*)
+│       │       ├── quote v1.0.40 (*)
+│       │       └── syn v2.0.106 (*)
+│       ├── proc-macro2 v1.0.101 (*)
+│       ├── quote v1.0.40 (*)
+│       └── syn v2.0.106 (*)
+├── toml v1.0.3+spec-1.1.0
+│   ├── serde_core v1.0.225
+│   ├── serde_spanned v1.0.4
+│   │   └── serde_core v1.0.225
+│   ├── toml_datetime v1.0.0+spec-1.1.0
+│   │   └── serde_core v1.0.225
+│   ├── toml_parser v1.0.9+spec-1.1.0
+│   │   └── winnow v0.7.13
+│   ├── toml_writer v1.0.6+spec-1.1.0
+│   └── winnow v0.7.13
+├── wasm-bindgen v0.2.113 (*)
+├── wasm-bindgen-futures v0.4.63
+│   ├── cfg-if v1.0.3
+│   ├── futures-util v0.3.32
+│   │   ├── futures-core v0.3.32
+│   │   ├── futures-task v0.3.32
+│   │   ├── pin-project-lite v0.2.16
+│   │   └── slab v0.4.12
+│   ├── js-sys v0.3.90 (*)
+│   ├── once_cell v1.21.3
+│   └── wasm-bindgen v0.2.113 (*)
+└── x25519-dalek v2.0.1
+    ├── curve25519-dalek v4.1.3 (*)
+    ├── rand_core v0.6.4 (*)
+    └── zeroize v1.8.2 (*)
+[dev-dependencies]
+├── env_logger v0.11.8
+│   ├── anstream v0.6.21
+│   │   ├── anstyle v1.0.13
+│   │   ├── anstyle-parse v0.2.7
+│   │   │   └── utf8parse v0.2.2
+│   │   ├── anstyle-query v1.1.5
+│   │   ├── colorchoice v1.0.4
+│   │   ├── is_terminal_polyfill v1.70.2
+│   │   └── utf8parse v0.2.2
+│   ├── anstyle v1.0.13
+│   ├── env_filter v0.1.4
+│   │   ├── log v0.4.29
+│   │   └── regex v1.12.2
+│   │       ├── aho-corasick v1.1.4
+│   │       │   └── memchr v2.7.5
+│   │       ├── memchr v2.7.5
+│   │       ├── regex-automata v0.4.13
+│   │       │   ├── aho-corasick v1.1.4 (*)
+│   │       │   ├── memchr v2.7.5
+│   │       │   └── regex-syntax v0.8.8
+│   │       └── regex-syntax v0.8.8
+│   ├── jiff v0.2.17
+│   └── log v0.4.29
+├── hex v0.4.3
+├── serde_json v1.0.148 (*)
+└── toml v1.0.3+spec-1.1.0 (*)

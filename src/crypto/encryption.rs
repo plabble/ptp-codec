@@ -80,8 +80,8 @@ impl PlabbleConnectionContext {
         {
             debug!("Using XChaCha cipher, req: {is_request}");
             ciphers.push(Box::new(XChaCha20::new(
-                key[..32].into(),
-                key[32..56].into(),
+                (&key[..32]).try_into().unwrap(),
+                (&key[32..56]).try_into().unwrap(),
             )));
         }
 
@@ -91,8 +91,8 @@ impl PlabbleConnectionContext {
         {
             debug!("Using Aes256-CTR (64LE) cipher, req: {is_request}");
             ciphers.push(Box::new(Aes256Ctr64Le::new(
-                key[..32].into(),
-                key[32..48].into(),
+                (&key[..32]).try_into().unwrap(),
+                (&key[32..48]).try_into().unwrap(),
             )));
         }
 
@@ -120,10 +120,10 @@ impl PlabbleConnectionContext {
             && let Some(key) = keys.next()?
         {
             debug!("Encrypting body using XChaCha20-Poly1305, req: {is_request}");
-            let cipher = XChaCha20Poly1305::new(key[..32].into());
+            let cipher = XChaCha20Poly1305::new((&key[..32]).try_into().unwrap());
             buff = cipher
                 .encrypt(
-                    key[32..56].into(),
+                    (&key[32..56]).try_into().unwrap(),
                     Payload {
                         msg: &buff[..],
                         aad,
@@ -136,10 +136,10 @@ impl PlabbleConnectionContext {
             && let Some(key) = keys.next()?
         {
             debug!("Encrypting body using AES-256-GCM, req: {is_request}");
-            let cipher = Aes256Gcm::new(key[..32].into());
+            let cipher = Aes256Gcm::new((&key[..32]).try_into().unwrap());
             buff = cipher
                 .encrypt(
-                    key[32..44].into(),
+                    (&key[32..44]).try_into().unwrap(),
                     Payload {
                         msg: &buff[..],
                         aad,
@@ -171,10 +171,10 @@ impl PlabbleConnectionContext {
             && let Some(key) = keys.next()?
         {
             debug!("Decrypting body using AES-256-GCM, req: {is_request}");
-            let cipher = Aes256Gcm::new(key[..32].into());
+            let cipher = Aes256Gcm::new((&key[..32]).try_into().unwrap());
             buff = cipher
                 .decrypt(
-                    key[32..44].into(),
+                    (&key[32..44]).try_into().unwrap(),
                     Payload {
                         msg: &buff[..],
                         aad,
@@ -187,10 +187,10 @@ impl PlabbleConnectionContext {
             && let Some(key) = keys.next()?
         {
             debug!("Decrypting body using XChaCha20-Poly1305, req: {is_request}");
-            let cipher = XChaCha20Poly1305::new(key[..32].into());
+            let cipher = XChaCha20Poly1305::new((&key[..32]).try_into().unwrap());
             buff = cipher
                 .decrypt(
-                    key[32..56].into(),
+                    (&key[32..56]).try_into().unwrap(),
                     Payload {
                         msg: &buff[..],
                         aad,
