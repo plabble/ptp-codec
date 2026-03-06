@@ -71,5 +71,6 @@ env_logger = "^0.11"
 [profile.release]
 panic = "abort"
 # Tell `rustc` to optimize for small code size.
-opt-level = "s"
+# s: 676.46 KB z: 638.50 KB
+opt-level = "z"
 lto = true

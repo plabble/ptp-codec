@@ -9,6 +9,7 @@ use blake2::{
 pub mod algorithm;
 pub mod certificate;
 pub mod encryption;
+#[cfg(feature = "protocol")]
 mod key_exchange;
 mod signatures;
 
@@ -50,6 +51,7 @@ macro_rules! impl_hash {
 /// - `X25519` is the standard Diffie-Hellman over Curve25519.
 /// - `Kem512` / `Kem768` are optional post-quantum KEM algorithms
 ///   provided when the `pqc-lite` feature is enabled.
+#[cfg(feature = "protocol")]
 pub enum KeyExchangeAlgorithm {
     X25519,
     Kem512,
@@ -62,6 +64,7 @@ pub enum KeyExchangeAlgorithm {
 /// secret material generated when creating a request. The secret is kept
 /// as raw bytes so it can be used by the `process_response` method to
 /// compute the final shared secret.
+#[cfg(feature = "protocol")]
 pub struct KeyExchange {
     algorithm: KeyExchangeAlgorithm,
     secret: Option<Vec<u8>>,

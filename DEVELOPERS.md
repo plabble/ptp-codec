@@ -18,5 +18,3 @@ wasm-pack build --features wasm
 # of:
 wasm-pack build --target web --features wasm
 ```
-
-TODO: fix issues met rand door andere dependencies ook te updaten naar rc versies

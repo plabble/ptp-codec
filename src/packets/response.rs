@@ -190,7 +190,9 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Post => PlabbleResponseBody::Post,
             ResponsePacketType::Patch => PlabbleResponseBody::Patch,
             ResponsePacketType::Put => PlabbleResponseBody::Put,
-            ResponsePacketType::Delete => PlabbleResponseBody::Delete,
+            ResponsePacketType::Delete { .. } => {
+                PlabbleResponseBody::Delete(raw.body.deserialize_into().unwrap())
+            },
             ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
             ResponsePacketType::Unsubscribe => PlabbleResponseBody::Unsubscribe,
             ResponsePacketType::Register => {

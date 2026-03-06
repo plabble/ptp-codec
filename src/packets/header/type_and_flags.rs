@@ -51,6 +51,7 @@ pub enum RequestPacketType {
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - subscribe: Subscribe to changes on the requested keys.
     /// - range_mode_until: Use range mode until a specified key/index
+    /// - with_limit: Limit the number of returned entries
     Get {
         #[serde(default)]
         #[toggles("binary_keys")]
@@ -61,6 +62,10 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         range_mode_until: bool,
+
+        #[serde(default)]
+        #[toggles("limit")]
+        with_limit: bool
     } = 2,
     /// Start a data stream from or to a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
@@ -138,6 +143,8 @@ pub enum RequestPacketType {
     /// Delete values from a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - range_mode_until: Use range mode until a specified key/index
+    /// - with_limit: Limit the number of returned entries
+    /// - return_deleted: Include the deleted entries in the response body (same format as `Get` responses)
     Delete {
         #[serde(default)]
         #[toggles("binary_keys")]
@@ -145,6 +152,14 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         range_mode_until: bool,
+
+        #[serde(default)]
+        #[toggles("limit")]
+        with_limit: bool,
+
+        #[serde(default)]
+        #[toggles("return_deleted")]
+        return_deleted: bool,
     } = 7,
     /// Subscribe to changes on a bucket, or key(s)/key ranges
     /// - binary_keys: Indicate that the keys are in binary format.
@@ -252,7 +267,18 @@ pub enum ResponsePacketType {
     /// Response to a put request.
     Put = 6,
     /// Response to a delete request.
-    Delete = 7,
+    /// 
+    /// - return_deleted: Indicates the response body contains the deleted entries (matches the request's `return_deleted` flag).
+    /// - binary_keys: Keys in the response are in binary format (only if `return_deleted` is set).
+    Delete {
+        #[serde(default)]
+        #[toggles("return_deleted")]
+        return_deleted: bool,
+
+        #[serde(default)]
+        #[toggles("binary_keys")]
+        binary_keys: bool,
+    } = 7,
     /// Response to a subscribe request.
     Subscribe = 8,
     /// Response to an unsubscribe request.

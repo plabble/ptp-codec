@@ -320,11 +320,13 @@ Request header flags:
 - **binary_keys**: keys in the request/response are UTF-8 strings instead of numeric slot indexes.
 - **subscribe**: request a subscription for changes on the requested keys/range.
 - **range_mode_until**: treat a single provided range value as an "until" (end-only) bound.
+- **with_limit**: limit the number of returned entries
 
 Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64/URL-safe when using the TOML representation).
 
 Request body:
+- **limit**: optional integer to limit the number of returned entries (`u16` if present), can be used for pagination when combined with `range`
 - **range**: either `Numeric(start?, end?)` or `Binary(start_key?, end_key?)` (both bounds are optional). Numeric ranges use `u16` slots; binary ranges use UTF-8 keys.
 
 Example (numeric range):
@@ -334,9 +336,11 @@ use_encryption = true
 
 [header]
 packet_type = "Get"
+with_limit = true
 id = "AAAAAAAAAAAAAAAAAAAAAA"  # 16-byte id (base64url (no padding))
 
 [body]
+limit = 5
 range.Numeric = [5, 25]
 ```
 
@@ -642,11 +646,14 @@ Empty response without flags.
 Request header flags:
 - **binary_keys**: Use string keys instead of numeric slot indexes.
 - **range_mode_until**: Treat a single provided range value as an end-only bound (until).
+- **with_limit**: limit the number of returned entries
+- **return_deleted**: include the deleted entries in the response body (same format as `Get` responses)
 
 Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
 
 Request body:
+- **limit**: optional integer to limit the number of entries to be deleted in the range (`u16` if present). Can be used for popping values when combined with `range`.
 - **range**: a `BucketQuery` describing which slots to delete. Use `Numeric(start?, end?)` for u16 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets. If the range is empty, the entire bucket will be deleted.
 
 Example (numeric range):
@@ -656,9 +663,11 @@ use_encryption = true
 
 [header]
 packet_type = "Delete"
+with_limit = true
 id = "AAAAAAAAAAAAAAAAAAAAAA"
 
 [body]
+limit = 20
 range.Numeric = [0, 20]
 ```
 
@@ -677,7 +686,12 @@ range.Binary = ["old_key_start", "old_key_end"]
 ```
 
 ### DELETE response
-Empty response without flags.
+Response header flags:
+- **return_deleted**: indicates the response body contains the deleted entries (matches the request's `return_deleted` flag).
+- **binary_keys**: indicates keys in the response are UTF-8 strings (matches the request's `binary_keys`) - only when `return_deleted` is set.
+
+Response body (only if `return_deleted` is set):
+- `Delete` responses carry a `BucketBody` (see [implementation](./src/packets/body/bucket.rs)). For numeric buckets this is a key-value set with numbers and binary values, for binary it is a key-value set with both binary keys and values. - ONLY if `return_deleted` is set in the request.
 
 ## Subscribe
 - **Goal**: _Subscribe to updates_ for one or more keys or a key range inside a bucket.

@@ -11,10 +11,15 @@ use serde_with::{DisplayFromStr, serde_as};
 /// The range can be either numeric or binary, depending on the bucket type.
 ///
 /// # Members
+/// - `limit`: Optional limit on the number of returned entries (u16), only applies to GET/DELETE requests
 /// - `range`: A `BucketRange` enum representing the range of data to query within the bucket.
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BucketQuery {
+    #[serde(default)]
+    #[toggled_by = "limit"]
+    limit: Option<u16>,
+
     #[variant_by = "binary_keys"]
     range: BucketRange,
 }
@@ -92,7 +97,7 @@ mod tests {
     };
 
     #[test]
-    fn can_serialize_and_deserialize_get_request_numeric() {
+    fn can_serialize_get_request_numeric_with_limit() {
         let packet: PlabbleRequestPacket = toml::from_str(
             r#"
             version = 1
@@ -100,48 +105,23 @@ mod tests {
 
             [header]
             packet_type = "Get"
+            with_limit = true
             id = "AAAAAAAAAAAAAAAAAAAAAA"
 
             [body]
+            limit = 7
             range.Numeric = [5, 25]
-        "#,
-        )
-        .unwrap();
+        "#).unwrap();
 
         let mut config = SerializerConfig::new(None);
         let serialized = packet.to_bytes(Some(&mut config)).unwrap();
+
+        assert_eq!(0b0100_0001, serialized[0]); // version 1, encryption flag set
+        assert_eq!(0b1000_0010, serialized[1]); // with_limit flag is set
+        assert_eq!("418200000000000000000000000000000000000700050019", hex::encode(&serialized));
+
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
-
         assert_eq!(packet, deserialized);
-
-        // version = 0001, flags = 0100. Packet type = Get (0010), flags: 0000. 16 bytes id, start 0,5 end 0,25
-        assert_eq!(
-            vec![
-                0b0100_0001,
-                0b0000_0010,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                5,
-                0,
-                25
-            ],
-            serialized
-        );
     }
 
     #[test]
@@ -200,6 +180,7 @@ mod tests {
         assert!(matches!(
             deserialized.header.packet_type,
             RequestPacketType::Get {
+                with_limit: false,
                 binary_keys: false,
                 subscribe: false,
                 range_mode_until: true
@@ -558,6 +539,36 @@ mod tests {
         let serialized = packet.to_bytes(None).unwrap();
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
 
+        assert_eq!(packet, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_delete_response_with_data() {
+        let packet: PlabbleResponsePacket = toml::from_str(
+            r#"
+            version = 1
+            use_encryption = true
+
+            [header]
+            packet_type = "Delete"
+            request_counter = 1
+            return_deleted = true
+
+            [body.Numeric]
+            5 = "AAAAAA"
+            7 = "AAAAAAAA"
+        "#,
+        )
+        .unwrap();
+
+        let serialized = packet.to_bytes(None).unwrap();
+        assert_eq!(0b0001_0111, serialized[1]);
+
+        let case1 = "4117000100050400000000000706000000000000";
+        let case2 = "4117000100070600000000000000050400000000";
+
+        assert!(hex::encode(&serialized) == case1 || hex::encode(&serialized) == case2);
+        let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();
         assert_eq!(packet, deserialized);
     }
 }

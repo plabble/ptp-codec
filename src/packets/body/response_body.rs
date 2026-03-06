@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     crypto::certificate::Certificate,
     packets::body::{
-        bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody, error::PlabbleError, opcode::OpCodeResponseBody, proxy::ProxyResponseBody, session::SessionResponseBody, stream::StreamResponseBody
+        bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody,
+        error::PlabbleError, opcode::OpCodeResponseBody, proxy::ProxyResponseBody,
+        session::SessionResponseBody, stream::StreamResponseBody,
     },
 };
 
@@ -42,7 +44,11 @@ pub enum PlabbleResponseBody {
     Post = 4,
     Patch = 5,
     Put = 6,
-    Delete = 7,
+    Delete(
+        #[toggled_by = "return_deleted"]
+        #[variant_by = "binary_keys"]
+        Option<BucketBody>,
+    ) = 7,
     Subscribe = 8,
     Unsubscribe = 9,
     Register(Certificate) = 10,
