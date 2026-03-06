@@ -2,6 +2,7 @@ use crate::crypto::{
     KeyExchange, KeyExchangeAlgorithm,
     algorithm::{KeyExhangeRequest, KeyExhangeResponse},
 };
+
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 
 impl KeyExchange {
@@ -24,7 +25,7 @@ impl KeyExchange {
             KeyExchangeAlgorithm::X25519 => {
                 use x25519_dalek::PublicKey;
 
-                let secret = StaticSecret::random_from_rng(rand_core_064::OsRng);
+                let secret = StaticSecret::random();
                 let public = PublicKey::from(&secret);
                 self.secret = Some(secret.as_bytes().to_vec());
 
@@ -33,34 +34,32 @@ impl KeyExchange {
             #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem512 => {
                 use ml_kem::{
-                    EncodedSizeUser, KemCore, MlKem512, MlKem512Params,
-                    kem::{DecapsulationKey, EncapsulationKey},
+                    Kem, KeyExport, MlKem512, kem::{DecapsulationKey, EncapsulationKey}
                 };
 
                 let (dc, ec): (
-                    DecapsulationKey<MlKem512Params>,
-                    EncapsulationKey<MlKem512Params>,
-                ) = MlKem512::generate(&mut rand_core_064::OsRng);
+                    DecapsulationKey<MlKem512>,
+                    EncapsulationKey<MlKem512>,
+                ) = MlKem512::generate_keypair();
 
-                self.secret = Some(dc.as_bytes().to_vec());
+                self.secret = Some(dc.to_bytes().to_vec());
 
-                Some(KeyExhangeRequest::Kem512(ec.as_bytes().into()))
+                Some(KeyExhangeRequest::Kem512(ec.to_bytes().into()))
             }
             #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem768 => {
                 use ml_kem::{
-                    EncodedSizeUser, KemCore, MlKem768, MlKem768Params,
-                    kem::{DecapsulationKey, EncapsulationKey},
+                    Kem, KeyExport, MlKem768, kem::{DecapsulationKey, EncapsulationKey}
                 };
 
                 let (dc, ec): (
-                    DecapsulationKey<MlKem768Params>,
-                    EncapsulationKey<MlKem768Params>,
-                ) = MlKem768::generate(&mut rand_core_064::OsRng);
+                    DecapsulationKey<MlKem768>,
+                    EncapsulationKey<MlKem768>,
+                ) = MlKem768::generate_keypair();
 
-                self.secret = Some(dc.as_bytes().to_vec());
+                self.secret = Some(dc.to_bytes().to_vec());
 
-                Some(KeyExhangeRequest::Kem768(ec.as_bytes().into()))
+                Some(KeyExhangeRequest::Kem768(ec.to_bytes().into()))
             }
             #[cfg(not(feature = "pqc-lite"))]
             _ => None,
@@ -80,7 +79,7 @@ impl KeyExchange {
         match self.algorithm {
             KeyExchangeAlgorithm::X25519 => {
                 if let KeyExhangeRequest::X25519(other_pub) = req {
-                    let secret = EphemeralSecret::random_from_rng(rand_core_064::OsRng);
+                    let secret = EphemeralSecret::random();
                     let public = PublicKey::from(&secret);
                     let other_pub = PublicKey::from(*other_pub);
 
@@ -94,15 +93,12 @@ impl KeyExchange {
             KeyExchangeAlgorithm::Kem512 => {
                 if let KeyExhangeRequest::Kem512(encap_key) = req {
                     use ml_kem::{
-                        Ciphertext, EncodedSizeUser, MlKem512, MlKem512Params, SharedKey,
+                        Ciphertext, MlKem512, SharedKey,
                         kem::{Encapsulate, EncapsulationKey},
                     };
-                    let encapsulation_key =
-                        EncapsulationKey::<MlKem512Params>::from_bytes(encap_key.into());
+                    let encapsulation_key = EncapsulationKey::<MlKem512>::new(encap_key.into()).ok()?;
 
-                    let (es, ss): (Ciphertext<MlKem512>, SharedKey<MlKem512>) = encapsulation_key
-                        .encapsulate(&mut rand_core_064::OsRng)
-                        .ok()?;
+                    let (es, ss): (Ciphertext<MlKem512>, SharedKey) = encapsulation_key.encapsulate();
 
                     Some((ss.into(), KeyExhangeResponse::Kem512(es.into())))
                 } else {
@@ -113,15 +109,13 @@ impl KeyExchange {
             KeyExchangeAlgorithm::Kem768 => {
                 if let KeyExhangeRequest::Kem768(encap_key) = req {
                     use ml_kem::{
-                        Ciphertext, EncodedSizeUser, MlKem768, MlKem768Params, SharedKey,
+                        Ciphertext, MlKem768, SharedKey,
                         kem::{Encapsulate, EncapsulationKey},
                     };
                     let encapsulation_key =
-                        EncapsulationKey::<MlKem768Params>::from_bytes(encap_key.into());
+                        EncapsulationKey::<MlKem768>::new(encap_key.into()).ok()?;
 
-                    let (es, ss): (Ciphertext<MlKem768>, SharedKey<MlKem768>) = encapsulation_key
-                        .encapsulate(&mut rand_core_064::OsRng)
-                        .ok()?;
+                    let (es, ss): (Ciphertext<MlKem768>, SharedKey) = encapsulation_key.encapsulate();
 
                     Some((ss.into(), KeyExhangeResponse::Kem768(es.into())))
                 } else {
@@ -156,15 +150,15 @@ impl KeyExchange {
             KeyExchangeAlgorithm::Kem512 => {
                 if let KeyExhangeResponse::Kem512(ek) = res {
                     use ml_kem::{
-                        Ciphertext, EncodedSizeUser, MlKem512, MlKem512Params, SharedKey,
+                        Ciphertext, MlKem512, SharedKey,
                         kem::{Decapsulate, DecapsulationKey},
                     };
 
                     let ek: Ciphertext<MlKem512> = (*ek).into();
-                    let secret: &[u8; 1632] = self.secret.as_ref().unwrap()[..].try_into().unwrap();
+                    let secret: [u8; 64] = self.secret.as_ref().unwrap()[..].try_into().unwrap();
 
-                    let dc = DecapsulationKey::<MlKem512Params>::from_bytes(secret.into());
-                    let ss: SharedKey<MlKem512> = dc.decapsulate(&ek).ok()?;
+                    let dc = DecapsulationKey::<MlKem512>::from_seed(secret.into());
+                    let ss: SharedKey = dc.decapsulate(&ek);
 
                     Some(ss.into())
                 } else {
@@ -175,15 +169,15 @@ impl KeyExchange {
             KeyExchangeAlgorithm::Kem768 => {
                 if let KeyExhangeResponse::Kem768(ek) = res {
                     use ml_kem::{
-                        Ciphertext, EncodedSizeUser, MlKem768, MlKem768Params, SharedKey,
+                        Ciphertext, MlKem768, SharedKey,
                         kem::{Decapsulate, DecapsulationKey},
                     };
 
                     let ek: Ciphertext<MlKem768> = (*ek).into();
-                    let secret: &[u8; 2400] = self.secret.as_ref().unwrap()[..].try_into().unwrap();
+                    let secret: [u8; 64] = self.secret.as_ref().unwrap()[..].try_into().unwrap();
 
-                    let dc = DecapsulationKey::<MlKem768Params>::from_bytes(secret.into());
-                    let ss: SharedKey<MlKem768> = dc.decapsulate(&ek).ok()?;
+                    let dc = DecapsulationKey::<MlKem768>::from_seed(secret.into());
+                    let ss: SharedKey = dc.decapsulate(&ek);
 
                     Some(ss.into())
                 } else {

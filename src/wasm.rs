@@ -1,28 +1,31 @@
-use async_channel::{Receiver, Sender};
-use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+use async_channel::Sender;
 use js_sys::{Function, Uint8Array};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    core::BucketId,
-    packets::{
-        context::PlabbleConnectionContext, request::PlabbleRequestPacket,
-        response::PlabbleResponsePacket,
-    },
+    packets::
+        request::PlabbleRequestPacket
+    ,
     protocol::{PlabbleConnection as InnerPlabbleConnection, error::PlabbleStatusCode},
 };
 
 #[wasm_bindgen]
-pub fn version() -> String {
+pub fn plabble_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
 #[wasm_bindgen]
-pub fn set_panic_hook() {
-    #[cfg(feature = "console_error_panic_hook")]
+pub fn setup_logging(level: u8) {
     console_error_panic_hook::set_once();
+    console_log::init_with_level(match level {
+        1 => log::Level::Error,
+        2 => log::Level::Warn,
+        3 => log::Level::Info,
+        4 => log::Level::Debug,
+        _ => log::Level::Trace,
+    }).expect("Failed to setup logging");
 }
 
 #[wasm_bindgen]
@@ -31,8 +34,14 @@ pub struct PlabbleConnection {
     rx: Sender<Vec<u8>>,
 }
 
+/// Plabble Connection
 #[wasm_bindgen]
 impl PlabbleConnection {
+    /// Create new PlabbleConnection instance
+    /// 
+    /// - `handle_send`: JS callback to handle outgoing packets (called with Uint8Array)
+    /// - `get_bucket_key`: Optional JS callback to get bucket key (called with bucket ID as Uint8Array(16), should return Uint8Array(32))
+    /// - `get_psk`: Optional JS callback to get PSK (called with PSK ID as Uint8Array(12), should return Uint8Array(64))
     #[wasm_bindgen(constructor)]
     pub fn new(handle_send: Function, get_bucket_key: Option<Function>, get_psk: Option<Function>) -> Self {
         let (rx, recv) = async_channel::unbounded();
@@ -63,9 +72,7 @@ impl PlabbleConnection {
         Self { inner, rx }
     }
 
-    /**
-     * Send a request packet without waiting for response.
-     */
+    /// Send a packet to the Plabble connection (accepts a JSON string representing PlabbleRequestPacket)
     pub async fn send(&mut self, packet: &str) -> Result<(), JsValue> {
         let request = serde_json::from_str::<PlabbleRequestPacket>(packet)
             .map_err(|e| JsValue::from_str(&format!("Parse error: {:?}", e)))?;
@@ -77,12 +84,13 @@ impl PlabbleConnection {
         Ok(())
     }
 
-    pub fn on_recv(&self, data: Vec<u8>) {
-        let _ = self.rx.try_send(data);
+    /// Internal method to handle received packet bytes (called from JS)
+    pub async fn on_recv(&self, data: Vec<u8>) {
+        let _ = self.rx.send(data).await;
     }
 }
 
-// Helper function to call JS callbacks and convert result to fixed-size array
+/// Helper function to call JS callbacks and convert result to fixed-size array
 fn call_js_byte_array_cb_1<const N: usize>(callback: &Function, input: &[u8]) -> Option<[u8; N]> {
     callback
         .call1(&JsValue::NULL, &Uint8Array::from(input).into())

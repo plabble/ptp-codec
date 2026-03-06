@@ -15,7 +15,7 @@ impl SigningKey {
             SigningKey::Dsa44(key) => {
                 use ml_dsa::{MlDsa44, Signature, SigningKey, signature::Signer};
 
-                let key = SigningKey::<MlDsa44>::decode(key.into());
+                let key = SigningKey::<MlDsa44>::from_seed(key.into());
 
                 let signature: Signature<MlDsa44> = key.try_sign(data).ok()?;
                 Some(CryptoSignature::Dsa44(signature.encode().into()))
@@ -24,7 +24,7 @@ impl SigningKey {
             SigningKey::Dsa65(key) => {
                 use ml_dsa::{MlDsa65, Signature, SigningKey, signature::Signer};
 
-                let key = SigningKey::<MlDsa65>::decode(key.into());
+                let key = SigningKey::<MlDsa65>::from_seed(key.into());
                 let signature: Signature<MlDsa65> = key.try_sign(data).ok()?;
                 Some(CryptoSignature::Dsa65(signature.encode().into()))
             }
@@ -113,9 +113,9 @@ mod tests {
         use ml_dsa::{KeyGen, KeyPair, MlDsa44};
 
         let data = [0u8; 16];
-        let kp: KeyPair<MlDsa44> = MlDsa44::key_gen(&mut rand_core_064::OsRng);
+        let kp: KeyPair<MlDsa44> = MlDsa44::key_gen(&mut rand::rng());
 
-        let sig = SigningKey::Dsa44(kp.signing_key().encode().into());
+        let sig = SigningKey::Dsa44(kp.to_seed().into());
 
         let signature = sig.sign(&data).unwrap();
         assert!(matches!(signature, CryptoSignature::Dsa44(_)));
@@ -134,9 +134,9 @@ mod tests {
         use ml_dsa::{KeyGen, KeyPair, MlDsa65};
 
         let data = [0u8; 16];
-        let kp: KeyPair<MlDsa65> = MlDsa65::key_gen(&mut rand_core_064::OsRng);
+        let kp: KeyPair<MlDsa65> = MlDsa65::key_gen(&mut rand::rng());
 
-        let sig = SigningKey::Dsa65(kp.signing_key().encode().into());
+        let sig = SigningKey::Dsa65(kp.to_seed().into());
 
         let signature = sig.sign(&data).unwrap();
         assert!(matches!(signature, CryptoSignature::Dsa65(_)));

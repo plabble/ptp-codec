@@ -109,16 +109,16 @@ pub enum VerificationKey {
 ///
 /// # Variants:
 /// - Ed25519: 32 bytes key for Ed25519
-/// - Dsa44: 2560 bytes key for ML-DSA-44
-/// - Dsa65: 4032 bytes key for ML-DSA-65
+/// - Dsa44: 2560 bytes key for ML-DSA-44, but is a 32-byte seed
+/// - Dsa65: 4032 bytes key for ML-DSA-65, but is a 32-byte seed
 /// - Falcon: 2305 bytes key for Falcon-1024
 /// - SlhDsaSha128s: 64 bytes key for SLH-DSA-SHA128s
 #[serde_as]
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum SigningKey {
     Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
-    Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 2560]),
-    Dsa65(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 4032]),
+    Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    Dsa65(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
     Falcon(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 2305]),
     SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 64]),
 }
