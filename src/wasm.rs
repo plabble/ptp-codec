@@ -1,61 +1,18 @@
-use std::sync::Mutex;
 use async_channel::{Receiver, Sender};
-use wasm_bindgen::prelude::*;
-use js_sys::{Function, Uint8Array};
 use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+use js_sys::{Function, Uint8Array};
+use std::sync::{Arc, Mutex};
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     core::BucketId,
     packets::{
-        context::PlabbleConnectionContext,
-        request::PlabbleRequestPacket,
+        context::PlabbleConnectionContext, request::PlabbleRequestPacket,
         response::PlabbleResponsePacket,
     },
-    protocol::{PlabbleConnection as InnerPlabbleConnection, error::PlabbleStatusCode}
+    protocol::{PlabbleConnection as InnerPlabbleConnection, error::PlabbleStatusCode},
 };
-
-// Global callback storage
-static GLOBAL_GET_BUCKET_KEY: Mutex<Option<Function>> = Mutex::new(None);
-static GLOBAL_GET_PSK: Mutex<Option<Function>> = Mutex::new(None);
-
-// Wrapper functions that call the global callbacks
-fn call_global_bucket_key(id: &BucketId) -> Option<[u8; 32]> {
-    let guard = GLOBAL_GET_BUCKET_KEY.lock().unwrap();
-    if let Some(cb) = guard.as_ref() {
-        let bytes = id.to_bytes(None::<&mut SerializerConfig<()>>).unwrap();
-        let input = Uint8Array::from(&bytes[..]);
-        
-        if let Ok(result) = cb.call1(&JsValue::NULL, &input.into()) {
-            if let Ok(arr) = result.dyn_into::<Uint8Array>() {
-                if arr.length() == 32 {
-                    let mut output = [0u8; 32];
-                    arr.copy_to(&mut output);
-                    return Some(output);
-                }
-            }
-        }
-    }
-    None
-}
-
-fn call_global_psk(id: &[u8; 12]) -> Option<[u8; 64]> {
-    let guard = GLOBAL_GET_PSK.lock().unwrap();
-    if let Some(cb) = guard.as_ref() {
-        let input = Uint8Array::from(&id[..]);
-        
-        if let Ok(result) = cb.call1(&JsValue::NULL, &input.into()) {
-            if let Ok(arr) = result.dyn_into::<Uint8Array>() {
-                if arr.length() == 64 {
-                    let mut output = [0u8; 64];
-                    arr.copy_to(&mut output);
-                    return Some(output);
-                }
-            }
-        }
-    }
-    None
-}
 
 #[wasm_bindgen]
 pub fn version() -> String {
@@ -77,13 +34,24 @@ pub struct PlabbleConnection {
 #[wasm_bindgen]
 impl PlabbleConnection {
     #[wasm_bindgen(constructor)]
-    pub fn new(handle_send: Function) -> Self {
+    pub fn new(handle_send: Function, get_bucket_key: Option<Function>, get_psk: Option<Function>) -> Self {
         let (rx, recv) = async_channel::unbounded();
         let (send, tx) = async_channel::unbounded();
         let mut inner = InnerPlabbleConnection::new(send, recv);
+
         let data = inner.config.data.as_mut().unwrap();
-        data.get_bucket_key = Some(call_global_bucket_key);
-        data.get_psk = Some(call_global_psk);
+
+        if let Some(get_bucket_key) = get_bucket_key {
+            data.get_bucket_key = Some(Arc::new(move |bucket_id| {
+                call_js_byte_array_cb_1(&get_bucket_key, &bucket_id.data)
+            }));
+        }
+
+        if let Some(get_psk) = get_psk {
+            data.get_psk = Some(Arc::new(move |psk_id| {
+                call_js_byte_array_cb_1(&get_psk, psk_id)
+            }));
+        }
 
         spawn_local(async move {
             while let Ok(res) = tx.recv().await {
@@ -92,10 +60,7 @@ impl PlabbleConnection {
             }
         });
 
-        Self {
-            inner,
-            rx,
-        }
+        Self { inner, rx }
     }
 
     /**
@@ -104,8 +69,11 @@ impl PlabbleConnection {
     pub async fn send(&mut self, packet: &str) -> Result<(), JsValue> {
         let request = serde_json::from_str::<PlabbleRequestPacket>(packet)
             .map_err(|e| JsValue::from_str(&format!("Parse error: {:?}", e)))?;
-        
-        self.inner.send(request).await.map_err(|e| JsValue::from_str(&format!("{:?}", PlabbleStatusCode::from(e))))?;
+
+        self.inner
+            .send(request)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("{:?}", PlabbleStatusCode::from(e))))?;
         Ok(())
     }
 
@@ -114,95 +82,17 @@ impl PlabbleConnection {
     }
 }
 
-
-#[wasm_bindgen]
-pub struct ConnectionContext(PlabbleConnectionContext);
-
-#[wasm_bindgen]
-impl ConnectionContext {
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        let mut context = PlabbleConnectionContext::new();
-        context.get_bucket_key = Some(call_global_bucket_key);
-        context.get_psk = Some(call_global_psk);
-        Self(context)
-    }
-}
-
-#[wasm_bindgen]
-pub fn encode_packet(
-    input: &str,
-    is_request: bool,
-    context: &mut ConnectionContext,
-) -> Result<Uint8Array, JsValue> {
-    let mut config = Some(SerializerConfig::new(Some(context.0.clone())));
-
-    let packet_result = if is_request {
-        serde_json::from_str::<PlabbleRequestPacket>(input)
-            .map_err(|e| JsValue::from_str(&format!("Parse error: {:?}", e)))?
-            .to_bytes(config.as_mut())
-    } else {
-        serde_json::from_str::<PlabbleResponsePacket>(input)
-            .map_err(|e| JsValue::from_str(&format!("Parse error: {:?}", e)))?
-            .to_bytes(config.as_mut())
-    };
-
-    let res = match packet_result {
-        Ok(bytes) => Ok(Uint8Array::from(&bytes[..])),
-        Err(e) => Err(JsValue::from_str(&format!("{:?}", e))),
-    };
-
-    if res.is_ok() {
-        context.0.increment(is_request);
-    }
-
-    res
-}
-
-#[wasm_bindgen]
-pub fn decode_packet(
-    input: Uint8Array,
-    is_request: bool,
-    context: &mut ConnectionContext,
-) -> Result<String, JsValue> {
-    let bytes = input.to_vec();
-    
-    let mut config = Some(SerializerConfig::new(Some(context.0.clone())));
-
-    let res = if is_request {
-        let packet = PlabbleRequestPacket::from_bytes(&bytes, config.as_mut())
-            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
-
-        serde_json::to_string(&packet)
-            .map_err(|e| JsValue::from_str(&format!("Serialization error: {:?}", e)))
-    } else {
-        let packet = PlabbleResponsePacket::from_bytes(&bytes, config.as_mut())
-            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
-        
-        serde_json::to_string(&packet)
-            .map_err(|e| JsValue::from_str(&format!("Serialization error: {:?}", e)))
-    };
-
-    if res.is_ok() {
-        context.0.increment(is_request);
-    }
-
-    res
-}
-
-/* TODO: both here and in FFI code, key_exchange methods with KeyExchange object and bindings */
-
-#[wasm_bindgen]
-pub fn free_context(_context: ConnectionContext) {
-    // Context will be dropped when this function is called, freeing resources
-}
-
-#[wasm_bindgen]
-pub fn set_get_bucket_key_callback(cb: Function) {
-    *GLOBAL_GET_BUCKET_KEY.lock().unwrap() = Some(cb);
-}
-
-#[wasm_bindgen]
-pub fn set_get_psk_callback(cb: Function) {
-    *GLOBAL_GET_PSK.lock().unwrap() = Some(cb);
+// Helper function to call JS callbacks and convert result to fixed-size array
+fn call_js_byte_array_cb_1<const N: usize>(callback: &Function, input: &[u8]) -> Option<[u8; N]> {
+    callback
+        .call1(&JsValue::NULL, &Uint8Array::from(input).into())
+        .ok()?
+        .dyn_into::<Uint8Array>()
+        .ok()
+        .filter(|arr| arr.length() == N as u32)
+        .map(|arr| {
+            let mut output = [0u8; N];
+            arr.copy_to(&mut output);
+            output
+        })
 }

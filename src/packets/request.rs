@@ -264,6 +264,8 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::{
         errors::DeserializationError,
         packets::{
@@ -312,7 +314,7 @@ mod tests {
 
         // When encrypted with BucketId in AAD, decryption is different
         let context = config.data.as_mut().unwrap();
-        context.get_bucket_key = Some(|_| Some([0u8; 32]));
+        context.get_bucket_key = Some(Arc::new(|_| Some([0u8; 32])));
         context.include_bucket_key_in_auth_data = true;
 
         let without_bucket_key = hex::encode(&encrypted);
@@ -395,7 +397,7 @@ mod tests {
 
         // MAC is different when bucket key is included in AAD
         let context = config.data.as_mut().unwrap();
-        context.get_bucket_key = Some(|_| Some([0u8; 32]));
+        context.get_bucket_key = Some(Arc::new(|_| Some([0u8; 32])));
         context.include_bucket_key_in_auth_data = true;
 
         let serialized = packet.to_bytes(Some(&mut config)).unwrap();

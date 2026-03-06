@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     core::BucketId,
     crypto::{derive_key, hash_256, hash_512},
@@ -6,13 +8,13 @@ use crate::{
 
 /// Connection context for cryptography, counters, session etc.
 /// This object is used for handling MAC, encryption, key derivation etc.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PlabbleConnectionContext {
     /// Get bucket key by bucket ID
-    pub get_bucket_key: Option<fn(&BucketId) -> Option<[u8; 32]>>,
+    pub get_bucket_key: Option<Arc<dyn Fn(&BucketId) -> Option<[u8; 32]>>>,
 
     /// Get pre-shared key by ID
-    pub get_psk: Option<fn(&[u8; 12]) -> Option<[u8; 64]>>,
+    pub get_psk: Option<Arc<dyn Fn(&[u8; 12]) -> Option<[u8; 64]>>>,
 
     /// Session key, if in a session
     pub session_key: Option<[u8; 64]>,
@@ -93,7 +95,7 @@ impl PlabbleConnectionContext {
         raw_base_and_header: &[u8],
         bucket_id: Option<&BucketId>,
     ) -> [u8; 32] {
-        let bucket_key = bucket_id.and_then(|id| self.get_bucket_key.and_then(|f| f(id)));
+        let bucket_key = bucket_id.and_then(|id| self.get_bucket_key.as_ref().and_then(|f| f(id)));
 
         let mut data = Vec::new();
         data.push(raw_base_and_header);
@@ -135,7 +137,7 @@ impl PlabbleConnectionContext {
             // If it is not given, use a PSK. If that won't resolve, this function will return none
             // Try from base packet first if pre_shared_key is set, otherwise try session PSK
             if let Some(base) = base && base.pre_shared_key {
-                let psk = (self.get_psk?)(&base.psk_id?)?;
+                let psk = (self.get_psk.as_ref()?)(&base.psk_id?)?;
                 (psk, &base.psk_salt?)
             } else {
                 (self.session_psk?, &self.session_salt?)
@@ -176,6 +178,8 @@ impl PlabbleConnectionContext {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::packets::{base::PlabblePacketBase, context::PlabbleConnectionContext};
 
     #[test]
@@ -215,7 +219,7 @@ mod tests {
             psk_salt: Some([0u8; 16]),
         };
 
-        context.get_psk = Some(|_| Some([0u8; 64]));
+        context.get_psk = Some(Arc::new(|_| Some([0u8; 64])));
         let key4 = context.create_key(Some(&base), 0, true).unwrap();
         assert_ne!(key1, key4);
         assert_ne!(key2, key4);
