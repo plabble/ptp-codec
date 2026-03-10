@@ -1,5 +1,10 @@
+use std::fmt;
+
 use crate::{errors::{DeserializationError, SerializationError}, packets::body::error::PlabbleError};
 
+#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "ffi", uniffi(flat_error))]
+#[derive(Debug)]
 pub enum PlabbleProtocolError {
     SerializationError(SerializationError),
     DeserializationError(DeserializationError),
@@ -7,56 +12,9 @@ pub enum PlabbleProtocolError {
     SenderError,
     ReceiverError,
     UnexpectedResponse,
-    FailedToProcessResponse
-}
-
-#[repr(u16)]
-#[derive(Debug)]
-pub enum PlabbleStatusCode {
-    Ok = 0,
-    
-    /* 1 - 255: Plabble protocol error codes */
-    InternalServerError = 255,
-
-    SerializationFailed = 256,
-    DeserializationFailed = 257,
-    EncryptionFailed = 258,
-    DecryptionFailed = 259,
-    IntegrityCheckFailed = 260,
-
-    TransportError = 300,
-    UnexpectedResponse = 301,
-    FailedToProcessResponse = 302,
-}
-
-impl From<PlabbleProtocolError> for PlabbleStatusCode {
-    fn from(value: PlabbleProtocolError) -> Self {
-        match value {
-            PlabbleProtocolError::SerializationError(s) => {
-                match s {
-                    SerializationError::EncryptionFailed | SerializationError::NoKeyAvailable =>
-                        PlabbleStatusCode::EncryptionFailed,
-                    _ => PlabbleStatusCode::SerializationFailed,
-                }
-            }
-            PlabbleProtocolError::DeserializationError(d) => {
-                match d {
-                    DeserializationError::DecryptionFailed | DeserializationError::NoKeyAvailable =>
-                        PlabbleStatusCode::DecryptionFailed,
-                    DeserializationError::IntegrityFailed => PlabbleStatusCode::IntegrityCheckFailed,
-                    _ => PlabbleStatusCode::DeserializationFailed,
-                }
-            }
-            PlabbleProtocolError::ProtocolError(e) => {
-                match e {
-                    _ => PlabbleStatusCode::InternalServerError
-                }
-            },
-            PlabbleProtocolError::SenderError | PlabbleProtocolError::ReceiverError => PlabbleStatusCode::TransportError,
-            PlabbleProtocolError::UnexpectedResponse => PlabbleStatusCode::UnexpectedResponse,
-            PlabbleProtocolError::FailedToProcessResponse => PlabbleStatusCode::FailedToProcessResponse,
-        }
-    }
+    FailedToProcessResponse,
+    InputParsingFailed,
+    OutputSerializationFailed,
 }
 
 impl From<SerializationError> for PlabbleProtocolError {
@@ -76,3 +34,21 @@ impl From<PlabbleError> for PlabbleProtocolError {
         PlabbleProtocolError::ProtocolError(value)
     }
 }
+
+impl fmt::Display for PlabbleProtocolError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SerializationError(e) => write!(f, "Serialization error: {:?}", e),
+            Self::DeserializationError(e) => write!(f, "Deserialization error: {:?}", e),
+            Self::ProtocolError(e) => write!(f, "Protocol error: {:?}", e),
+            Self::SenderError => write!(f, "Sender error"),
+            Self::ReceiverError => write!(f, "Receiver error"),
+            Self::UnexpectedResponse => write!(f, "Unexpected response"),
+            Self::FailedToProcessResponse => write!(f, "Failed to process response"),
+            Self::InputParsingFailed => write!(f, "Input parsing failed"),
+            Self::OutputSerializationFailed => write!(f, "Output serialization failed"),
+        }
+    }
+}
+
+impl std::error::Error for PlabbleProtocolError {}

@@ -8,7 +8,7 @@ use crate::{
     packets::
         request::PlabbleRequestPacket
     ,
-    protocol::{PlabbleConnection as InnerPlabbleConnection, error::PlabbleStatusCode},
+    protocol::{PlabbleConnection as InnerPlabbleConnection},
 };
 
 #[wasm_bindgen]
@@ -80,7 +80,7 @@ impl PlabbleConnection {
         self.inner
             .send(request)
             .await
-            .map_err(|e| JsValue::from_str(&format!("{:?}", PlabbleStatusCode::from(e))))?;
+            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
         Ok(())
     }
 

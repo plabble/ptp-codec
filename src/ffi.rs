@@ -1,314 +1,148 @@
-use std::{
-    ffi::{CStr, CString},
-    fmt::Debug,
-    os::raw::c_char,
-    slice,
-    sync::Mutex,
-};
+use std::sync::Arc;
 
-use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+use async_channel::{Receiver, Sender};
+use binary_codec::{BinarySerializer, SerializerConfig};
+use futures::lock::Mutex;
 use serde::Serialize;
 
 use crate::{
-    core::BucketId,
-    packets::{
-        context::PlabbleConnectionContext, request::PlabbleRequestPacket,
-        response::PlabbleResponsePacket,
+    packets::request::PlabbleRequestPacket,
+    protocol::{
+        PlabbleConnection as InnerPlabbleConnection,
+        error::PlabbleProtocolError,
     },
 };
 
-pub type LookupBytesCallback = unsafe extern "C" fn(*const u8, *mut u8) -> bool;
+// ── Callback interfaces ─────────────────────────────────────────────────────
 
-// Global storage/settings
-static GLOBAL_GET_BUCKET_KEY: Mutex<Option<LookupBytesCallback>> = Mutex::new(None);
-static GLOBAL_GET_PSK: Mutex<Option<LookupBytesCallback>> = Mutex::new(None);
-
-// Wrapper functions that call the global callbacks
-fn call_global_bucket_key(id: &BucketId) -> Option<[u8; 32]> {
-    let guard = GLOBAL_GET_BUCKET_KEY.lock().unwrap();
-    if let Some(cb) = *guard {
-        let bytes = id.to_bytes(None::<&mut SerializerConfig<()>>).unwrap();
-        let mut output = [0u8; 32];
-        let res = unsafe { cb(bytes.as_ptr(), output.as_mut_ptr()) };
-        if res { Some(output) } else { None }
-    } else {
-        None
-    }
+/// Callback interface for looking up bucket keys by bucket ID.
+#[uniffi::export(callback_interface)]
+pub trait BucketKeyProvider: Send + Sync {
+    /// Given a bucket ID serialized as bytes, return the 32-byte bucket key, or None.
+    fn get_bucket_key(&self, bucket_id_bytes: Vec<u8>) -> Option<Vec<u8>>;
 }
 
-fn call_global_psk(id: &[u8; 12]) -> Option<[u8; 64]> {
-    let guard = GLOBAL_GET_PSK.lock().unwrap();
-    if let Some(cb) = *guard {
-        let mut output = [0u8; 64];
-        let res = unsafe { cb(id.as_ptr(), output.as_mut_ptr()) };
-        if res { Some(output) } else { None }
-    } else {
-        None
-    }
+/// Callback interface for looking up pre-shared keys.
+#[uniffi::export(callback_interface)]
+pub trait PskProvider: Send + Sync {
+    /// Given a 12-byte PSK ID, return the 64-byte pre-shared key, or None.
+    fn get_psk(&self, psk_id: Vec<u8>) -> Option<Vec<u8>>;
 }
 
-#[repr(C)]
-pub enum FfiStatus {
-    Ok = 0,
-    NullPointer = 1,
-    InvalidInput = 2,
-    InputParsingFailed = 3,
-    Error = 255,
+// ── Connection object ───────────────────────────────────────────────────────
+
+/// A Plabble protocol connection handle.
+#[derive(uniffi::Object)]
+pub struct PlabbleConnection {
+    inner: Mutex<InnerPlabbleConnection>,
+    tx: Receiver<Vec<u8>>,
+    rx: Sender<Vec<u8>>,
 }
 
-#[repr(C)]
-pub struct FfiBytes {
-    pub buff: *mut u8,
-    pub len: usize,
-}
+// Safety: The inner PlabbleConnection is protected by a Mutex ensuring exclusive
+// access. The callback closures stored in the connection context capture only
+// Send+Sync values (Arc<dyn BucketKeyProvider> and Arc<dyn PskProvider>).
+unsafe impl Send for PlabbleConnection {}
+unsafe impl Sync for PlabbleConnection {}
 
-#[repr(C)]
-pub struct FfiBytesOutput {
-    pub status: FfiStatus,
-    pub data: FfiBytes,
-}
+#[uniffi::export]
+impl PlabbleConnection {
+    /// Create a new Plabble connection.
+    #[uniffi::constructor]
+    pub fn new() -> Self {
+        let (rx_sender, inner_rx) = async_channel::unbounded();
+        let (inner_tx, tx_receiver) = async_channel::unbounded();
+        let inner = InnerPlabbleConnection::new(inner_tx, inner_rx);
 
-#[repr(C)]
-pub struct FfiStringOutput {
-    pub status: FfiStatus,
-    pub data: *mut c_char,
-}
-
-impl FfiBytesOutput {
-    pub fn fail(status: FfiStatus) -> Self {
         Self {
-            status,
-            data: FfiBytes {
-                buff: std::ptr::null_mut(),
-                len: 0,
-            },
+            inner: Mutex::new(inner),
+            tx: tx_receiver,
+            rx: rx_sender,
         }
     }
 
-    pub fn error<T: Serialize + Debug>(data: T) -> Self {
-        let mut bytes = format!("{:?}", data).into_bytes();
-        let len = bytes.len();
-        let buff = bytes.as_mut_ptr();
-        std::mem::forget(bytes);
-        Self {
-            status: FfiStatus::Error,
-            data: FfiBytes { buff, len },
-        }
+    /// Set a callback for looking up bucket keys by bucket ID.
+    pub async fn set_bucket_key_provider(&self, provider: Box<dyn BucketKeyProvider>) {
+        let provider: Arc<dyn BucketKeyProvider> = Arc::from(provider);
+        let mut inner = self.inner.lock().await;
+        let data = inner.config.data.as_mut().unwrap();
+        data.get_bucket_key = Some(Arc::new(move |bucket_id| {
+            let bytes = bucket_id
+                .to_bytes(None::<&mut SerializerConfig<()>>)
+                .unwrap();
+            provider
+                .get_bucket_key(bytes)
+                .and_then(|v| <[u8; 32]>::try_from(v).ok())
+        }));
     }
 
-    pub fn new(mut data: Vec<u8>) -> Self {
-        let buff = data.as_mut_ptr();
-        let len = data.len();
+    /// Set a callback for looking up pre-shared keys by PSK ID.
+    pub async fn set_psk_provider(&self, provider: Box<dyn PskProvider>) {
+        let provider: Arc<dyn PskProvider> = Arc::from(provider);
+        let mut inner = self.inner.lock().await;
+        let data = inner.config.data.as_mut().unwrap();
+        data.get_psk = Some(Arc::new(move |psk_id| {
+            provider
+                .get_psk(psk_id.to_vec())
+                .and_then(|v| <[u8; 64]>::try_from(v).ok())
+        }));
+    }
 
-        std::mem::forget(data);
+    /// Send a request packet serialized as a JSON (or TOML) string.
+    pub async fn send_request(&self, request: String) -> Result<(), PlabbleProtocolError> {
+        let packet = deserialize_request(&request)?;
+        let mut inner = self.inner.lock().await;
+        inner.send(packet).await
+    }
 
-        FfiBytesOutput {
-            status: FfiStatus::Ok,
-            data: FfiBytes { buff, len },
-        }
+    /// Feed raw incoming bytes received from the transport layer into the connection.
+    pub fn handle_incoming(&self, bytes: Vec<u8>) -> Result<(), PlabbleProtocolError> {
+        self.rx
+            .try_send(bytes)
+            .map_err(|_| PlabbleProtocolError::SenderError)
+    }
+
+    /// Poll for the next outgoing packet (non-blocking).
+    /// Returns the raw bytes to send over the transport, or None if nothing is queued.
+    pub async fn poll_outgoing(&self) -> Option<Vec<u8>> {
+        self.tx.recv().await.ok()
     }
 }
 
-impl FfiStringOutput {
-    pub fn fail(status: FfiStatus) -> Self {
-        Self {
-            status,
-            data: CString::new("").unwrap().into_raw(),
-        }
+// ── Free functions ──────────────────────────────────────────────────────────
+
+/// Returns the library version string.
+#[uniffi::export]
+pub fn plabble_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/// Deserialize a request packet from a JSON or TOML string (depending on enabled features).
+fn deserialize_request(data: &str) -> Result<PlabbleRequestPacket, PlabbleProtocolError> {
+    #[cfg(feature = "with-json")]
+    {
+        return serde_json::from_str(data).map_err(|_| PlabbleProtocolError::InputParsingFailed);
     }
 
-    pub fn error<T: Serialize + Debug>(data: T) -> Self {
-        Self {
-            status: FfiStatus::Error,
-            data: CString::new(format!("{:?}", &data)).unwrap().into_raw(),
-        }
-    }
-
-    pub fn new(s: String) -> Self {
-        Self {
-            status: FfiStatus::Ok,
-            data: CString::new(s).unwrap().into_raw(),
-        }
+    #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
+    {
+        return toml::from_str(data).map_err(|_| PlabbleProtocolError::InputParsingFailed);
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn version() -> *const c_char {
-    CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw()
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn encode_packet(
-    input: *const c_char,
-    is_request: bool,
-    context: *mut PlabbleConnectionContext,
-) -> FfiBytesOutput {
-    if input.is_null() {
-        return FfiBytesOutput::fail(FfiStatus::NullPointer);
+/// Serialize an object to a JSON or TOML string (depending on enabled features).
+#[allow(dead_code)]
+fn serialize_output<T: Serialize>(data: &T) -> Result<String, PlabbleProtocolError> {
+    #[cfg(feature = "with-json")]
+    {
+        return serde_json::to_string(data)
+            .map_err(|_| PlabbleProtocolError::OutputSerializationFailed);
     }
 
-    let context = if context.is_null() {
-        None
-    } else {
-        Some(unsafe { Box::from_raw(context) })
-    };
-
-    let mut config = context
-        .as_ref()
-        .map(|ctx| SerializerConfig::new(Some(*ctx.clone())));
-
-    let result = unsafe {
-        let cstr = CStr::from_ptr(input);
-        match cstr.to_str() {
-            Ok(s) => {
-                let packet_result = if is_request {
-                    #[cfg(feature = "with-json")]
-                    {
-                        serde_json::from_str::<PlabbleRequestPacket>(s)
-                            .map(|p| p.to_bytes(config.as_mut()))
-                    }
-
-                    #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
-                    toml::from_str::<PlabbleRequestPacket>(s).map(|p| p.to_bytes(config.as_mut()))
-                } else {
-                    #[cfg(feature = "with-json")]
-                    {
-                        serde_json::from_str::<PlabbleResponsePacket>(s)
-                            .map(|p| p.to_bytes(config.as_mut()))
-                    }
-
-                    #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
-                    toml::from_str::<PlabbleResponsePacket>(s).map(|p| p.to_bytes(config.as_mut()))
-                };
-
-                match packet_result {
-                    Ok(serialization_result) => match serialization_result {
-                        Ok(bytes) => FfiBytesOutput::new(bytes),
-                        Err(e) => FfiBytesOutput::error(e),
-                    },
-                    Err(_) => FfiBytesOutput::fail(FfiStatus::InputParsingFailed),
-                }
-            }
-            Err(_) => FfiBytesOutput::fail(FfiStatus::InvalidInput),
-        }
-    };
-
-    // Increment counter on the owned Box and return ownership
-    if let Some(mut ctx) = context {
-        if result.is_ok() {
-            ctx.increment(is_request);
-        }
-        std::mem::forget(ctx);
+    #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
+    {
+        return toml::to_string(data).map_err(|_| PlabbleProtocolError::OutputSerializationFailed);
     }
-
-    result
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn decode_packet(
-    input: FfiBytes,
-    is_request: bool,
-    context: *mut PlabbleConnectionContext,
-) -> FfiStringOutput {
-    if input.buff.is_null() || input.len == 0 {
-        return FfiStringOutput::fail(FfiStatus::NullPointer);
-    }
-
-    let context = if context.is_null() {
-        None
-    } else {
-        Some(unsafe { Box::from_raw(context) })
-    };
-
-    let mut config = context
-        .as_ref()
-        .map(|ctx| SerializerConfig::new(Some(*ctx.clone())));
-
-    let bytes = unsafe { slice::from_raw_parts(input.buff, input.len) };
-    let packet_result = if is_request {
-        #[cfg(feature = "with-json")]
-        {
-            PlabbleRequestPacket::from_bytes(bytes, config.as_mut()).map(|p| serde_json::to_string(&p))
-        }
-
-        #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
-        PlabbleRequestPacket::from_bytes(bytes, config.as_mut()).map(|p| toml::to_string(&p))
-    } else {
-        #[cfg(feature = "with-json")]
-        {
-            PlabbleResponsePacket::from_bytes(bytes, config.as_mut()).map(|p| serde_json::to_string(&p))
-        }
-        
-        #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
-        PlabbleResponsePacket::from_bytes(bytes, config.as_mut()).map(|p| toml::to_string(&p))
-    };
-
-    let result = match packet_result {
-        Ok(serialization_result) => match serialization_result {
-            Ok(str) => FfiStringOutput::new(str),
-            Err(_) => FfiStringOutput::fail(FfiStatus::InputParsingFailed),
-        },
-        Err(e) => FfiStringOutput::error(e),
-    };
-
-    // Return ownership back to the same pointer address
-    if let Some(mut ctx) = context {
-        if result.is_ok() {
-            ctx.increment(is_request);
-        }
-        std::mem::forget(ctx);
-    }
-
-    result
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn free_bytes(data: FfiBytes) {
-    if data.buff.is_null() || data.len == 0 {
-        return;
-    }
-
-    unsafe {
-        // Reconstruct the Vec and drop it to free the memory.
-        let _ = Vec::from_raw_parts(data.buff, data.len, data.len);
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn free_string(s: *mut c_char) {
-    if s.is_null() {
-        return;
-    }
-    unsafe {
-        // Reconstruct the CString and drop it to free the memory.
-        let _ = CString::from_raw(s);
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn new_connection_context() -> *mut PlabbleConnectionContext {
-    let mut context = PlabbleConnectionContext::new();
-    context.get_bucket_key = Some(call_global_bucket_key);
-    context.get_psk = Some(call_global_psk);
-    Box::into_raw(Box::new(context))
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn free_connection_context(ctx: *mut PlabbleConnectionContext) {
-    if ctx.is_null() {
-        return;
-    }
-    unsafe {
-        let _ = Box::from_raw(ctx);
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn set_get_bucket_key_callback(cb: LookupBytesCallback) {
-    *GLOBAL_GET_BUCKET_KEY.lock().unwrap() = Some(cb);
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn set_get_psk_callback(cb: LookupBytesCallback) {
-    *GLOBAL_GET_PSK.lock().unwrap() = Some(cb);
 }

@@ -6,6 +6,7 @@ use crate::scripting::interpreter::ScriptError;
 /// Plabble error code body
 /// The length is prefixed by a u8 in the packet body.
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
 #[serde(tag = "type")]
 #[repr(u8)]
 pub enum PlabbleError {

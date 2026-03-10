@@ -11,11 +11,15 @@ repository = "https://github.com/plabble/ptp-codec"
 name = "plabble_codec"
 crate-type = ["lib", "cdylib", "staticlib"]
 
+# [[bin]]
+# name = "uniffi-bindgen"
+# path = "uniffi-bindgen.rs"
+
 [dependencies]
 aes = "0.9.0-rc.4"
 aes-gcm = "0.11.0-rc.3"
 base64 = "0.22.1"
-binary-codec = "0.6.1"
+binary-codec = "0.6.2"
 # binary-codec = { path = "../Binary-Codec/binary-codec" }
 blake2 = "0.10.6"
 blake3 = { version = "1.8.3", optional = true }
@@ -47,15 +51,17 @@ getrandom = { version = "^0.4", optional = true, features = ["wasm_js"] }
 # Protocol implementation dependencies
 # hints: async-broadcast
 async-channel = { version = "2.5.0", optional = true }
+futures = { version = "0.3.32", optional = true }
+uniffi = { version = "0.31.0", optional = true }
 
 [features]
-default = ["blake-3", "pqc-lite", "pqc-heavy", "with-toml", "wasm"]
+default = ["blake-3", "pqc-lite", "pqc-heavy", "with-toml", "wasm", "ffi"]
 blake-3 = ["blake3"]
 pqc-lite = ["ml-dsa", "ml-kem"]
 with-json = ["serde_json"]
 with-toml = ["toml"]
 wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook", "console_log", "getrandom", "wasm-bindgen-futures", "with-json", "client"]
-ffi = []
+ffi = ["uniffi", "client", "futures"]
 pqc-heavy = []
 protocol = ["async-channel"]
 server = ["protocol"]

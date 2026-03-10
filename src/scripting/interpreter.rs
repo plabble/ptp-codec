@@ -30,6 +30,7 @@ pub struct ScriptInterpreter {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, FromBytes, ToBytes, Clone)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
 pub enum ScriptError {
     /// When the stack is empty while n items are required
     StackUnderflow(u32),

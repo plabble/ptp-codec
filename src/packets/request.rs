@@ -156,7 +156,7 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
             && (!header.is_session_packet() || base.pre_shared_key)
         {
             let expected: [u8; 16] = stream.slice_end().try_into().map_err(|_| {
-                DeserializationError::UnexpectedLength(16, stream.slice_end().len())
+                DeserializationError::UnexpectedLength(16, stream.slice_end().len() as u64)
             })?;
 
             let mac_key = ctx

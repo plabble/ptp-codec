@@ -7,6 +7,10 @@ pub mod scripting;
 #[cfg(feature = "protocol")]
 pub mod protocol;
 
+// Initialize uniffi
+#[cfg(feature = "ffi")]
+uniffi::setup_scaffolding!();
+
 #[cfg(feature = "ffi")]
 pub mod ffi;
 

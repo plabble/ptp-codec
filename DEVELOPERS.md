@@ -5,7 +5,7 @@ Run all tests:
 cargo test --all-features
 ```
 
-## WASM installation
+## WASM/FFI installation
 ```sh
 sudo dnf install openssl-devel
 curl https://drager.github.io/wasm-pack/installer/init.sh -sSf | sh

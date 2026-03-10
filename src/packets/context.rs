@@ -11,10 +11,10 @@ use crate::{
 #[derive(Clone)]
 pub struct PlabbleConnectionContext {
     /// Get bucket key by bucket ID
-    pub get_bucket_key: Option<Arc<dyn Fn(&BucketId) -> Option<[u8; 32]>>>,
+    pub get_bucket_key: Option<Arc<dyn Fn(&BucketId) -> Option<[u8; 32]> + Send + Sync>>,
 
     /// Get pre-shared key by ID
-    pub get_psk: Option<Arc<dyn Fn(&[u8; 12]) -> Option<[u8; 64]>>>,
+    pub get_psk: Option<Arc<dyn Fn(&[u8; 12]) -> Option<[u8; 64]> + Send + Sync>>,
 
     /// Session key, if in a session
     pub session_key: Option<[u8; 64]>,
