@@ -37,6 +37,19 @@ pub struct SessionOptions {
     pub algorithms: Vec<String>
 }
 
+impl Default for SessionOptions {
+    fn default() -> Self {
+        SessionOptions {
+            enable_full_encryption: false,
+            stored_key_lifetime: None,
+            client_salt: false,
+            server_salt: false,
+            psk_id: None,
+            algorithms: Vec::new(),
+        }
+    }
+}
+
 /// Set crypto settings based on algorithm string list
 pub fn set_crypto_settings(settings: &mut CryptoSettings, algorithms: Vec<String>) {
     for alg in algorithms {

@@ -77,7 +77,8 @@ impl PlabbleConnection {
     }
 
     /// Start a new session with the given options. Returns the PSK ID if a pre-shared key is created.
-    pub async fn start_session(&mut self, options: SessionOptions) -> Result<Option<[u8; 12]>, PlabbleProtocolError> {
+    pub async fn start_session(&mut self, options: Option<SessionOptions>) -> Result<Option<[u8; 12]>, PlabbleProtocolError> {
+        let options = options.unwrap_or_default();
         let mut settings = CryptoSettings::default();
         set_crypto_settings(&mut settings, options.algorithms);
         

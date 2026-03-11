@@ -3,28 +3,20 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender};
 use binary_codec::{BinarySerializer, SerializerConfig};
 use futures::lock::Mutex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    packets::request::PlabbleRequestPacket,
-    protocol::{
-        PlabbleConnection as InnerPlabbleConnection,
-        error::PlabbleProtocolError,
-    },
-};
+use crate::protocol::{
+        PlabbleConnection as InnerPlabbleConnection, client::options::SessionOptions, error::PlabbleProtocolError
+    };
 
 // ── Callback interfaces ─────────────────────────────────────────────────────
 
-/// Callback interface for looking up bucket keys by bucket ID.
+/// Callback interface for looking up bucket keys by bucket ID and pre-shared keys.
 #[uniffi::export(callback_interface)]
-pub trait BucketKeyProvider: Send + Sync {
+pub trait KeyProvider: Send + Sync {
     /// Given a bucket ID serialized as bytes, return the 32-byte bucket key, or None.
     fn get_bucket_key(&self, bucket_id_bytes: Vec<u8>) -> Option<Vec<u8>>;
-}
 
-/// Callback interface for looking up pre-shared keys.
-#[uniffi::export(callback_interface)]
-pub trait PskProvider: Send + Sync {
     /// Given a 12-byte PSK ID, return the 64-byte pre-shared key, or None.
     fn get_psk(&self, psk_id: Vec<u8>) -> Option<Vec<u8>>;
 }
@@ -56,27 +48,24 @@ impl PlabbleConnection {
     }
 
     /// Set a callback for looking up bucket keys by bucket ID.
-    pub async fn set_bucket_key_provider(&self, provider: Box<dyn BucketKeyProvider>) {
-        let provider: Arc<dyn BucketKeyProvider> = Arc::from(provider);
+    pub async fn set_key_provider(&self, provider: Box<dyn KeyProvider>) {
+        let bucket_key_provider: Arc<dyn KeyProvider> = Arc::from(provider);
+        let psk_provider = bucket_key_provider.clone();
+
         let mut inner = self.inner.lock().await;
         let data = inner.config.data.as_mut().unwrap();
+
         data.get_bucket_key = Some(Arc::new(move |bucket_id| {
             let bytes = bucket_id
                 .to_bytes(None::<&mut SerializerConfig<()>>)
                 .unwrap();
-            provider
+            bucket_key_provider
                 .get_bucket_key(bytes)
                 .and_then(|v| <[u8; 32]>::try_from(v).ok())
         }));
-    }
 
-    /// Set a callback for looking up pre-shared keys by PSK ID.
-    pub async fn set_psk_provider(&self, provider: Box<dyn PskProvider>) {
-        let provider: Arc<dyn PskProvider> = Arc::from(provider);
-        let mut inner = self.inner.lock().await;
-        let data = inner.config.data.as_mut().unwrap();
         data.get_psk = Some(Arc::new(move |psk_id| {
-            provider
+            psk_provider
                 .get_psk(psk_id.to_vec())
                 .and_then(|v| <[u8; 64]>::try_from(v).ok())
         }));
@@ -84,9 +73,24 @@ impl PlabbleConnection {
 
     /// Send a request packet serialized as a JSON (or TOML) string.
     pub async fn send_request(&self, request: String) -> Result<(), PlabbleProtocolError> {
-        let packet = deserialize_request(&request)?;
+        let packet = deserialize_input(&request)?;
         let mut inner = self.inner.lock().await;
         inner.send(packet).await
+    }
+
+    /// Send a request packet and wait for the associated response, returning it as a JSON (or TOML) string.
+    pub async fn send_and_recv(&self, request: String) -> Result<String, PlabbleProtocolError> {
+        let packet = deserialize_input(&request)?;
+        let mut inner = self.inner.lock().await;
+        let response = inner.send_and_recv(packet).await?;
+        serialize_output(&response)
+    }
+
+    /// Wait for the next incoming response packet and return it as a JSON (or TOML) string.
+    pub async fn recv(&self) -> Result<String, PlabbleProtocolError> {
+        let mut inner = self.inner.lock().await;
+        let response = inner.recv().await?;
+        serialize_output(&response)
     }
 
     /// Feed raw incoming bytes received from the transport layer into the connection.
@@ -94,6 +98,14 @@ impl PlabbleConnection {
         self.rx
             .try_send(bytes)
             .map_err(|_| PlabbleProtocolError::SenderError)
+    }
+
+    /// Start a new session with the given options serialized as a JSON (or TOML) string. Returns the PSK ID as 12-byte array if a pre-shared key is created.
+    pub async fn start_session(&self, options: Option<String>) -> Result<Option<Vec<u8>>, PlabbleProtocolError> {
+        let options = options.map(|opts| deserialize_input(&opts)).transpose()?;
+        let mut inner = self.inner.lock().await;
+        let psk_id = inner.start_session(options).await?;
+        Ok(psk_id.map(|id| id.to_vec()))
     }
 
     /// Poll for the next outgoing packet (non-blocking).
@@ -113,8 +125,8 @@ pub fn plabble_version() -> String {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/// Deserialize a request packet from a JSON or TOML string (depending on enabled features).
-fn deserialize_request(data: &str) -> Result<PlabbleRequestPacket, PlabbleProtocolError> {
+/// Deserialize a packet from a JSON or TOML string (depending on enabled features).
+fn deserialize_input<T : for<'a> Deserialize<'a>>(data: &str) -> Result<T, PlabbleProtocolError> {
     #[cfg(feature = "with-json")]
     {
         return serde_json::from_str(data).map_err(|_| PlabbleProtocolError::InputParsingFailed);
