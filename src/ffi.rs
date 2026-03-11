@@ -39,12 +39,6 @@ pub struct PlabbleConnection {
     rx: Sender<Vec<u8>>,
 }
 
-// Safety: The inner PlabbleConnection is protected by a Mutex ensuring exclusive
-// access. The callback closures stored in the connection context capture only
-// Send+Sync values (Arc<dyn BucketKeyProvider> and Arc<dyn PskProvider>).
-unsafe impl Send for PlabbleConnection {}
-unsafe impl Sync for PlabbleConnection {}
-
 #[uniffi::export]
 impl PlabbleConnection {
     /// Create a new Plabble connection.
