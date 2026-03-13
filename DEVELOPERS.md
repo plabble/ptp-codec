@@ -15,7 +15,7 @@ cargo install cargo-generate
 ## WASM build
 ```sh
 wasm-pack build --features wasm
-# of:
+# or:
 wasm-pack build --target web --features wasm
 ```
 

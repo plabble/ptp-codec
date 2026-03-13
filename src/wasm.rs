@@ -5,8 +5,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    core::deserialize_input,
-    protocol::PlabbleConnection as InnerPlabbleConnection,
+    core::{deserialize_input, serialize_output}, packets::response, protocol::PlabbleConnection as InnerPlabbleConnection
 };
 
 #[wasm_bindgen]
@@ -39,19 +38,36 @@ impl PlabbleConnection {
     /// Create new PlabbleConnection instance
     ///
     /// - `handle_send`: JS callback to handle outgoing packets (called with Uint8Array)
-    /// - `get_bucket_key`: Optional JS callback to get bucket key (called with bucket ID as Uint8Array(16), should return Uint8Array(32))
-    /// - `get_psk`: Optional JS callback to get PSK (called with PSK ID as Uint8Array(12), should return Uint8Array(64))
     #[wasm_bindgen(constructor)]
     pub fn new(
-        handle_send: Function,
-        get_bucket_key: Option<Function>,
-        get_psk: Option<Function>,
+        handle_send: Function
     ) -> Self {
         let (rx, recv) = async_channel::unbounded();
         let (send, tx) = async_channel::unbounded();
-        let mut inner = InnerPlabbleConnection::new(send, recv);
+        let inner = InnerPlabbleConnection::new(send, recv);
 
-        let data = inner.config.data.as_mut().unwrap();
+        spawn_local(async move {
+            while let Ok(res) = tx.recv().await {
+                let array = Uint8Array::from(&res[..]);
+                let _ = handle_send.call1(&JsValue::NULL, &array.into());
+            }
+        });
+
+        Self { inner, rx }
+    }
+
+    /// Set key providers/JS callbacks
+    /// 
+    /// - `get_bucket_key`: Optional JS callback to get bucket key (called with bucket ID as Uint8Array(16), should return Uint8Array(32))
+    /// - `get_psk`: Optional JS callback to get PSK (called with PSK ID as Uint8Array(12), should return Uint8Array(64))
+    /// - `store_psk`: Optional JS callback to store PSK (called with PSK ID as Uint8Array(12), PSK as Uint8Array(64), expiration as number)
+    pub fn set_key_providers(
+        &mut self,
+        get_bucket_key: Option<Function>,
+        get_psk: Option<Function>,
+        store_psk: Option<Function>,
+    ) {
+        let data = self.inner.config.data.as_mut().unwrap();
 
         if let Some(get_bucket_key) = get_bucket_key {
             data.get_bucket_key = Some(Arc::new(move |bucket_id| {
@@ -65,17 +81,22 @@ impl PlabbleConnection {
             }));
         }
 
-        spawn_local(async move {
-            while let Ok(res) = tx.recv().await {
-                let array = Uint8Array::from(&res[..]);
-                let _ = handle_send.call1(&JsValue::NULL, &array.into());
-            }
-        });
-
-        Self { inner, rx }
+        if let Some(store_psk) = store_psk {
+            data.store_psk = Some(Arc::new(move |psk_id, psk, expiration| {
+                let psk_id_array = Uint8Array::from(&psk_id[..]);
+                let psk_array = Uint8Array::from(&psk[..]);
+                // TODO: error logging?
+                let _ = store_psk.call3(
+                    &JsValue::NULL,
+                    &psk_id_array.into(),
+                    &psk_array.into(),
+                    &JsValue::from_f64(expiration.map(|v| v as f64).unwrap_or(f64::NAN)),
+                );
+            }));
+        }
     }
 
-    /// Send a packet to the Plabble connection (accepts a JSON string representing PlabbleRequestPacket)
+    /// Send a packet to the Plabble connection (accepts a JSON/TOML string representing PlabbleRequestPacket)
     pub async fn send_request(&mut self, packet: &str) -> Result<(), JsValue> {
         let request = deserialize_input(packet)
             .map_err(|e| JsValue::from_str(&format!("Deserialize error: {:?}", e)))?;
@@ -87,6 +108,32 @@ impl PlabbleConnection {
         Ok(())
     }
 
+    /// Send a packet and wait for the response (accepts a JSON/TOML string representing PlabbleRequestPacket, returns a JSON/TOML string representing PlabbleResponsePacket)
+    pub async fn send_and_recv(&mut self, packet: &str) -> Result<String, JsValue> {
+        let request = deserialize_input(packet)
+            .map_err(|e| JsValue::from_str(&format!("Deserialize error: {:?}", e)))?;
+
+        let response = self
+            .inner
+            .send_and_recv(request)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
+
+        serialize_output(&response)
+            .map_err(|e| JsValue::from_str(&format!("Serialize error: {:?}", e)))
+    }
+
+    /// Wait for the next incoming response packet and return it as a JSON/TOML string representing PlabbleResponsePacket
+    pub async fn recv_response(&mut self) -> Result<String, JsValue> {
+        let response = self
+            .inner
+            .recv_response()
+            .await
+            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
+
+        serialize_output(&response)
+            .map_err(|e| JsValue::from_str(&format!("Serialize error: {:?}", e)))
+    }
 
     // TODO: same options as ffi.rs has
 

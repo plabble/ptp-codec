@@ -106,6 +106,7 @@ pub fn read_base_packet(
         ctx.crypto_settings = base.crypto_settings;
         settings.apply_to(config);
     } else {
+        // TODO: investigate if this is correct. Don't we want to persist crypto settings in connection? if so, document that.
         CryptoSettings::default().apply_to(config);
     }
 

@@ -16,6 +16,9 @@ pub struct PlabbleConnectionContext {
     /// Get pre-shared key by ID
     pub get_psk: Option<Arc<dyn Fn(&[u8; 12]) -> Option<[u8; 64]> + Send + Sync>>,
 
+    /// Store pre-shared key (psk ID, key, expiration)
+    pub store_psk: Option<Arc<dyn Fn([u8; 12], [u8; 64], Option<u32>) + Send + Sync>>,
+
     /// Session key, if in a session
     pub session_key: Option<[u8; 64]>,
 
@@ -54,6 +57,7 @@ impl PlabbleConnectionContext {
         Self {
             get_bucket_key: None,
             get_psk: None,
+            store_psk: None,
             session_key: None,
             crypto_settings: None,
             full_encryption: false,

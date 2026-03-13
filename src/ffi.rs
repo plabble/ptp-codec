@@ -19,6 +19,9 @@ pub trait KeyProvider: Send + Sync {
 
     /// Given a 12-byte PSK ID, return the 64-byte pre-shared key, or None.
     fn get_psk(&self, psk_id: Vec<u8>) -> Option<Vec<u8>>;
+
+    /// Store a pre-shared key with the given PSK ID and optional expiration time (as a UNIX timestamp).
+    fn store_psk(&self, psk_id: Vec<u8>, psk: Vec<u8>, expiration: Option<u32>);
 }
 
 // ── Connection object ───────────────────────────────────────────────────────
@@ -51,6 +54,7 @@ impl PlabbleConnection {
     pub async fn set_key_provider(&self, provider: Box<dyn KeyProvider>) {
         let bucket_key_provider: Arc<dyn KeyProvider> = Arc::from(provider);
         let psk_provider = bucket_key_provider.clone();
+        let store_psk_provider = bucket_key_provider.clone();
 
         let mut inner = self.inner.lock().await;
         let data = inner.config.data.as_mut().unwrap();
@@ -68,6 +72,10 @@ impl PlabbleConnection {
             psk_provider
                 .get_psk(psk_id.to_vec())
                 .and_then(|v| <[u8; 64]>::try_from(v).ok())
+        }));
+
+        data.store_psk = Some(Arc::new(move |psk_id, psk, expiration| {
+            store_psk_provider.store_psk(psk_id.to_vec(), psk.to_vec(), expiration);
         }));
     }
 
