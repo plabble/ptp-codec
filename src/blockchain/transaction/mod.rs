@@ -16,7 +16,11 @@ pub struct Transaction {
     #[toggles("time_lock")]
     has_time_lock: bool,
 
-    // 3 bits reserved for future use
+    /// Indicates whether the transaction is replaceable by fee (RBF),
+    /// allowing it to be replaced with a higher fee transaction before being included in a block
+    replaceable_by_fee: bool,
+
+    // 2 bits reserved for future use
 
     /// Transaction inputs
     #[dyn_length]

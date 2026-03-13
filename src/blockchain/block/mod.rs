@@ -25,3 +25,11 @@ pub struct Block {
     data: HashMap<[u8; 24], BlockData>,
 }
 
+impl Block {
+    /// Get hashes of all entries in the block, sorted in ascending order.
+    pub fn get_hashes(&self) -> Vec<[u8; 24]> {
+        let mut hashes: Vec<[u8; 24]> = self.data.keys().cloned().collect();
+        hashes.sort();
+        hashes
+    }
+}

@@ -13,7 +13,10 @@ pub struct TransactionOutput {
     #[toggles("burn")]
     burn: bool,
 
-    // 6 bits reserved for future use
+    /// If set to true, this specific output is not replaceable by fee (RBF) and must be included in the replacement transaction as is
+    not_replaceable: bool,
+
+    // 7 bits reserved for future use
 
     /// Value of the transaction output in the smallest unit
     value: OutputType,
