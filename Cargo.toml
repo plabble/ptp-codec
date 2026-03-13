@@ -57,7 +57,7 @@ futures = { version = "0.3.32", optional = true }
 uniffi = { version = "0.29.4", optional = true }
 
 [features]
-default = ["blake-3", "pqc-lite", "pqc-heavy", "use-toml", "ffi", "wasm"]
+default = ["blake-3", "pqc-lite", "pqc-heavy", "blockchain"]
 
 # Crypto settings
 blake-3 = ["blake3"]
@@ -72,6 +72,7 @@ use-toml = ["toml"]
 protocol = ["async-channel"]
 server = ["protocol"]
 client = ["protocol"]
+blockchain = []
 
 # Bindings
 wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook", "console_log", "getrandom", "wasm-bindgen-futures", "client"]

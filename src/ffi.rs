@@ -5,8 +5,7 @@ use binary_codec::{BinarySerializer, SerializerConfig};
 use futures::lock::Mutex;
 
 use crate::{
-    core::{deserialize_input, serialize_output},
-    protocol::{PlabbleConnection as InnerPlabbleConnection, error::PlabbleProtocolError},
+    protocol::{deserialize_input, serialize_output, PlabbleConnection as InnerPlabbleConnection, error::PlabbleProtocolError},
 };
 
 // ── Callback interfaces ─────────────────────────────────────────────────────

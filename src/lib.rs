@@ -11,6 +11,9 @@ pub mod protocol;
 #[cfg(feature = "ffi")]
 uniffi::setup_scaffolding!();
 
+#[cfg(feature = "blockchain")]
+pub mod blockchain;
+
 #[cfg(feature = "ffi")]
 pub mod ffi;
 

@@ -13,14 +13,17 @@ fn epoch() -> DateTime<Utc> {
 }
 
 impl PlabbleDateTime {
+    /// Returns the number of seconds since the Plabble epoch
     pub fn timestamp(&self) -> u32 {
         (self.0 - epoch()).num_seconds() as u32
     }
 
+    /// Creates a PlabbleDateTime from a number of seconds since the epoch
     pub fn new(timestamp: u32) -> Self {
         Self(epoch() + Duration::seconds(timestamp as i64))
     }
 
+    /// Creates a PlabbleDateTime for a given number of seconds in the future from now
     pub fn from_now(seconds: u32) -> Self {
         Self(Utc::now() + Duration::seconds(seconds as i64))
     }
