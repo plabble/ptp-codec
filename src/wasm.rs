@@ -76,19 +76,22 @@ impl PlabbleConnection {
     }
 
     /// Send a packet to the Plabble connection (accepts a JSON string representing PlabbleRequestPacket)
-    pub async fn send(&mut self, packet: &str) -> Result<(), JsValue> {
+    pub async fn send_request(&mut self, packet: &str) -> Result<(), JsValue> {
         let request = deserialize_input(packet)
             .map_err(|e| JsValue::from_str(&format!("Deserialize error: {:?}", e)))?;
 
         self.inner
-            .send(request)
+            .send_request(request)
             .await
             .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
         Ok(())
     }
 
+
+    // TODO: same options as ffi.rs has
+
     /// Internal method to handle received packet bytes (called from JS)
-    pub async fn on_recv(&self, data: Vec<u8>) {
+    pub async fn handle_incoming(&self, data: Vec<u8>) {
         let _ = self.rx.send(data).await;
     }
 }

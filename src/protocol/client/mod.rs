@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
-use async_channel::{Receiver, Sender};
-use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+use binary_codec::{BinaryDeserializer, BinarySerializer};
 
 use crate::{
     core::PlabbleDateTime,
@@ -12,7 +9,6 @@ use crate::{
             request_body::PlabbleRequestBody, response_body::PlabbleResponseBody,
             session::SessionRequestBody,
         },
-        context::PlabbleConnectionContext,
         header::{
             request_header::PlabbleRequestHeader,
             type_and_flags::{RequestPacketType, ResponsePacketType},
@@ -31,20 +27,10 @@ pub mod options;
 
 /// Client-side implementation of [`PlabbleConnection`].
 impl PlabbleConnection {
-    /// Creates a new [`PlabbleConnection`] with the given binary sender and receiver.
-    pub fn new(tx: Sender<Vec<u8>>, rx: Receiver<Vec<u8>>) -> Self {
-        Self {
-            config: SerializerConfig::new(Some(PlabbleConnectionContext::new())),
-            tx,
-            rx,
-            hooks: HashMap::new(),
-        }
-    }
-
     /// Sends a request packet without waiting for a response.
     ///
     /// If the packet is not fire-and-forget, the internal counter will be incremented.
-    pub async fn send(&mut self, packet: PlabbleRequestPacket) -> Result<(), PlabbleProtocolError> {
+    pub async fn send_request(&mut self, packet: PlabbleRequestPacket) -> Result<(), PlabbleProtocolError> {
         let bytes = packet.to_bytes(Some(&mut self.config))?;
         self.tx
             .send(bytes)
@@ -65,7 +51,7 @@ impl PlabbleConnection {
         let counter = self.config.data.as_ref().unwrap().client_counter;
         let (tx, rx) = async_channel::bounded(1);
         self.hooks.insert(counter, tx);
-        self.send(packet).await?;
+        self.send_request(packet).await?;
         rx.recv()
             .await
             .map_err(|_| PlabbleProtocolError::ReceiverError)
@@ -75,7 +61,7 @@ impl PlabbleConnection {
     ///
     /// If the packet is not fire-and-forget, the internal counter is incremented
     /// and any registered hook for the matching request counter is notified.
-    pub async fn recv(&mut self) -> Result<PlabbleResponsePacket, PlabbleProtocolError> {
+    pub async fn recv_response(&mut self) -> Result<PlabbleResponsePacket, PlabbleProtocolError> {
         let bytes = self
             .rx
             .recv()

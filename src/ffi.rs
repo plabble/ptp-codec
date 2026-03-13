@@ -75,7 +75,7 @@ impl PlabbleConnection {
     pub async fn send_request(&self, request: String) -> Result<(), PlabbleProtocolError> {
         let packet = deserialize_input(&request)?;
         let mut inner = self.inner.lock().await;
-        inner.send(packet).await
+        inner.send_request(packet).await
     }
 
     /// Send a request packet and wait for the associated response, returning it as a JSON (or TOML) string.
@@ -87,9 +87,9 @@ impl PlabbleConnection {
     }
 
     /// Wait for the next incoming response packet and return it as a JSON (or TOML) string.
-    pub async fn recv(&self) -> Result<String, PlabbleProtocolError> {
+    pub async fn recv_response(&self) -> Result<String, PlabbleProtocolError> {
         let mut inner = self.inner.lock().await;
-        let response = inner.recv().await?;
+        let response = inner.recv_response().await?;
         serialize_output(&response)
     }
 
@@ -115,6 +115,24 @@ impl PlabbleConnection {
     /// Returns the raw bytes to send over the transport, or None if nothing is queued.
     pub async fn poll_outgoing(&self) -> Option<Vec<u8>> {
         self.tx.recv().await.ok()
+    }
+}
+
+#[cfg(feature = "server")]
+#[uniffi::export]
+impl PlabbleConnection {
+    /// Send a response packet serialized as a JSON (or TOML) string. 
+    pub async fn send_response(&self, response: String) -> Result<(), PlabbleProtocolError> {
+        let packet = deserialize_input(&response)?;
+        let mut inner = self.inner.lock().await;
+        inner.send_response(packet).await
+    }
+
+    /// Wait for the next incoming request packet and return it as a JSON (or TOML) string.
+    pub async fn recv_request(&self) -> Result<String, PlabbleProtocolError> {
+        let mut inner = self.inner.lock().await;
+        let request = inner.recv_request().await?;
+        serialize_output(&request)
     }
 }
 
