@@ -10,7 +10,7 @@ use crate::{
         base::{PlabblePacketBase, read_base_packet, write_base_packet},
         body::request_body::PlabbleRequestBody,
         context::PlabbleConnectionContext,
-        header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType}
+        header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
     },
 };
 
@@ -243,7 +243,7 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             }
             RequestPacketType::Proxy { .. } => {
                 PlabbleRequestBody::Proxy(raw.body.deserialize_into().unwrap())
-            },
+            }
             RequestPacketType::Custom { .. } => {
                 PlabbleRequestBody::Custom(raw.body.deserialize_into().unwrap())
             }

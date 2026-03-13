@@ -8,7 +8,7 @@ use crate::{
         base::{PlabblePacketBase, read_base_packet, write_base_packet},
         body::response_body::PlabbleResponseBody,
         context::PlabbleConnectionContext,
-        header::{response_header::PlabbleResponseHeader, type_and_flags::ResponsePacketType}
+        header::{response_header::PlabbleResponseHeader, type_and_flags::ResponsePacketType},
     },
 };
 
@@ -192,7 +192,7 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Put => PlabbleResponseBody::Put,
             ResponsePacketType::Delete { .. } => {
                 PlabbleResponseBody::Delete(raw.body.deserialize_into().unwrap())
-            },
+            }
             ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
             ResponsePacketType::Unsubscribe => PlabbleResponseBody::Unsubscribe,
             ResponsePacketType::Register => {
@@ -201,7 +201,7 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Identify => PlabbleResponseBody::Identity,
             ResponsePacketType::Proxy { .. } => {
                 PlabbleResponseBody::Proxy(raw.body.deserialize_into().unwrap())
-            },
+            }
             ResponsePacketType::Custom { .. } => {
                 PlabbleResponseBody::Custom(raw.body.deserialize_into().unwrap())
             }

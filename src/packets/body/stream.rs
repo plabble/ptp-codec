@@ -147,10 +147,7 @@ mod tests {
 
         let data = "d4a29e4893ac";
         let bytes = packet.to_bytes(None).unwrap();
-        assert_eq!(
-            format!("01030002{}", data),
-            hex::encode(&bytes)
-        );
+        assert_eq!(format!("01030002{}", data), hex::encode(&bytes));
 
         let deserialized = PlabbleResponsePacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized);
@@ -174,10 +171,7 @@ mod tests {
         .unwrap();
 
         let bytes = packet.to_bytes(None).unwrap();
-        assert_eq!(
-            "0113000207",
-            hex::encode(&bytes)
-        );
+        assert_eq!("0113000207", hex::encode(&bytes));
         let deserialized = PlabbleResponsePacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized);
     }

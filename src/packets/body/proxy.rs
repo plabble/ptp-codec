@@ -41,7 +41,7 @@ pub enum ProxyRequestBody {
 
         /// Public keys or encapsulation keys for creating shared secrets with each hop
         #[multi_enum]
-        keys: Vec<KeyExhangeRequest>
+        keys: Vec<KeyExhangeRequest>,
     },
 }
 
@@ -68,7 +68,7 @@ pub enum ProxyResponseBody {
 
         /// Information about the selected hops in the route
         #[key_dyn_length]
-        hops: HashMap<String, HopInfo>
+        hops: HashMap<String, HopInfo>,
     },
 }
 
@@ -93,8 +93,9 @@ mod tests {
     #[test]
     fn can_serialize_and_deserialize_proxy_init_request_with_hops() {
         let key = "82c26445e178bba57f5d44abb236688ff8ff5a8ac77a5514b7eb3849ed3ed0c9";
-        
-        let request: PlabbleRequestPacket = toml::from_str(r#"
+
+        let request: PlabbleRequestPacket = toml::from_str(
+            r#"
             version = 1
 
             [header]
@@ -109,11 +110,16 @@ mod tests {
 
             [[body.Initialize.keys]]
             X25519 = "gsJkReF4u6V_XUSrsjZoj_j_WorHelUUt-s4Se0-0Mk"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         let bytes = request.to_bytes(None).unwrap();
         assert_eq!(bytes[1], 0b0001_1100);
 
-        assert_eq!(format!("011c04746573740204686f703104686f7032{}", key), hex::encode(&bytes));
+        assert_eq!(
+            format!("011c04746573740204686f703104686f7032{}", key),
+            hex::encode(&bytes)
+        );
         let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(request, deserialized);
     }
@@ -121,8 +127,9 @@ mod tests {
     #[test]
     fn can_serialize_and_deserialize_proxy_init_request_with_random_hops() {
         let key = "82c26445e178bba57f5d44abb236688ff8ff5a8ac77a5514b7eb3849ed3ed0c9";
-        
-        let request: PlabbleRequestPacket = toml::from_str(r#"
+
+        let request: PlabbleRequestPacket = toml::from_str(
+            r#"
             version = 1
 
             [header]
@@ -136,7 +143,9 @@ mod tests {
 
             [[body.Initialize.keys]]
             X25519 = "gsJkReF4u6V_XUSrsjZoj_j_WorHelUUt-s4Se0-0Mk"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         let bytes = request.to_bytes(None).unwrap();
         assert_eq!(bytes[1], 0b0101_1100);
 
@@ -147,7 +156,8 @@ mod tests {
 
     #[test]
     fn can_serialize_and_deserialize_proxy_tunnel_request() {
-        let request: PlabbleRequestPacket = toml::from_str(r#"
+        let request: PlabbleRequestPacket = toml::from_str(
+            r#"
             version = 1
 
             [header]
@@ -157,7 +167,9 @@ mod tests {
             [body.Tunnel]
             tunnel_id = 7
             packet = "9V0FzpQi"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         let bytes = request.to_bytes(None).unwrap();
         assert_eq!(bytes[1], 0b0010_1100);
 
@@ -168,7 +180,8 @@ mod tests {
 
     #[test]
     fn can_serialize_and_deserialize_proxy_tunnel_response() {
-        let request: PlabbleResponsePacket = toml::from_str(r#"
+        let request: PlabbleResponsePacket = toml::from_str(
+            r#"
             version = 1
 
             [header]
@@ -178,7 +191,9 @@ mod tests {
             [body.Tunnel]
             tunnel_id = 7
             packet = "9V0FzpQi"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         let bytes = request.to_bytes(None).unwrap();
         assert_eq!(bytes[1], 0b0000_1100);
 
@@ -224,8 +239,14 @@ mod tests {
         let hop2 = hex::encode(b"hop2");
 
         let possibilities = vec![
-            format!("011c00050704{}{}{}04{}{}{}", hop1, key1, sig1, hop2, key2, sig2),
-            format!("011c00050704{}{}{}04{}{}{}", hop2, key2, sig2, hop1, key1, sig1)
+            format!(
+                "011c00050704{}{}{}04{}{}{}",
+                hop1, key1, sig1, hop2, key2, sig2
+            ),
+            format!(
+                "011c00050704{}{}{}04{}{}{}",
+                hop2, key2, sig2, hop1, key1, sig1
+            ),
         ];
 
         assert!(possibilities.contains(&hex::encode(&bytes)));

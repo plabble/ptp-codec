@@ -65,7 +65,7 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         #[toggles("limit")]
-        with_limit: bool
+        with_limit: bool,
     } = 2,
     /// Start a data stream from or to a bucket
     /// - binary_keys: Indicate that the keys are in binary format.
@@ -267,7 +267,7 @@ pub enum ResponsePacketType {
     /// Response to a put request.
     Put = 6,
     /// Response to a delete request.
-    /// 
+    ///
     /// - return_deleted: Indicates the response body contains the deleted entries (matches the request's `return_deleted` flag).
     /// - binary_keys: Keys in the response are in binary format (only if `return_deleted` is set).
     Delete {
@@ -292,7 +292,7 @@ pub enum ResponsePacketType {
     Proxy {
         #[serde(default)]
         #[toggles("init_session")]
-        init_session: bool
+        init_session: bool,
     } = 12,
     /// Custom packet type for supporting sub-protocols
     Custom {

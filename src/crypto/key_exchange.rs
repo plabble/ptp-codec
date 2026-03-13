@@ -34,13 +34,12 @@ impl KeyExchange {
             #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem512 => {
                 use ml_kem::{
-                    Kem, KeyExport, MlKem512, kem::{DecapsulationKey, EncapsulationKey}
+                    Kem, KeyExport, MlKem512,
+                    kem::{DecapsulationKey, EncapsulationKey},
                 };
 
-                let (dc, ec): (
-                    DecapsulationKey<MlKem512>,
-                    EncapsulationKey<MlKem512>,
-                ) = MlKem512::generate_keypair();
+                let (dc, ec): (DecapsulationKey<MlKem512>, EncapsulationKey<MlKem512>) =
+                    MlKem512::generate_keypair();
 
                 self.secret = Some(dc.to_bytes().to_vec());
 
@@ -49,13 +48,12 @@ impl KeyExchange {
             #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem768 => {
                 use ml_kem::{
-                    Kem, KeyExport, MlKem768, kem::{DecapsulationKey, EncapsulationKey}
+                    Kem, KeyExport, MlKem768,
+                    kem::{DecapsulationKey, EncapsulationKey},
                 };
 
-                let (dc, ec): (
-                    DecapsulationKey<MlKem768>,
-                    EncapsulationKey<MlKem768>,
-                ) = MlKem768::generate_keypair();
+                let (dc, ec): (DecapsulationKey<MlKem768>, EncapsulationKey<MlKem768>) =
+                    MlKem768::generate_keypair();
 
                 self.secret = Some(dc.to_bytes().to_vec());
 
@@ -96,9 +94,11 @@ impl KeyExchange {
                         Ciphertext, MlKem512, SharedKey,
                         kem::{Encapsulate, EncapsulationKey},
                     };
-                    let encapsulation_key = EncapsulationKey::<MlKem512>::new(encap_key.into()).ok()?;
+                    let encapsulation_key =
+                        EncapsulationKey::<MlKem512>::new(encap_key.into()).ok()?;
 
-                    let (es, ss): (Ciphertext<MlKem512>, SharedKey) = encapsulation_key.encapsulate();
+                    let (es, ss): (Ciphertext<MlKem512>, SharedKey) =
+                        encapsulation_key.encapsulate();
 
                     Some((ss.into(), KeyExhangeResponse::Kem512(es.into())))
                 } else {
@@ -115,7 +115,8 @@ impl KeyExchange {
                     let encapsulation_key =
                         EncapsulationKey::<MlKem768>::new(encap_key.into()).ok()?;
 
-                    let (es, ss): (Ciphertext<MlKem768>, SharedKey) = encapsulation_key.encapsulate();
+                    let (es, ss): (Ciphertext<MlKem768>, SharedKey) =
+                        encapsulation_key.encapsulate();
 
                     Some((ss.into(), KeyExhangeResponse::Kem768(es.into())))
                 } else {

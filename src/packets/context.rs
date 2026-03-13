@@ -136,7 +136,9 @@ impl PlabbleConnectionContext {
         } else {
             // If it is not given, use a PSK. If that won't resolve, this function will return none
             // Try from base packet first if pre_shared_key is set, otherwise try session PSK
-            if let Some(base) = base && base.pre_shared_key {
+            if let Some(base) = base
+                && base.pre_shared_key
+            {
                 let psk = (self.get_psk.as_ref()?)(&base.psk_id?)?;
                 (psk, &base.psk_salt?)
             } else {
@@ -167,12 +169,33 @@ impl PlabbleConnectionContext {
     }
 
     /// Create session key from shared secrets and salts, and store it in the context
-    pub fn create_session_key(&mut self, blake_3: bool, client_salt: Option<[u8; 16]>, server_salt: Option<[u8; 16]>, shared_secrets: Vec<[u8; 32]>) {
+    pub fn create_session_key(
+        &mut self,
+        blake_3: bool,
+        client_salt: Option<[u8; 16]>,
+        server_salt: Option<[u8; 16]>,
+        shared_secrets: Vec<[u8; 32]>,
+    ) {
         let salt = client_salt.or(server_salt).unwrap_or(*b"PLABBLE-PROTOCOL");
         let context = server_salt.unwrap_or(*b"PROTOCOL.PLABBLE");
-        let ikm = hash_512(blake_3, shared_secrets.iter().map(|s| s.as_slice()).collect());
+        let ikm = hash_512(
+            blake_3,
+            shared_secrets.iter().map(|s| s.as_slice()).collect(),
+        );
         let session_key = derive_key(blake_3, &ikm, &salt, &context, None);
         self.session_key = Some(session_key);
+    }
+
+    /// Generate a bucket key for the given bucket ID, using the session key and a fixed context string.
+    pub fn create_bucket_key(&self, blake_3: bool, bucket_id_bytes: &[u8; 16]) -> Option<[u8; 64]> {
+        let key = derive_key(
+            blake_3,
+            self.session_key.as_ref()?,
+            b"PLABBLE___BUCKET",
+            bucket_id_bytes,
+            None,
+        );
+        Some(key)
     }
 }
 

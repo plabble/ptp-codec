@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::{errors::{DeserializationError, SerializationError}, packets::body::error::PlabbleError};
+use crate::{
+    errors::{DeserializationError, SerializationError},
+    packets::body::error::PlabbleError,
+};
 
 #[cfg_attr(feature = "ffi", derive(uniffi::Error))]
 #[cfg_attr(feature = "ffi", uniffi(flat_error))]

@@ -1,4 +1,7 @@
-use binary_codec::{BinaryDeserializer, BinarySerializer, BitStreamReader, BitStreamWriter, FromBytes, SerializerConfig, ToBytes};
+use binary_codec::{
+    BinaryDeserializer, BinarySerializer, BitStreamReader, BitStreamWriter, FromBytes,
+    SerializerConfig, ToBytes,
+};
 use serde::{Deserialize, Serialize};
 use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;

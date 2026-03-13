@@ -14,8 +14,10 @@ pub mod server;
 pub mod client;
 
 /// Plabble Connection
+// #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+// #[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct PlabbleConnection {
-    hooks: HashMap<u16, Sender<PlabbleResponsePacket>>,
+    pub hooks: HashMap<u16, Sender<PlabbleResponsePacket>>,
     pub config: SerializerConfig<PlabbleConnectionContext>,
     pub tx: Sender<Vec<u8>>,
     pub rx: Receiver<Vec<u8>>,

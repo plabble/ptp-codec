@@ -83,7 +83,7 @@ pub struct KeyExchange {
 pub fn derive_key(
     blake3: bool,
     ikm: &[u8],
-    salt: &[u8],
+    salt: &[u8; 16],
     context: &[u8; 16],
     extra_key: Option<&[u8; 64]>,
 ) -> [u8; 64] {
@@ -114,6 +114,7 @@ pub fn derive_key(
     // This is called Mac, but is actually useful for key derivation because of salt/personalization
     let mut kdf = Blake2bMac512::new_with_salt_and_personal(ikm, salt, context)
         .expect("Failed to create KDF hasher");
+
     if let Some(extra_key) = extra_key {
         kdf.update(extra_key);
     }

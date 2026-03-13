@@ -3,11 +3,11 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender};
 use binary_codec::{BinarySerializer, SerializerConfig};
 use futures::lock::Mutex;
-use serde::{Deserialize, Serialize};
 
-use crate::protocol::{
-        PlabbleConnection as InnerPlabbleConnection, client::options::SessionOptions, error::PlabbleProtocolError
-    };
+use crate::{
+    core::{deserialize_input, serialize_output},
+    protocol::{PlabbleConnection as InnerPlabbleConnection, error::PlabbleProtocolError},
+};
 
 // ── Callback interfaces ─────────────────────────────────────────────────────
 
@@ -101,7 +101,10 @@ impl PlabbleConnection {
     }
 
     /// Start a new session with the given options serialized as a JSON (or TOML) string. Returns the PSK ID as 12-byte array if a pre-shared key is created.
-    pub async fn start_session(&self, options: Option<String>) -> Result<Option<Vec<u8>>, PlabbleProtocolError> {
+    pub async fn start_session(
+        &self,
+        options: Option<String>,
+    ) -> Result<Option<Vec<u8>>, PlabbleProtocolError> {
         let options = options.map(|opts| deserialize_input(&opts)).transpose()?;
         let mut inner = self.inner.lock().await;
         let psk_id = inner.start_session(options).await?;
@@ -121,34 +124,4 @@ impl PlabbleConnection {
 #[uniffi::export]
 pub fn plabble_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-/// Deserialize a packet from a JSON or TOML string (depending on enabled features).
-fn deserialize_input<T : for<'a> Deserialize<'a>>(data: &str) -> Result<T, PlabbleProtocolError> {
-    #[cfg(feature = "with-json")]
-    {
-        return serde_json::from_str(data).map_err(|_| PlabbleProtocolError::InputParsingFailed);
-    }
-
-    #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
-    {
-        return toml::from_str(data).map_err(|_| PlabbleProtocolError::InputParsingFailed);
-    }
-}
-
-/// Serialize an object to a JSON or TOML string (depending on enabled features).
-#[allow(dead_code)]
-fn serialize_output<T: Serialize>(data: &T) -> Result<String, PlabbleProtocolError> {
-    #[cfg(feature = "with-json")]
-    {
-        return serde_json::to_string(data)
-            .map_err(|_| PlabbleProtocolError::OutputSerializationFailed);
-    }
-
-    #[cfg(all(feature = "with-toml", not(feature = "with-json")))]
-    {
-        return toml::to_string(data).map_err(|_| PlabbleProtocolError::OutputSerializationFailed);
-    }
 }

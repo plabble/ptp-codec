@@ -111,14 +111,19 @@ mod tests {
             [body]
             limit = 7
             range.Numeric = [5, 25]
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
         let mut config = SerializerConfig::new(None);
         let serialized = packet.to_bytes(Some(&mut config)).unwrap();
 
         assert_eq!(0b0100_0001, serialized[0]); // version 1, encryption flag set
         assert_eq!(0b1000_0010, serialized[1]); // with_limit flag is set
-        assert_eq!("418200000000000000000000000000000000000700050019", hex::encode(&serialized));
+        assert_eq!(
+            "418200000000000000000000000000000000000700050019",
+            hex::encode(&serialized)
+        );
 
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
         assert_eq!(packet, deserialized);

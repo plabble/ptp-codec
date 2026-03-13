@@ -1,4 +1,4 @@
-use crate::{crypto::hash_128, core::default_true};
+use crate::{core::default_true, crypto::hash_128};
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 use serde_with::base64::{Base64, UrlSafe};

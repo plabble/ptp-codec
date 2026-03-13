@@ -13,12 +13,12 @@ pub struct SessionOptions {
     #[serde(default)]
     pub enable_full_encryption: bool,
 
-    /// Stored key lifetime (PSK) in seconds from now, if you want to save the session key for future use. 
+    /// Stored key lifetime (PSK) in seconds from now, if you want to save the session key for future use.
     /// If not set, the session key will only be used for the current session.
     #[serde(default)]
     pub stored_key_lifetime: Option<u32>,
 
-    /// If true, the client will generate a random salt and include it in the session request. 
+    /// If true, the client will generate a random salt and include it in the session request.
     #[serde(default)]
     pub client_salt: bool,
 
@@ -34,7 +34,7 @@ pub struct SessionOptions {
     /// List of cryptographic algorithm names (lowercase) to (not) use. If emtpy, default crypto settings will be used
     /// Examples: "!x25519", "aes256", "chacha20", "!ed25519", "blake3", "mldsa44", "mldsa65", "mlkem512", "mlkem768"
     #[serde(default)]
-    pub algorithms: Vec<String>
+    pub algorithms: Vec<String>,
 }
 
 impl Default for SessionOptions {
@@ -73,7 +73,7 @@ pub fn set_crypto_settings(settings: &mut CryptoSettings, algorithms: Vec<String
                     _ => {}
                 }
                 settings.post_quantum_settings = Some(pq_settings);
-            },
+            }
             _ => {}
         }
     }
