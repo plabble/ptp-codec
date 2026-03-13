@@ -21,6 +21,7 @@ pub struct Block {
 
     /// Block entries/data, mapping from entry hash to the actual data
     #[serde_as(as = "HashMap<Hex<Lowercase>, _>")]
-    data: HashMap<[u8; 32], BlockData>,
+    #[val_dyn_length]
+    data: HashMap<[u8; 24], BlockData>,
 }
 

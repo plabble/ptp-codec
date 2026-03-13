@@ -6,6 +6,7 @@ use serde_with::serde_as;
 
 /// Block proof, which is a cryptographic proof that a block is valid and can be added to the blockchain
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[no_discriminator]
 pub enum BlockProof {
     /// Proof of work (the parameters that are the answer to solve the target)
     #[toggled_by = "proof_of_work"]
@@ -17,6 +18,9 @@ pub enum BlockProof {
         /// Mining target
         target: Difficulty,
     },
+
+    // ProofOfAuthority: node pubkey/pubkey id & signature
+    // ProofOfStake: signature, pubkey of validator/staker, stake amount
 }
 
 /// Mining target

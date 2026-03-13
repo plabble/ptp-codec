@@ -2,7 +2,7 @@ use blake2::{
     Blake2b, Blake2bMac, Digest,
     digest::{
         Mac,
-        consts::{U16, U32, U64},
+        consts::{U16, U24, U32, U64},
     },
 };
 
@@ -14,6 +14,7 @@ mod key_exchange;
 mod signatures;
 
 type Blake2b128 = Blake2b<U16>;
+type Blake2b192 = Blake2b<U24>;
 type Blake2b256 = Blake2b<U32>;
 type Blake2b512 = Blake2b<U64>;
 type Blake2bMac128 = Blake2bMac<U16>;
@@ -124,6 +125,12 @@ pub fn derive_key(
 
 impl_hash!(hash_128, 16, Blake2b128, |h: blake3::Hasher| {
     let mut out = [0u8; 16];
+    h.finalize_xof().fill(&mut out);
+    out
+});
+
+impl_hash!(hash_192, 24, Blake2b192, |h: blake3::Hasher| {
+    let mut out = [0u8; 24];
     h.finalize_xof().fill(&mut out);
     out
 });

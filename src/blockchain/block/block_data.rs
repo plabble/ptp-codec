@@ -25,7 +25,7 @@ pub enum BlockData {
 
     /// Existence proof hash (e.g. file, image, etc.) stored outside the blockchain, to prove existence
     /// This is in general something nobody can verify
-    Hash(#[serde_as(as = "Hex<Lowercase>")] [u8; 64]) = 2,
+    Hash(#[serde_as(as = "Hex<Lowercase>")] [u8; 32]) = 2,
 
     /// Resource hash (e.g. file, image, etc.) stored outside the blockchain, to prove existence
     /// Contains URL

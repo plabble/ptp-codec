@@ -11,7 +11,7 @@ use crate::core::PlabbleDateTime;
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct BlockHeader {
     /// Block version number, used for compatibility checks and future upgrades
-    #[bits(4)]
+    #[bits = 4]
     version: u8,
 
     /// Indicates if this block contains a proof-of-work
@@ -20,11 +20,11 @@ pub struct BlockHeader {
 
     /// Merkle root of the previous block, linking this block to the blockchain
     #[serde_as(as = "Hex<Lowercase>")]
-    prev_block_hash: [u8; 32],
+    prev_block_hash: [u8; 24],
     
     /// Merkle root of the items/entries included in the block, ensuring data integrity
     #[serde_as(as = "Hex<Lowercase>")]
-    merkle_root: [u8; 32], 
+    merkle_root: [u8; 24], 
 
     /// Timestamp of when the block was created
     timestamp: PlabbleDateTime,
