@@ -194,6 +194,7 @@ pub enum Opcode {
     // Special: 200+
     TIME = 200, // Push the current time as a Plabble numeric timestamp to the stack
 
+    // TODO: see how this should work out. At least, see providers.rs and integrate them in the interpreter.rs
     CHECKLOCK = 201, // Takes a number from the stack and fails if it is bigger than the current transaction block height or time, depending on the transaction. (fails if not in the context of a transaction)
     TXID = 202, // Push the current transaction ID to the stack (fails if not in the context of a transaction)
     GETBLOCK = 204, // Take block ID from the stack and push raw block data back (fails if not in the context of a blockchain)

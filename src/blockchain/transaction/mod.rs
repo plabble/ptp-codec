@@ -32,14 +32,19 @@ pub struct Transaction {
     #[dyn_length]
     pub outputs: Vec<TransactionOutput>,
 
-    /// Optional time lock for the transaction, which specifies the earliest time the transaction can be included in a block.
-    /// This field is only present if `has_time_lock` is true.
-    #[toggled_by = "time_lock"]
-    pub time_lock: Option<PlabbleDateTime>,
+    /// Transaction lock
+    #[variant_by = "time_lock"]
+    pub lock: TransactionLock
+}
 
-    /// Optional relative height lock for the transaction, which specifies the minimum number of blocks that must be mined after the transaction is included before it can be spent.
-    #[toggled_by = "!time_lock"]
-    pub height_lock: Option<u16>,
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[no_discriminator]
+pub enum TransactionLock {
+    /// Relative height lock, specifying the minimum number of blocks that must be mined after the transaction is included before it can be spent.
+    Height(#[dyn_int] u64),
+
+    /// Time lock, specifying the earliest time (as a Plabble timestamp) that the transaction can be included in a block.
+    Time(PlabbleDateTime),
 }
 
 #[cfg(test)]
@@ -49,6 +54,7 @@ mod tests {
     use crate::{
         blockchain::transaction::{
             Transaction,
+            TransactionLock,
             tx_input::TransactionInput,
             tx_output::{OutputType, TransactionOutput},
         },
@@ -98,8 +104,7 @@ mod tests {
                     locking_script: Some(OpcodeScript::new(vec![Opcode::FALSE])),
                 },
             ],
-            time_lock: Some(PlabbleDateTime::new(10)),
-            height_lock: None,
+            lock: TransactionLock::Time(PlabbleDateTime::new(10)),
         };
 
         let config: Option<&mut SerializerConfig> = None;

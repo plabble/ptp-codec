@@ -3,20 +3,8 @@ use std::sync::Arc;
 use crate::{
     core::BucketId,
     crypto::{derive_key, hash_256, hash_512},
-    packets::base::{PlabblePacketBase, settings::CryptoSettings},
+    packets::base::{PlabblePacketBase, settings::CryptoSettings}, providers::KeyProvider,
 };
-
-// Key/storage provider for Plabble Connection
-pub trait KeyProvider: Send + Sync {
-    /// Given a bucket ID serialized as bytes, return the 32-byte bucket key, or None.
-    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 32]>;
-
-    /// Given a 12-byte PSK ID, return the 64-byte pre-shared key, or None.
-    fn get_psk(&self, psk_id: &[u8; 12]) -> Option<[u8; 64]>;
-
-    /// Store a pre-shared key with the given PSK ID and optional expiration time (as a UNIX timestamp).
-    fn store_psk(&self, psk_id: [u8; 12], psk: [u8; 64], expiration: Option<u32>);
-}
 
 /// Connection context for cryptography, counters, session etc.
 /// This object is used for handling MAC, encryption, key derivation etc.

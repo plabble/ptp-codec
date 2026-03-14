@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender};
 use futures::lock::Mutex;
 
-use crate::{packets::context::KeyProvider, protocol::{
+use crate::{providers::KeyProvider, protocol::{
     PlabbleConnection as InnerPlabbleConnection, deserialize_input, error::PlabbleProtocolError,
     serialize_output,
 }};

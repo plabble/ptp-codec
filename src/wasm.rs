@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    packets::context::KeyProvider,
+    providers::KeyProvider,
     protocol::{PlabbleConnection as InnerPlabbleConnection, deserialize_input, serialize_output},
 };
 
