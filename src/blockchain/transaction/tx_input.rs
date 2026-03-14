@@ -12,13 +12,13 @@ use crate::scripting::opcode_script::OpcodeScript;
 pub struct TransactionInput {
     /// Reference to the previous transaction ID
     #[serde_as(as = "Hex<Lowercase>")]
-    transaction_id: [u8; 24],
+    pub transaction_id: [u8; 24],
 
     /// Index of the output in the previous transaction that is being spent
     #[dyn_int]
-    output_index: u64,
+    pub output_index: u64,
 
     /// Unlocking script to unlock the referenced output, allowing it to be transferred in this transaction
     #[dyn_length]
-    unlocking_script: OpcodeScript
+    pub unlocking_script: OpcodeScript
 }

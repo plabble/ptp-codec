@@ -29,7 +29,7 @@ pub enum BlockData {
 
     /// Resource hash (e.g. file, image, etc.) stored outside the blockchain, to prove existence
     /// Contains URL
-    Resource(#[dyn_length] String) = 3,
+    Resource(String) = 3,
 
     /// Smart contract that automatically executes when certain conditions are met
     SmartContract(SmartContract) = 4,
@@ -39,7 +39,6 @@ pub enum BlockData {
 
     /// Arbitrary binary data
     Blob(
-        #[dyn_length]
         #[serde_as(as = "Hex<Lowercase>")]
         Vec<u8>,
     ) = 255,

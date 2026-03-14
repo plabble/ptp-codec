@@ -28,9 +28,9 @@ pub enum BlockProof {
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Difficulty {
     /// Exponent, which is a single byte value that defines the difficulty of the mining target
-    exponent: u8,
+    pub exponent: u8,
 
     /// Coefficient, which is a 3-byte value that, together with the exponent, defines the mining target
     #[serde_as(as = "Hex<Lowercase>")]
-    coefficient: [u8; 3],
+    pub coefficient: [u8; 3],
 }
