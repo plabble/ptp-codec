@@ -188,18 +188,110 @@ pub enum Opcode {
     // 147 - 149
 
     // Crypto operations
-    HASH = 150,    // Take byte for algorithm, hashes bytes and put them back on stack
-    SIGN = 151, // Take byte for algorithm, signature, data to sign and puts signature back on stack
-    VERIFY = 152, // Takes byte for algorithm, public key, signature, data and puts boolean back
-    ENCRYPT = 153, // Takes byte for algorithm, key, data and puts encrypted data back
-    DECRYPT = 154, // Takes byte for algorithm, key, ciphertext and puts plain data back
-    // 155 - 159
+    CRYPTO(OpAlgorithm) = 150, // Perform a crypto operation based on the provided algorithm. Takes necessary parameters for the algorithm from the stack and pushes result back. See OpAlgorithm enum for details.
+    // 151 - 159
 
     // Special: 200+
     TIME = 200, // Push the current time as a Plabble numeric timestamp to the stack
 
+    CHECKLOCK = 201, // Takes a number from the stack and fails if it is bigger than the current transaction block height or time, depending on the transaction. (fails if not in the context of a transaction)
+    TXID = 202, // Push the current transaction ID to the stack (fails if not in the context of a transaction)
+    GETBLOCK = 204, // Take block ID from the stack and push raw block data back (fails if not in the context of a blockchain)
+    GETENTRY = 205, // Take entry / TX ID from the stack and push raw entry data back from blockchain (fails if not in the context of a blockchain)
+
     EVALSUB = 254, // Evaluate top stack item as if it is a script in a child process and push the result back
     EVAL = 255, // Evaluate stack bytes as if it is a script against the current stack (dangerous)
+}
+
+// TODO: all algorithms in one, we can omit codes like HASH/SIGN etc and just have a few opcodes
+
+/// Opcode Algorithm (for CRYPTO operations)
+#[repr(u8)]
+#[derive(Debug, Clone, PartialEq, ToBytes, FromBytes, Serialize, Deserialize)]
+pub enum OpAlgorithm {
+    // Hashing / MAC
+
+    /// Hash using Blake2b with 128-bit output
+    Blake2_128 = 0,
+    /// Hash using Blake3 with 128-bit output
+    Blake3_128 = 1,
+    /// Hash using Blake2b with 192-bit output
+    Blake2_192 = 2,
+    /// Hash using Blake3 with 192-bit output
+    Blake3_192 = 3,
+    /// Hash using Blake2b with 256-bit output
+    Blake2_256 = 4,
+    /// Hash using Blake3 with 256-bit output
+    Blake3_256 = 5,
+    /// Hash using Blake2b with 512-bit output
+    Blake2_512 = 6,
+    /// Hash using Blake3 with 512-bit output
+    Blake3_512 = 7,
+
+    /// Calculate MAC using Blake2b with 128-bit output (takes key, data from stack)
+    Blake2Mac = 8,
+    /// Verify and assert using Blake2b with 128-bit output (takes key, data, and expected MAC from stack, calculates MAC and asserts it is correct)
+    Blake2MacAssert = 9,
+
+    /// Calculate MAC using Blake3 with 128-bit output (takes key, data from stack)
+    Blake3Mac = 10,
+    /// Verify and assert using Blake3 with 128-bit output (takes key, data, and expected MAC from stack, calculates MAC and asserts it is correct)
+    Blake3MacAssert = 11,
+
+    /// Calculate MAC using Poly1305 (takes key, data from stack)
+    Poly1305 = 12,
+    /// Verify and assert using Poly1305 (takes key, data, and expected MAC from stack, calculates MAC and asserts it is correct)
+    Poly1305Assert = 13,
+
+    // 11-19: more space for hashing/MAC algorithms
+
+    // Signing / Verifying
+
+    /// Sign using Ed25519 (takes secret key and message from stack, puts signature back)
+    SignEd25519 = 50,
+    /// Verify using Ed25519 (takes public key, message, and signature from stack, puts boolean back)
+    VerifyEd25519 = 51,
+    /// Verify using Ed25519 (see above) and asserts true
+    VerifyAssertEd25519 = 52,
+
+    /// Sign using ML-DSA-44 (takes secret key and message from stack, puts signature back)
+    SignDsa44 = 53,
+    /// Verify using ML-DSA-44 (takes public key, message, and signature from stack, puts boolean back)
+    VerifyDsa44 = 54,
+    /// Verify using ML-DSA-44 (see above) and asserts true
+    VerifyAssertDsa44 = 55,
+
+    /// Sign using ML-DSA-65 (takes secret key and message from stack, puts signature back)
+    SignDsa65 = 56,
+    /// Verify using ML-DSA-65 (takes public key, message, and signature from stack, puts boolean back) 
+    VerifyDsa65 = 57,
+    /// Verify using ML-DSA-65 (see above) and asserts true
+    VerifyAssertDsa65 = 58,
+
+    /// Sign using Falcon (takes secret key and message from stack, puts signature back)
+    SignFalcon = 59,
+    /// Verify using Falcon (takes public key, message, and signature from stack, puts boolean back)
+    VerifyFalcon = 60,
+    /// Verify using Falcon (see above) and asserts true
+    VerifyAssertFalcon = 61,
+
+    /// Sign using SLH-DSA-SHA128s (takes secret key and message from stack, puts signature back)
+    SignSlhDsaSha128s = 62,
+    /// Verify using SLH-DSA-SHA128s (takes public key, message, and signature from stack, puts boolean back)
+    VerifySlhDsaSha128s = 63,
+    /// Verify using SLH-DSA-SHA128s (see above) and asserts true
+    VerifyAssertSlhDsaSha128s = 64,
+
+    // 65-69: more space for signing/verifying algorithms
+
+    // Encryption / Decryption
+
+    /// Encrypt/decrypt using XChaCha20 stream cipher (takes key and data from stack, puts result back)
+    KeyStreamXChaCha20 = 70, 
+    /// Encrypt/decrypt using AES-256 in CTR mode (takes key and data from stack, puts result back)
+    KeyStreamAes256 = 71,
+
+    // 72-79: more space for encryption/decryption algorithms
 }
 
 /* Example script

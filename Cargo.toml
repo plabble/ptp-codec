@@ -39,6 +39,7 @@ serde-value = "^0.7"
 serde_json = { version = "^1.0", optional = true }
 serde_with = { version = "^3.17", features = ["base64", "hex"] }
 x25519-dalek = { version = "3.0.0-pre.6", features = ["static_secrets", "getrandom"] }
+poly1305 = "0.8.0"
 
 # WASM dependencies
 wasm-bindgen = { version = "0.2.110", optional = true }

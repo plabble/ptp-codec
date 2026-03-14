@@ -961,15 +961,15 @@ impl ScriptInterpreter {
 
                 self.push(StackData::Number(count))?;
             }
-            Opcode::HASH => todo!(),
-            Opcode::SIGN => todo!(),
-            Opcode::VERIFY => todo!(),
-            Opcode::ENCRYPT => todo!(),
-            Opcode::DECRYPT => todo!(),
+            Opcode::CRYPTO(_) => todo!(),
             Opcode::TIME => {
                 let now = PlabbleDateTime(Utc::now());
                 self.push(StackData::Number(now.timestamp() as i128))?;
             }
+            Opcode::CHECKLOCK => todo!(),
+            Opcode::TXID => todo!(),
+            Opcode::GETBLOCK => todo!(),
+            Opcode::GETENTRY => todo!(),
             Opcode::EVALSUB => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
