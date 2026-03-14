@@ -7,9 +7,16 @@ pub struct MerkleNode {
     pub right: Option<Box<MerkleNode>>,
 }
 
+#[derive(Debug)]
 pub struct MerkleTree {
     pub root: MerkleNode,
     blake3: bool,
+}
+
+#[derive(Debug)]
+pub struct MerkleProof {
+    pub path: Vec<bool>,       // Path in tree: true for right, false for left
+    pub hashes: Vec<[u8; 24]>, // Hashes of sibling nodes
 }
 
 impl MerkleNode {
@@ -19,6 +26,10 @@ impl MerkleNode {
             left: None,
             right: None,
         }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.left.is_none() && self.right.is_none()
     }
 }
 
@@ -57,10 +68,182 @@ impl MerkleTree {
         MerkleTree::new(nodes.remove(0), blake3)
     }
 
-    // TODO: make proof, verify proof
+    /// Generate a Merkle inclusion proof for a given target hash.
+    /// Returns `Some(MerkleProof)` if the hash is found, otherwise `None`.
+    pub fn make_proof(&self, target_hash: [u8; 24]) -> Option<MerkleProof> {
+        fn recurse(
+            node: &MerkleNode,
+            target_hash: [u8; 24],
+            path: &mut Vec<bool>,
+            hashes: &mut Vec<[u8; 24]>,
+        ) -> bool {
+            if node.is_leaf() && node.hash == target_hash {
+                return true;
+            }
+
+            if let Some(left) = &node.left {
+                if recurse(left, target_hash, path, hashes) {
+                    path.push(false); // Left child
+                    hashes.push(node.right.as_ref().unwrap().hash);
+                    return true;
+                }
+            }
+
+            if let Some(right) = &node.right {
+                if recurse(right, target_hash, path, hashes) {
+                    path.push(true); // Right child
+                    hashes.push(node.left.as_ref().unwrap().hash);
+                    return true;
+                }
+            }
+
+            false
+        }
+
+        let mut path = Vec::new();
+        let mut hashes = Vec::new();
+        if recurse(&self.root, target_hash, &mut path, &mut hashes) {
+            Some(MerkleProof { path, hashes })
+        } else {
+            None
+        }
+    }
+
+    /// Verify a Merkle inclusion proof.
+    /// Returns `true` if the proof is valid and the hash is part of the tree.
+    pub fn verify_proof(
+        &self,
+        target_hash: [u8; 24],
+        proof: &MerkleProof
+    ) -> bool {
+        let mut computed_hash = target_hash;
+        for (i, sibling_hash) in proof.hashes.iter().enumerate() {
+            computed_hash = if proof.path[i] {
+                hash_192(self.blake3, vec![sibling_hash, &computed_hash])
+            } else {
+                hash_192(self.blake3, vec![&computed_hash, sibling_hash])
+            };
+        }
+        computed_hash == self.root_hash()
+    }
 
     /// Get the Merkle root hash of the tree.
     pub fn root_hash(&self) -> [u8; 24] {
         self.root.hash
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn h(data: &[u8]) -> [u8; 24] {
+        hash_192(false, vec![data])
+    }
+
+    fn sample_hashes() -> Vec<[u8;24]> {
+        vec![
+            h(b"a"),
+            h(b"b"),
+            h(b"c"),
+            h(b"d"),
+        ]
+    }
+
+    #[test]
+    fn merkle_root_is_deterministic() {
+        let leaves = sample_hashes();
+
+        let tree1 = MerkleTree::new_from_hashes(false, leaves.clone());
+        let tree2 = MerkleTree::new_from_hashes(false, leaves);
+
+        assert_eq!(tree1.root_hash(), tree2.root_hash());
+    }
+
+    #[test]
+    fn proof_generation_and_verification() {
+        let leaves = sample_hashes();
+        let tree = MerkleTree::new_from_hashes(false, leaves.clone());
+        let second_tree = MerkleTree::new(MerkleNode::new(tree.root_hash()), false);
+
+        for leaf in leaves {
+            let proof = tree.make_proof(leaf).unwrap();
+            assert!(tree.verify_proof(leaf, &proof));
+            assert!(second_tree.verify_proof(leaf, &proof));
+        }
+    }
+
+    #[test]
+    fn proof_fails_for_wrong_leaf() {
+        let leaves = sample_hashes();
+        let tree = MerkleTree::new_from_hashes(false, leaves.clone());
+
+        let proof = tree.make_proof(leaves[0]).unwrap();
+
+        let fake_leaf = h(b"evil");
+        assert!(!tree.verify_proof(fake_leaf, &proof));
+    }
+
+    #[test]
+    fn proof_fails_if_hash_modified() {
+        let leaves = sample_hashes();
+        let tree = MerkleTree::new_from_hashes(false, leaves.clone());
+
+        let mut proof = tree.make_proof(leaves[0]).unwrap();
+
+        proof.hashes[0][0] ^= 1;
+
+        assert!(!tree.verify_proof(leaves[0], &proof));
+    }
+
+    #[test]
+    fn proof_fails_if_path_modified() {
+        let leaves = sample_hashes();
+        let tree = MerkleTree::new_from_hashes(false, leaves.clone());
+
+        let mut proof = tree.make_proof(leaves[0]).unwrap();
+
+        proof.path[0] = !proof.path[0];
+
+        assert!(!tree.verify_proof(leaves[0], &proof));
+    }
+
+    #[test]
+    fn proof_for_missing_leaf_returns_none() {
+        let leaves = sample_hashes();
+        let tree = MerkleTree::new_from_hashes(false, leaves);
+
+        let missing = h(b"not_present");
+
+        assert!(tree.make_proof(missing).is_none());
+    }
+
+    #[test]
+    fn works_with_odd_number_of_leaves() {
+        let leaves = vec![
+            h(b"a"),
+            h(b"b"),
+            h(b"c"),
+        ];
+
+        let tree = MerkleTree::new_from_hashes(false, leaves.clone());
+
+        for leaf in leaves {
+            let proof = tree.make_proof(leaf).unwrap();
+            assert!(tree.verify_proof(leaf, &proof));
+        }
+    }
+
+    #[test]
+    fn single_leaf_tree() {
+        let leaf = h(b"a");
+
+        let tree = MerkleTree::new_from_hashes(false, vec![leaf]);
+
+        let proof = tree.make_proof(leaf).unwrap();
+
+        assert!(tree.verify_proof(leaf, &proof));
+        assert!(proof.hashes.is_empty());
+        assert!(proof.path.is_empty());
     }
 }
