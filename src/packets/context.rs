@@ -6,18 +6,24 @@ use crate::{
     packets::base::{PlabblePacketBase, settings::CryptoSettings},
 };
 
+// Key/storage provider for Plabble Connection
+pub trait KeyProvider: Send + Sync {
+    /// Given a bucket ID serialized as bytes, return the 32-byte bucket key, or None.
+    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 32]>;
+
+    /// Given a 12-byte PSK ID, return the 64-byte pre-shared key, or None.
+    fn get_psk(&self, psk_id: &[u8; 12]) -> Option<[u8; 64]>;
+
+    /// Store a pre-shared key with the given PSK ID and optional expiration time (as a UNIX timestamp).
+    fn store_psk(&self, psk_id: [u8; 12], psk: [u8; 64], expiration: Option<u32>);
+}
+
 /// Connection context for cryptography, counters, session etc.
 /// This object is used for handling MAC, encryption, key derivation etc.
 #[derive(Clone)]
 pub struct PlabbleConnectionContext {
-    /// Get bucket key by bucket ID
-    pub get_bucket_key: Option<Arc<dyn Fn(&BucketId) -> Option<[u8; 32]> + Send + Sync>>,
-
-    /// Get pre-shared key by ID
-    pub get_psk: Option<Arc<dyn Fn(&[u8; 12]) -> Option<[u8; 64]> + Send + Sync>>,
-
-    /// Store pre-shared key (psk ID, key, expiration)
-    pub store_psk: Option<Arc<dyn Fn([u8; 12], [u8; 64], Option<u32>) + Send + Sync>>,
+    /// Key provider for looking up bucket keys/PSKs
+    pub key_provider: Option<Arc<dyn KeyProvider>>,
 
     /// Session key, if in a session
     pub session_key: Option<[u8; 64]>,
@@ -55,9 +61,7 @@ impl PlabbleConnectionContext {
     /// Create new connection context (for new connection)
     pub fn new() -> Self {
         Self {
-            get_bucket_key: None,
-            get_psk: None,
-            store_psk: None,
+            key_provider: None,
             session_key: None,
             crypto_settings: None,
             full_encryption: false,
@@ -99,7 +103,11 @@ impl PlabbleConnectionContext {
         raw_base_and_header: &[u8],
         bucket_id: Option<&BucketId>,
     ) -> [u8; 32] {
-        let bucket_key = bucket_id.and_then(|id| self.get_bucket_key.as_ref().and_then(|f| f(id)));
+        let bucket_key = bucket_id.and_then(|id| {
+            self.key_provider
+                .as_ref()
+                .and_then(|provider| provider.get_bucket_key(&id.data))
+        });
 
         let mut data = Vec::new();
         data.push(raw_base_and_header);
@@ -143,7 +151,7 @@ impl PlabbleConnectionContext {
             if let Some(base) = base
                 && base.pre_shared_key
             {
-                let psk = (self.get_psk.as_ref()?)(&base.psk_id?)?;
+                let psk = self.key_provider.as_ref()?.get_psk(&base.psk_id?)?;
                 (psk, &base.psk_salt?)
             } else {
                 (self.session_psk?, &self.session_salt?)
@@ -204,10 +212,30 @@ impl PlabbleConnectionContext {
 }
 
 #[cfg(test)]
+pub mod helpers {
+    use crate::packets::context::KeyProvider;
+
+    pub struct ExampleKeyProvider;
+    impl KeyProvider for ExampleKeyProvider {
+        fn get_bucket_key(&self, _bucket_id: &[u8; 16]) -> Option<[u8; 32]> {
+            Some([0; 32])
+        }
+
+        fn get_psk(&self, _psk_id: &[u8; 12]) -> Option<[u8; 64]> {
+            Some([0; 64])
+        }
+
+        fn store_psk(&self, _psk_id: [u8; 12], _psk: [u8; 64], _expiration: Option<u32>) {
+            // Do nothing for testing
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use crate::packets::{base::PlabblePacketBase, context::PlabbleConnectionContext};
+    use crate::packets::{base::PlabblePacketBase, context::{PlabbleConnectionContext, helpers::ExampleKeyProvider}};
 
     #[test]
     fn keys_are_unique_by_alt_byte_and_is_request() {
@@ -246,7 +274,7 @@ mod tests {
             psk_salt: Some([0u8; 16]),
         };
 
-        context.get_psk = Some(Arc::new(|_| Some([0u8; 64])));
+        context.key_provider = Some(Arc::new(ExampleKeyProvider));
         let key4 = context.create_key(Some(&base), 0, true).unwrap();
         assert_ne!(key1, key4);
         assert_ne!(key2, key4);

@@ -1,19 +1,18 @@
 use std::sync::Arc;
 
 use async_channel::{Receiver, Sender};
-use binary_codec::{BinarySerializer, SerializerConfig};
 use futures::lock::Mutex;
 
-use crate::protocol::{
+use crate::{packets::context::KeyProvider, protocol::{
     PlabbleConnection as InnerPlabbleConnection, deserialize_input, error::PlabbleProtocolError,
     serialize_output,
-};
+}};
 
 // ── Callback interfaces ─────────────────────────────────────────────────────
 
 /// Callback interface for looking up bucket keys by bucket ID and pre-shared keys.
 #[uniffi::export(callback_interface)]
-pub trait KeyProvider: Send + Sync {
+pub trait SessionKeyProvider: Send + Sync {
     /// Given a bucket ID serialized as bytes, return the 32-byte bucket key, or None.
     fn get_bucket_key(&self, bucket_id_bytes: Vec<u8>) -> Option<Vec<u8>>;
 
@@ -22,6 +21,32 @@ pub trait KeyProvider: Send + Sync {
 
     /// Store a pre-shared key with the given PSK ID and optional expiration time (as a UNIX timestamp).
     fn store_psk(&self, psk_id: Vec<u8>, psk: Vec<u8>, expiration: Option<u32>);
+}
+
+struct KeyProviderBridge {
+    inner: Arc<dyn SessionKeyProvider>,
+}
+
+impl KeyProviderBridge {
+    fn new(inner: Arc<dyn SessionKeyProvider>) -> Self {
+        Self { inner }
+    }
+}
+
+impl KeyProvider for KeyProviderBridge {
+    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 32]> {
+        let result = self.inner.get_bucket_key(bucket_id.to_vec())?;
+        result.try_into().ok()
+    }
+
+    fn get_psk(&self, psk_id: &[u8; 12]) -> Option<[u8; 64]> {
+        let result = self.inner.get_psk(psk_id.to_vec())?;
+        result.try_into().ok()
+    }
+
+    fn store_psk(&self, psk_id: [u8; 12], psk: [u8; 64], expiration: Option<u32>) {
+        self.inner.store_psk(psk_id.to_vec(), psk.to_vec(), expiration)
+    }
 }
 
 // ── Connection object ───────────────────────────────────────────────────────
@@ -51,32 +76,12 @@ impl PlabbleConnection {
     }
 
     /// Set a callback for looking up bucket keys by bucket ID.
-    pub async fn set_key_provider(&self, provider: Box<dyn KeyProvider>) {
-        let bucket_key_provider: Arc<dyn KeyProvider> = Arc::from(provider);
-        let psk_provider = bucket_key_provider.clone();
-        let store_psk_provider = bucket_key_provider.clone();
-
+    pub async fn set_key_provider(&self, provider: Box<dyn SessionKeyProvider>) {
         let mut inner = self.inner.lock().await;
         let data = inner.config.data.as_mut().unwrap();
 
-        data.get_bucket_key = Some(Arc::new(move |bucket_id| {
-            let bytes = bucket_id
-                .to_bytes(None::<&mut SerializerConfig<()>>)
-                .unwrap();
-            bucket_key_provider
-                .get_bucket_key(bytes)
-                .and_then(|v| <[u8; 32]>::try_from(v).ok())
-        }));
-
-        data.get_psk = Some(Arc::new(move |psk_id| {
-            psk_provider
-                .get_psk(psk_id.to_vec())
-                .and_then(|v| <[u8; 64]>::try_from(v).ok())
-        }));
-
-        data.store_psk = Some(Arc::new(move |psk_id, psk, expiration| {
-            store_psk_provider.store_psk(psk_id.to_vec(), psk.to_vec(), expiration);
-        }));
+        let provider: Arc<dyn SessionKeyProvider> = Arc::from(provider);
+        data.key_provider = Some(Arc::new(KeyProviderBridge::new(provider)));
     }
 
     /// Send a request packet serialized as a JSON (or TOML) string.

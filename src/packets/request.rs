@@ -269,7 +269,7 @@ mod tests {
     use crate::{
         errors::DeserializationError,
         packets::{
-            base::settings::CryptoSettings, context::PlabbleConnectionContext,
+            base::settings::CryptoSettings, context::{PlabbleConnectionContext, helpers::ExampleKeyProvider},
             request::PlabbleRequestPacket,
         },
     };
@@ -314,7 +314,7 @@ mod tests {
 
         // When encrypted with BucketId in AAD, decryption is different
         let context = config.data.as_mut().unwrap();
-        context.get_bucket_key = Some(Arc::new(|_| Some([0u8; 32])));
+        context.key_provider = Some(Arc::new(ExampleKeyProvider));
         context.include_bucket_key_in_auth_data = true;
 
         let without_bucket_key = hex::encode(&encrypted);
@@ -397,7 +397,7 @@ mod tests {
 
         // MAC is different when bucket key is included in AAD
         let context = config.data.as_mut().unwrap();
-        context.get_bucket_key = Some(Arc::new(|_| Some([0u8; 32])));
+        context.key_provider = Some(Arc::new(ExampleKeyProvider));
         context.include_bucket_key_in_auth_data = true;
 
         let serialized = packet.to_bytes(Some(&mut config)).unwrap();
@@ -411,7 +411,7 @@ mod tests {
 
         // Deserialization fails if bucket key getter is not provided and bucket key is included in AAD
         let context = config.data.as_mut().unwrap();
-        context.get_bucket_key = None;
+        context.key_provider = None;
         context.include_bucket_key_in_auth_data = false;
 
         let wrong = PlabbleRequestPacket::from_bytes(&serialized, Some(&mut config));

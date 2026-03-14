@@ -1,12 +1,13 @@
+use std::sync::Arc;
+
 use async_channel::Sender;
 use js_sys::{Function, Uint8Array};
-use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    protocol::PlabbleConnection as InnerPlabbleConnection,
-    protocol::{deserialize_input, serialize_output},
+    packets::context::KeyProvider,
+    protocol::{PlabbleConnection as InnerPlabbleConnection, deserialize_input, serialize_output},
 };
 
 #[wasm_bindgen]
@@ -33,6 +34,51 @@ pub struct PlabbleConnection {
     rx: Sender<Vec<u8>>,
 }
 
+#[wasm_bindgen]
+pub struct SessionKeyProvider {
+    get_bucket_key: Function,
+    get_psk: Function,
+    store_psk: Function,
+}
+
+#[wasm_bindgen]
+impl SessionKeyProvider {
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        get_bucket_key: Function,
+        get_psk: Function,
+        store_psk: Function,
+    ) -> SessionKeyProvider {
+        Self {
+            get_bucket_key,
+            get_psk,
+            store_psk,
+        }
+    }
+}
+
+impl KeyProvider for SessionKeyProvider {
+    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 32]> {
+        call_js_byte_array_cb_1(&self.get_bucket_key, bucket_id)
+    }
+
+    fn get_psk(&self, psk_id: &[u8; 12]) -> Option<[u8; 64]> {
+        call_js_byte_array_cb_1(&self.get_psk, psk_id)
+    }
+
+    fn store_psk(&self, psk_id: [u8; 12], psk: [u8; 64], expiration: Option<u32>) {
+        let psk_id_array = Uint8Array::from(&psk_id[..]);
+        let psk_array = Uint8Array::from(&psk[..]);
+        // TODO: error logging?
+        let _ = self.store_psk.call3(
+            &JsValue::NULL,
+            &psk_id_array.into(),
+            &psk_array.into(),
+            &JsValue::from_f64(expiration.map(|v| v as f64).unwrap_or(f64::NAN)),
+        );
+    }
+}
+
 /// Plabble Connection
 #[wasm_bindgen]
 impl PlabbleConnection {
@@ -56,43 +102,11 @@ impl PlabbleConnection {
     }
 
     /// Set key providers/JS callbacks
-    ///
-    /// - `get_bucket_key`: Optional JS callback to get bucket key (called with bucket ID as Uint8Array(16), should return Uint8Array(32))
-    /// - `get_psk`: Optional JS callback to get PSK (called with PSK ID as Uint8Array(12), should return Uint8Array(64))
-    /// - `store_psk`: Optional JS callback to store PSK (called with PSK ID as Uint8Array(12), PSK as Uint8Array(64), expiration as number)
-    pub fn set_key_providers(
-        &mut self,
-        get_bucket_key: Option<Function>,
-        get_psk: Option<Function>,
-        store_psk: Option<Function>,
-    ) {
+    pub fn set_key_provider(&mut self, provider: SessionKeyProvider) {
         let data = self.inner.config.data.as_mut().unwrap();
 
-        if let Some(get_bucket_key) = get_bucket_key {
-            data.get_bucket_key = Some(Arc::new(move |bucket_id| {
-                call_js_byte_array_cb_1(&get_bucket_key, &bucket_id.data)
-            }));
-        }
-
-        if let Some(get_psk) = get_psk {
-            data.get_psk = Some(Arc::new(move |psk_id| {
-                call_js_byte_array_cb_1(&get_psk, psk_id)
-            }));
-        }
-
-        if let Some(store_psk) = store_psk {
-            data.store_psk = Some(Arc::new(move |psk_id, psk, expiration| {
-                let psk_id_array = Uint8Array::from(&psk_id[..]);
-                let psk_array = Uint8Array::from(&psk[..]);
-                // TODO: error logging?
-                let _ = store_psk.call3(
-                    &JsValue::NULL,
-                    &psk_id_array.into(),
-                    &psk_array.into(),
-                    &JsValue::from_f64(expiration.map(|v| v as f64).unwrap_or(f64::NAN)),
-                );
-            }));
-        }
+        let provider: Arc<dyn KeyProvider> = Arc::from(provider);
+        data.key_provider = Some(provider);
     }
 
     /// Send a packet to the Plabble connection (accepts a JSON/TOML string representing PlabbleRequestPacket)

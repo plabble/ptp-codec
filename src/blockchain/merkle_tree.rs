@@ -1,5 +1,9 @@
+use binary_codec::{FromBytes, ToBytes};
+use serde::{Deserialize, Serialize};
+
 use crate::crypto::hash_192;
 
+/// Merkle node for a Merkle tree
 #[derive(Debug, Clone)]
 pub struct MerkleNode {
     pub hash: [u8; 24],
@@ -7,16 +11,27 @@ pub struct MerkleNode {
     pub right: Option<Box<MerkleNode>>,
 }
 
+/// Merkle tree
 #[derive(Debug)]
 pub struct MerkleTree {
     pub root: MerkleNode,
     blake3: bool,
 }
 
-#[derive(Debug)]
+/// Merkle Proof
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq)]
 pub struct MerkleProof {
-    pub path: Vec<bool>,       // Path in tree: true for right, false for left
-    pub hashes: Vec<[u8; 24]>, // Hashes of sibling nodes
+    /// Length of the path (number of sibling hashes)
+    #[length_for = "hashes"]
+    pub length: u8,
+
+    /// Hashes of sibling nodes
+    #[length_by = "hashes"]
+    pub hashes: Vec<[u8; 24]>,
+
+    /// Path in the merkle tree
+    #[length_by = "hashes"]
+    pub path: Vec<bool>, 
 }
 
 impl MerkleNode {
@@ -34,6 +49,7 @@ impl MerkleNode {
 }
 
 impl MerkleTree {
+    /// Create new merkle tree from single node (root node)
     pub fn new(root: MerkleNode, blake3: bool) -> Self {
         MerkleTree { root, blake3 }
     }
@@ -103,7 +119,7 @@ impl MerkleTree {
         let mut path = Vec::new();
         let mut hashes = Vec::new();
         if recurse(&self.root, target_hash, &mut path, &mut hashes) {
-            Some(MerkleProof { path, hashes })
+            Some(MerkleProof { length: hashes.len() as u8, hashes, path })
         } else {
             None
         }
@@ -135,6 +151,8 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
+    use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+
     use super::*;
 
     fn h(data: &[u8]) -> [u8; 24] {
@@ -245,5 +263,34 @@ mod tests {
         assert!(tree.verify_proof(leaf, &proof));
         assert!(proof.hashes.is_empty());
         assert!(proof.path.is_empty());
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_proof() {
+        let leaves = vec![
+            h(b"a"),
+            h(b"b"),
+            h(b"c"),
+            h(b"d"),
+            h(b"e"),
+            h(b"f")
+        ];
+        let tree = MerkleTree::new_from_hashes(false, leaves.clone());
+
+        let proof = tree.make_proof(leaves[1]).unwrap();
+        println!("{:?}", proof.path);
+
+        let config: Option<&mut SerializerConfig> = None;
+        let bytes = proof.to_bytes(config).unwrap();
+
+        print!("{}", hex::encode(&bytes));
+
+        let config: Option<&mut SerializerConfig> = None;
+        let deserialized = MerkleProof::from_bytes(&bytes, config).unwrap();
+
+        assert_eq!(proof, deserialized);
+
+        let tree = MerkleTree::new(MerkleNode::new(tree.root_hash()), false);
+        assert!(tree.verify_proof(leaves[1], &proof));
     }
 }

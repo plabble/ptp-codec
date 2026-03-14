@@ -107,8 +107,8 @@ impl PlabbleConnection {
 
                 if with_psk {
                     let psk_id = body.psk_id.expect("Expected PSK ID");
-                    if let Some(store_psk) = &context.store_psk {
-                        store_psk(
+                    if let Some(provider) = &context.key_provider {
+                        provider.store_psk(
                             psk_id,
                             context.session_key.clone().unwrap(),
                             psk_expiration.map(|d| d.timestamp()),
