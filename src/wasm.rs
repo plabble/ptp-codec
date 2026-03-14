@@ -5,7 +5,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    protocol::{deserialize_input, serialize_output}, protocol::PlabbleConnection as InnerPlabbleConnection
+    protocol::PlabbleConnection as InnerPlabbleConnection,
+    protocol::{deserialize_input, serialize_output},
 };
 
 #[wasm_bindgen]
@@ -39,9 +40,7 @@ impl PlabbleConnection {
     ///
     /// - `handle_send`: JS callback to handle outgoing packets (called with Uint8Array)
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        handle_send: Function
-    ) -> Self {
+    pub fn new(handle_send: Function) -> Self {
         let (rx, recv) = async_channel::unbounded();
         let (send, tx) = async_channel::unbounded();
         let inner = InnerPlabbleConnection::new(send, recv);
@@ -57,7 +56,7 @@ impl PlabbleConnection {
     }
 
     /// Set key providers/JS callbacks
-    /// 
+    ///
     /// - `get_bucket_key`: Optional JS callback to get bucket key (called with bucket ID as Uint8Array(16), should return Uint8Array(32))
     /// - `get_psk`: Optional JS callback to get PSK (called with PSK ID as Uint8Array(12), should return Uint8Array(64))
     /// - `store_psk`: Optional JS callback to store PSK (called with PSK ID as Uint8Array(12), PSK as Uint8Array(64), expiration as number)

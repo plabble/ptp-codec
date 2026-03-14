@@ -37,7 +37,6 @@ impl PlabbleConnection {
     }
 }
 
-
 // ── Helpers ─────────────────────────────────────────────────────────────────
 use crate::protocol::error::PlabbleProtocolError;
 

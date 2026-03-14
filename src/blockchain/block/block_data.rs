@@ -1,7 +1,7 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
-use serde_with::hex::Hex;
 use serde_with::formats::Lowercase;
+use serde_with::hex::Hex;
 use serde_with::serde_as;
 
 use crate::blockchain::contract::SmartContract;
@@ -9,8 +9,8 @@ use crate::blockchain::transaction::Transaction;
 use crate::crypto::certificate::Certificate;
 
 /// Data that can be stored on the Plabble Blockchain
-/// 
-/// In general, blockchain storage is expensive. 
+///
+/// In general, blockchain storage is expensive.
 /// Therefore, most nodes will NOT accept any data that is not somehow (at the same time or in advance) referenced by a transaction
 /// However, we want to allow the possibility to store data on the blockchain without a transaction, for instance Plabble Certificates which might be free
 #[repr(u8)]
@@ -38,8 +38,5 @@ pub enum BlockData {
     Certificate(Certificate) = 5,
 
     /// Arbitrary binary data
-    Blob(
-        #[serde_as(as = "Hex<Lowercase>")]
-        Vec<u8>,
-    ) = 255,
+    Blob(#[serde_as(as = "Hex<Lowercase>")] Vec<u8>) = 255,
 }

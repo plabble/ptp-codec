@@ -51,6 +51,7 @@ pub enum KeyExhangeResponse {
 ///
 /// # Variants:
 /// - Ed25519: 64 bytes signature for Ed25519 signatures
+/// - Ed448: 114 bytes signature for Ed448 signatures
 /// - Dsa44: 2420 bytes signature for ML-DSA-44 post-quantum signatures
 /// - Dsa65: 3309 bytes signature for ML-DSA-65 post-quantum signatures
 /// - Falcon: 1462 bytes signature for Falcon-1024 post-quantum signatures
@@ -61,6 +62,9 @@ pub enum KeyExhangeResponse {
 pub enum CryptoSignature {
     #[toggled_by = "ed25519"]
     Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 64]),
+
+    #[toggled_by = "ed448"]
+    Ed448(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 114]),
 
     #[toggled_by = "dsa44"]
     Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 2420]),
@@ -80,6 +84,7 @@ pub enum CryptoSignature {
 ///
 /// # Variants:
 /// - Ed25519: 32 bytes key for Ed25519
+/// - Ed448: 57 bytes key for Ed448
 /// - Dsa44: 1312 bytes key for ML-DSA-44
 /// - Dsa65: 1952 bytes key for ML-DSA-65
 /// - Falcon: 1793 bytes key for Falcon-1024 which is bigger than the signature :D
@@ -90,6 +95,9 @@ pub enum CryptoSignature {
 pub enum VerificationKey {
     #[toggled_by = "ed25519"]
     Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+
+    #[toggled_by = "ed448"]
+    Ed448(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 57]),
 
     #[toggled_by = "dsa44"]
     Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1312]),
@@ -104,11 +112,14 @@ pub enum VerificationKey {
     SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
 }
 
+// TODO: ed448
+
 /// Secret siging keys used in various algorithms for creating a digital signature
 /// The signatures are stored as fixed-size byte arrays, serialized/deserialized using base64 encoding (when using serde)
 ///
 /// # Variants:
 /// - Ed25519: 32 bytes key for Ed25519
+/// - Ed448: 57 bytes key for Ed448
 /// - Dsa44: 2560 bytes key for ML-DSA-44, but is a 32-byte seed
 /// - Dsa65: 4032 bytes key for ML-DSA-65, but is a 32-byte seed
 /// - Falcon: 2305 bytes key for Falcon-1024
@@ -117,6 +128,7 @@ pub enum VerificationKey {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum SigningKey {
     Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    Ed448(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 57]),
     Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
     Dsa65(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
     Falcon(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 2305]),

@@ -17,7 +17,6 @@ pub struct TransactionOutput {
     pub not_replaceable: bool,
 
     // 5 bits reserved for future use
-
     /// Value of the transaction output in the smallest unit
     #[variant_by = "monetary"]
     pub value: OutputType,

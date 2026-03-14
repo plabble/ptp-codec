@@ -1,14 +1,8 @@
 use binary_codec::{BinaryDeserializer, BinarySerializer};
 
 use crate::{
-    packets::{
-        request::PlabbleRequestPacket,
-        response::PlabbleResponsePacket,
-    },
-    protocol::{
-        PlabbleConnection,
-        error::PlabbleProtocolError,
-    },
+    packets::{request::PlabbleRequestPacket, response::PlabbleResponsePacket},
+    protocol::{PlabbleConnection, error::PlabbleProtocolError},
 };
 
 pub mod implementation;
@@ -19,7 +13,10 @@ impl PlabbleConnection {
     /// Sends a request packet without waiting for a response.
     ///
     /// If the packet is not fire-and-forget, the internal counter will be incremented.
-    pub async fn send_request(&mut self, packet: PlabbleRequestPacket) -> Result<(), PlabbleProtocolError> {
+    pub async fn send_request(
+        &mut self,
+        packet: PlabbleRequestPacket,
+    ) -> Result<(), PlabbleProtocolError> {
         let bytes = packet.to_bytes(Some(&mut self.config))?;
         self.tx
             .send(bytes)

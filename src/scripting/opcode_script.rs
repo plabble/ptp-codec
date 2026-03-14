@@ -210,7 +210,6 @@ pub enum Opcode {
 #[derive(Debug, Clone, PartialEq, ToBytes, FromBytes, Serialize, Deserialize)]
 pub enum OpAlgorithm {
     // Hashing / MAC
-
     /// Hash using Blake2b with 128-bit output
     Blake2_128 = 0,
     /// Hash using Blake3 with 128-bit output
@@ -246,7 +245,6 @@ pub enum OpAlgorithm {
     // 11-19: more space for hashing/MAC algorithms
 
     // Signing / Verifying
-
     /// Sign using Ed25519 (takes secret key and message from stack, puts signature back)
     SignEd25519 = 50,
     /// Verify using Ed25519 (takes public key, message, and signature from stack, puts boolean back)
@@ -254,44 +252,46 @@ pub enum OpAlgorithm {
     /// Verify using Ed25519 (see above) and asserts true
     VerifyAssertEd25519 = 52,
 
+    SignEd448 = 53,
+    VerifyEd448 = 54,
+    VerifyAssertEd448 = 55,
+
     /// Sign using ML-DSA-44 (takes secret key and message from stack, puts signature back)
-    SignDsa44 = 53,
+    SignDsa44 = 56,
     /// Verify using ML-DSA-44 (takes public key, message, and signature from stack, puts boolean back)
-    VerifyDsa44 = 54,
+    VerifyDsa44 = 57,
     /// Verify using ML-DSA-44 (see above) and asserts true
-    VerifyAssertDsa44 = 55,
+    VerifyAssertDsa44 = 58,
 
     /// Sign using ML-DSA-65 (takes secret key and message from stack, puts signature back)
-    SignDsa65 = 56,
-    /// Verify using ML-DSA-65 (takes public key, message, and signature from stack, puts boolean back) 
-    VerifyDsa65 = 57,
+    SignDsa65 = 59,
+    /// Verify using ML-DSA-65 (takes public key, message, and signature from stack, puts boolean back)
+    VerifyDsa65 = 60,
     /// Verify using ML-DSA-65 (see above) and asserts true
-    VerifyAssertDsa65 = 58,
+    VerifyAssertDsa65 = 61,
 
     /// Sign using Falcon (takes secret key and message from stack, puts signature back)
-    SignFalcon = 59,
+    SignFalcon = 62,
     /// Verify using Falcon (takes public key, message, and signature from stack, puts boolean back)
-    VerifyFalcon = 60,
+    VerifyFalcon = 63,
     /// Verify using Falcon (see above) and asserts true
-    VerifyAssertFalcon = 61,
+    VerifyAssertFalcon = 64,
 
     /// Sign using SLH-DSA-SHA128s (takes secret key and message from stack, puts signature back)
-    SignSlhDsaSha128s = 62,
+    SignSlhDsaSha128s = 65,
     /// Verify using SLH-DSA-SHA128s (takes public key, message, and signature from stack, puts boolean back)
-    VerifySlhDsaSha128s = 63,
+    VerifySlhDsaSha128s = 66,
     /// Verify using SLH-DSA-SHA128s (see above) and asserts true
-    VerifyAssertSlhDsaSha128s = 64,
+    VerifyAssertSlhDsaSha128s = 67,
 
-    // 65-69: more space for signing/verifying algorithms
+    // 68-79: more space for signing/verifying algorithms
 
     // Encryption / Decryption
-
     /// Encrypt/decrypt using XChaCha20 stream cipher (takes key and data from stack, puts result back)
-    KeyStreamXChaCha20 = 70, 
+    KeyStreamXChaCha20 = 80,
     /// Encrypt/decrypt using AES-256 in CTR mode (takes key and data from stack, puts result back)
-    KeyStreamAes256 = 71,
-
-    // 72-79: more space for encryption/decryption algorithms
+    KeyStreamAes256 = 81,
+    // 82-89: more space for encryption/decryption algorithms
 }
 
 /* Example script

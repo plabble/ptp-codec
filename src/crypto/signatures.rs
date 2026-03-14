@@ -11,6 +11,13 @@ impl SigningKey {
                 let signature = key.try_sign(data).ok()?.to_bytes();
                 Some(CryptoSignature::Ed25519(signature))
             }
+            SigningKey::Ed448(key) => {
+                use ed448_goldilocks::{SigningKey, signature::Signer};
+
+                let key = SigningKey::try_from(&key[..]).expect("Invalid Ed448 signing key");
+                let signature = key.try_sign(data).ok()?.to_bytes();
+                Some(CryptoSignature::Ed448(signature))
+            }
             #[cfg(feature = "pqc-lite")]
             SigningKey::Dsa44(key) => {
                 use ml_dsa::{MlDsa44, Signature, SigningKey, signature::Signer};
@@ -47,6 +54,17 @@ impl VerificationKey {
                     let key = VerifyingKey::from_bytes(key).ok()?;
                     let signature = Signature::from_bytes(signature);
                     Some(key.verify(data, &signature).is_ok())
+                } else {
+                    None
+                }
+            }
+            VerificationKey::Ed448(key) => {
+                if let CryptoSignature::Ed448(signature) = signature {
+                    use ed448_goldilocks::{Signature, VerifyingKey};
+
+                    let key = VerifyingKey::from_bytes(key).ok()?;
+                    let signature = Signature::from_bytes(signature);
+                    Some(key.verify_raw(&signature, data).is_ok())
                 } else {
                     None
                 }
@@ -105,6 +123,27 @@ mod tests {
         assert_eq!(Some(true), ver.verify(&data, &signature)); // Valid
         assert_eq!(Some(false), ver.verify(&[0u8; 15], &signature)); // Invalid data
         assert_eq!(Some(false), inv.verify(&data, &signature)); // Invalid key
+    }
+
+    #[test]
+    fn can_sign_and_verify_ed448() {
+        use ed448_goldilocks::SigningKey as SK;
+
+        let data = [0u8; 16];
+        let sk = SK::try_from(&[0u8; 57][..]).expect("Invalid Ed448 signing key");
+        let vk = sk.verifying_key();
+
+        let sig = SigningKey::Ed448([0u8; 57]);
+
+        let signature = sig.sign(&data).unwrap();
+        assert!(matches!(signature, CryptoSignature::Ed448(_)));
+
+        let ver = VerificationKey::Ed448(vk.to_bytes());
+        let inv = VerificationKey::Ed448([0u8; 57]);
+
+        assert_eq!(Some(true), ver.verify(&data, &signature)); // Valid
+        assert_eq!(Some(false), ver.verify(&[0u8; 15], &signature)); // Invalid data
+        assert_eq!(None, inv.verify(&data, &signature)); // Invalid key
     }
 
     #[cfg(feature = "pqc-lite")]

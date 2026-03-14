@@ -1,7 +1,7 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
-use serde_with::hex::Hex;
 use serde_with::formats::Lowercase;
+use serde_with::hex::Hex;
 use serde_with::serde_as;
 
 use crate::blockchain::block::block_proof::BlockProof;
@@ -21,10 +21,10 @@ pub struct BlockHeader {
     /// Merkle root of the previous block, linking this block to the blockchain
     #[serde_as(as = "Hex<Lowercase>")]
     pub prev_block_hash: [u8; 24],
-    
+
     /// Merkle root of the items/entries included in the block, ensuring data integrity
     #[serde_as(as = "Hex<Lowercase>")]
-    pub merkle_root: [u8; 24], 
+    pub merkle_root: [u8; 24],
 
     /// Timestamp of when the block was created
     pub timestamp: PlabbleDateTime,

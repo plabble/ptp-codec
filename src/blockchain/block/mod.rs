@@ -36,8 +36,8 @@ impl Block {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
+    use std::collections::HashMap;
 
     use crate::{
         blockchain::block::{
@@ -102,6 +102,5 @@ mod tests {
         let config: Option<&mut SerializerConfig> = None;
         let deserialized = Block::from_bytes(&serialized, config).unwrap();
         assert_eq!(block, deserialized);
-
     }
 }

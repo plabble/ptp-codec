@@ -1,7 +1,7 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
-use serde_with::hex::Hex;
 use serde_with::formats::Lowercase;
+use serde_with::hex::Hex;
 use serde_with::serde_as;
 
 /// Block proof, which is a cryptographic proof that a block is valid and can be added to the blockchain
@@ -18,7 +18,6 @@ pub enum BlockProof {
         /// Mining target
         target: Difficulty,
     },
-
     // ProofOfAuthority: node pubkey/pubkey id & signature
     // ProofOfStake: signature, pubkey of validator/staker, stake amount
 }

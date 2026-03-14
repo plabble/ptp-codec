@@ -1,7 +1,7 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
-use serde_with::hex::Hex;
 use serde_with::formats::Lowercase;
+use serde_with::hex::Hex;
 use serde_with::serde_as;
 
 use crate::scripting::opcode_script::OpcodeScript;
@@ -20,5 +20,5 @@ pub struct TransactionInput {
 
     /// Unlocking script to unlock the referenced output, allowing it to be transferred in this transaction
     #[dyn_length]
-    pub unlocking_script: OpcodeScript
+    pub unlocking_script: OpcodeScript,
 }

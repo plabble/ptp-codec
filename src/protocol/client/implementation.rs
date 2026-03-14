@@ -11,7 +11,7 @@ use crate::{
             request_header::PlabbleRequestHeader,
             type_and_flags::{RequestPacketType, ResponsePacketType},
         },
-        request::PlabbleRequestPacket
+        request::PlabbleRequestPacket,
     },
     protocol::{
         PlabbleConnection,
@@ -23,7 +23,7 @@ use crate::{
 /// Client protocol implementation for [`PlabbleConnection`].
 impl PlabbleConnection {
     /// Start a new session with the given options. Returns the PSK ID if a pre-shared key is created.
-    /// 
+    ///
     /// - `options` is a JSON (or TOML) string containing session options. See [`SessionOptions`] for details.
     /// - Returns the PSK ID as a 12-byte array if a pre-shared key is created, or None if no PSK is used.
     pub async fn start_session(
@@ -58,8 +58,8 @@ impl PlabbleConnection {
         }
 
         let psk_expiration = options
-                    .stored_key_lifetime
-                    .map(|d| PlabbleDateTime::from_now(d));
+            .stored_key_lifetime
+            .map(|d| PlabbleDateTime::from_now(d));
 
         let req = PlabbleRequestPacket {
             base,
@@ -108,7 +108,11 @@ impl PlabbleConnection {
                 if with_psk {
                     let psk_id = body.psk_id.expect("Expected PSK ID");
                     if let Some(store_psk) = &context.store_psk {
-                        store_psk(psk_id, context.session_key.clone().unwrap(), psk_expiration.map(|d|d.timestamp()));
+                        store_psk(
+                            psk_id,
+                            context.session_key.clone().unwrap(),
+                            psk_expiration.map(|d| d.timestamp()),
+                        );
                     }
                     return Ok(Some(psk_id));
                 } else {

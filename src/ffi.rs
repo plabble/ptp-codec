@@ -4,8 +4,9 @@ use async_channel::{Receiver, Sender};
 use binary_codec::{BinarySerializer, SerializerConfig};
 use futures::lock::Mutex;
 
-use crate::{
-    protocol::{deserialize_input, serialize_output, PlabbleConnection as InnerPlabbleConnection, error::PlabbleProtocolError},
+use crate::protocol::{
+    PlabbleConnection as InnerPlabbleConnection, deserialize_input, error::PlabbleProtocolError,
+    serialize_output,
 };
 
 // ── Callback interfaces ─────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ impl PlabbleConnection {
 #[cfg(feature = "server")]
 #[uniffi::export]
 impl PlabbleConnection {
-    /// Send a response packet serialized as a JSON (or TOML) string. 
+    /// Send a response packet serialized as a JSON (or TOML) string.
     pub async fn send_response(&self, response: String) -> Result<(), PlabbleProtocolError> {
         let packet = deserialize_input(&response)?;
         let mut inner = self.inner.lock().await;

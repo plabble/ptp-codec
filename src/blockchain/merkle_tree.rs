@@ -9,12 +9,16 @@ pub struct MerkleNode {
 
 pub struct MerkleTree {
     pub root: MerkleNode,
-    blake3: bool
+    blake3: bool,
 }
 
 impl MerkleNode {
     pub fn new(hash: [u8; 24]) -> Self {
-        MerkleNode { hash, left: None, right: None }
+        MerkleNode {
+            hash,
+            left: None,
+            right: None,
+        }
     }
 }
 
@@ -49,11 +53,13 @@ impl MerkleTree {
             }
             nodes = new_level;
         }
-        
+
         MerkleTree::new(nodes.remove(0), blake3)
     }
 
-     /// Get the Merkle root hash of the tree.
+    // TODO: make proof, verify proof
+
+    /// Get the Merkle root hash of the tree.
     pub fn root_hash(&self) -> [u8; 24] {
         self.root.hash
     }

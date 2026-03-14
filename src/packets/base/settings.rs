@@ -32,9 +32,10 @@ pub struct CryptoSettings {
     #[toggles("x25519")]
     pub key_exchange_x25519: bool,
 
-    /// Reserved for future use
+    /// Sign with Ed448, 57 B keys, signature 114 B.
     #[serde(default)]
-    pub flag_64: bool,
+    #[toggles("ed448")]
+    pub sign_ed448: bool,
 
     /// Use post-quantum cryptography (e.g., Kyber etc.)
     /// This adds the Post-Quantum settings
@@ -115,7 +116,7 @@ impl Default for CryptoSettings {
             use_blake3: false,
             sign_ed25519: true,
             key_exchange_x25519: true,
-            flag_64: false,
+            sign_ed448: false,
             use_post_quantum: false,
             post_quantum_settings: None,
         }
@@ -187,7 +188,7 @@ mod tests {
         assert_eq!(settings.encrypt_with_chacha, true);
         assert_eq!(settings.sign_ed25519, true);
         assert_eq!(settings.key_exchange_x25519, true);
-        assert_eq!(settings.flag_64, false);
+        assert_eq!(settings.sign_ed448, false);
 
         assert_eq!(vec![0b0011_1011], bytes);
     }
