@@ -11,14 +11,15 @@ use serde_with::{DisplayFromStr, serde_as};
 /// The range can be either numeric or binary, depending on the bucket type.
 ///
 /// # Members
-/// - `limit`: Optional limit on the number of returned entries (u16), only applies to GET/DELETE requests
+/// - `limit`: Optional limit on the number of returned entries (u32), only applies to GET/DELETE requests
 /// - `range`: A `BucketRange` enum representing the range of data to query within the bucket.
 #[serde_as]
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BucketQuery {
     #[serde(default)]
+    #[dyn_int]
     #[toggled_by = "limit"]
-    limit: Option<u16>,
+    limit: Option<u32>,
 
     #[variant_by = "binary_keys"]
     range: BucketRange,
@@ -42,7 +43,7 @@ pub struct PutRequestBody {
 /// This is used for writing or reading data from bucket slots
 ///
 /// # Members
-/// - `Numeric`: A hashmap where the key is a `u16` representing the slot number,
+/// - `Numeric`: A hashmap where the key is a `u32` representing the slot number,
 ///   and the value is a vector of bytes representing the data stored in that slot.
 /// - `Binary`: A hashmap where the key is a `String` representing the slot identifier,
 ///   and the value is a vector of bytes representing the data stored in that slot.
@@ -51,9 +52,10 @@ pub struct PutRequestBody {
 #[no_discriminator]
 pub enum BucketBody {
     Numeric(
+        #[dyn_int]
         #[val_dyn_length]
         #[serde_as(as = "HashMap<DisplayFromStr, Base64<UrlSafe, Unpadded>>")]
-        HashMap<u16, Vec<u8>>,
+        HashMap<u32, Vec<u8>>,
     ),
     Binary(
         #[val_dyn_length]
@@ -68,14 +70,21 @@ pub enum BucketBody {
 /// The range can be either numeric or binary, depending on the bucket type.
 ///
 /// # Members
-/// - `Numeric`: A tuple containing two optional `u16` values representing optionally
+/// - `Numeric`: A tuple containing two optional `u32` values representing optionally
 ///  the start and/or end of the numeric range
 /// - `Binary`: A tuple containing two optional `String` values representing optionally
 ///  the start and/or end of the binary range.
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 #[no_discriminator]
 pub enum BucketRange {
-    Numeric(#[serde(default)] Option<u16>, #[serde(default)] Option<u16>),
+    Numeric(
+        #[serde(default)]
+        #[dyn_int]
+        Option<u32>,
+        #[serde(default)]
+        #[dyn_int]
+        Option<u32>,
+    ),
     Binary(
         #[dyn_length]
         #[serde(default)]
@@ -121,7 +130,7 @@ mod tests {
         assert_eq!(0b0100_0001, serialized[0]); // version 1, encryption flag set
         assert_eq!(0b1000_0010, serialized[1]); // with_limit flag is set
         assert_eq!(
-            "418200000000000000000000000000000000000700050019",
+            "418200000000000000000000000000000000070519",
             hex::encode(&serialized)
         );
 
@@ -177,7 +186,6 @@ mod tests {
                 254,
                 132,
                 95,
-                0,
                 25
             ],
             serialized
@@ -289,10 +297,8 @@ mod tests {
             0b0000_0010,
             0,
             1,
-            0,
             5,
             4,
-            0,
             0,
             0,
             0,
@@ -311,10 +317,8 @@ mod tests {
             0b0000_0010,
             0,
             1,
-            0,
             7,
             6,
-            0,
             0,
             0,
             0,
@@ -426,7 +430,7 @@ mod tests {
 
             [header]
             packet_type = "Put"
-            id = "AAAAAAAAAAAAAAAAAAAAAA"
+            id = "AQEBAQEBAQEBAQEBAQEBAQ"
 
             [body]
             body.Numeric = { 5 = "AAAAAA" }
@@ -436,7 +440,7 @@ mod tests {
 
         let serialized = packet.to_bytes(None).unwrap();
         assert_eq!(
-            "41060000000000000000000000000000000000050400000000",
+            "410601010101010101010101010101010101050400000000",
             hex::encode(&serialized)
         );
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
@@ -493,7 +497,7 @@ mod tests {
 
         let serialized = packet.to_bytes(None).unwrap();
         assert_eq!(
-            "41070000000000000000000000000000000000050019",
+            "4107000000000000000000000000000000000519",
             hex::encode(&serialized)
         );
         let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
@@ -547,8 +551,8 @@ mod tests {
         let serialized = packet.to_bytes(None).unwrap();
         assert_eq!(0b0001_0111, serialized[1]);
 
-        let case1 = "4117000100050400000000000706000000000000";
-        let case2 = "4117000100070600000000000000050400000000";
+        let case1 = "411700010504000000000706000000000000";
+        let case2 = "411700010706000000000000050400000000";
 
         assert!(hex::encode(&serialized) == case1 || hex::encode(&serialized) == case2);
         let deserialized = PlabbleResponsePacket::from_bytes(&serialized, None).unwrap();

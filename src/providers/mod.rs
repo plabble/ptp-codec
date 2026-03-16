@@ -24,16 +24,16 @@ pub trait PlabbleBucketProvider: Send + Sync {
     fn select_bucket(&mut self, bucket_id: &[u8; 16]) -> Result<(), PlabbleProtocolError>;
 
     /// Read numeric slot from selected bucket
-    fn read(&self, slot: u16) -> Result<Vec<u8>, PlabbleProtocolError>;
+    fn read(&self, slot: u32) -> Result<Vec<u8>, PlabbleProtocolError>;
 
     /// Write numeric slot in selected bucket
-    fn write(&self, slot: u16, data: Vec<u8>) -> Result<(), PlabbleProtocolError>;
+    fn write(&self, slot: u32, data: Vec<u8>) -> Result<(), PlabbleProtocolError>;
 
     /// Append data to selected bucket
     fn append(&self, data: Vec<u8>) -> Result<(), PlabbleProtocolError>;
 
     /// Delete numeric slot from selected bucket
-    fn delete(&self, slot: u16) -> Result<(), PlabbleProtocolError>;
+    fn delete(&self, slot: u32) -> Result<(), PlabbleProtocolError>;
 }
 
 /// Plabble provider for interacting with Plabble blockchain

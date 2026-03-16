@@ -326,8 +326,8 @@ Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64/URL-safe when using the TOML representation).
 
 Request body:
-- **limit**: optional integer to limit the number of returned entries (`u16` if present), can be used for pagination when combined with `range`
-- **range**: either `Numeric(start?, end?)` or `Binary(start_key?, end_key?)` (both bounds are optional). Numeric ranges use `u16` slots; binary ranges use UTF-8 keys.
+- **limit**: optional integer to limit the number of returned entries ([dynint](#plabble-dynamic-int) `u64` if present), can be used for pagination when combined with `range`
+- **range**: either `Numeric(start?, end?)` or `Binary(start_key?, end_key?)` (both bounds are optional). Numeric ranges use [dynint](#plabble-dynamic-int) `u64` slots; binary ranges use UTF-8 keys.
 
 Example (numeric range):
 ```toml
@@ -600,7 +600,7 @@ Request header:
 - **id**: the [Bucket ID](#bucket-id) identifying the target bucket.
 
 Request body:
-- **body**: the `BucketBody` to write; use `Numeric` for u16 slot indexes or `Binary` for string keys.
+- **body**: the `BucketBody` to write; use `Numeric` for [dynint](#plabble-dynamic-int) u64 slot indexes or `Binary` for string keys.
 
 Example (numeric keys, overwrite):
 ```toml
@@ -653,8 +653,8 @@ Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
 
 Request body:
-- **limit**: optional integer to limit the number of entries to be deleted in the range (`u16` if present). Can be used for popping values when combined with `range`.
-- **range**: a `BucketQuery` describing which slots to delete. Use `Numeric(start?, end?)` for u16 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets. If the range is empty, the entire bucket will be deleted.
+- **limit**: optional integer to limit the number of entries to be deleted in the range (`u64` [dynint](#plabble-dynamic-int) if present). Can be used for popping values when combined with `range`.
+- **range**: a `BucketQuery` describing which slots to delete. Use `Numeric(start?, end?)` for [dynint](#plabble-dynamic-int) u64 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets. If the range is empty, the entire bucket will be deleted.
 
 Example (numeric range):
 ```toml
@@ -711,7 +711,7 @@ Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
 
 Request body:
-- **range**: a `BucketQuery` describing which keys to subscribe to. Use `Numeric(start?, end?)` for u16 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets.
+- **range**: a `BucketQuery` describing which keys to subscribe to. Use `Numeric(start?, end?)` for [dynint](#plabble-dynamic-int) u64 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets.
 
 Example (numeric range):
 ```toml

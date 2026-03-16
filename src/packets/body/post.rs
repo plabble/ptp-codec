@@ -200,7 +200,6 @@ mod tests {
                 0,
                 0,
                 // numeric range, 2 byte (only start)
-                0,
                 1
             ]
         )

@@ -171,10 +171,10 @@ pub enum Opcode {
     // Bucket operations
     SERVER = 130, // Connect to other server. Takes address from stack
     SELECT = 131, // Select bucket by ID (takes 16 bytes for bucket ID)
-    READ = 132, // Read numeric slot of bucket (takes 2 bytes for u16 bucket index) and push result to stack
-    WRITE = 133, // Write numeric slot to bucket. Takes 2 bytes for slot, content from stack
+    READ = 132, // Read numeric slot of bucket (takes dynamic int for u32 bucket index) and push result to stack
+    WRITE = 133, // Write numeric slot to bucket. Takes dynamic int for u32 bucket index, content from stack
     APPEND = 134, // Write to bucket, next free slot. Takes content from stack
-    DELETE = 135, // Delete slot from bucket. Takes 2 bytes for slot number.
+    DELETE = 135, // Delete slot from bucket. Takes dynamic int for u32 slot number.
     // 136 - 139
 
     // Slice operations

@@ -43,7 +43,7 @@ pub struct StreamResponseBody {
 #[no_discriminator]
 pub enum SlotRange {
     Numeric(
-        u16,
+        u32,
         #[serde(default)]
         #[dyn_int]
         Option<u64>,
@@ -87,7 +87,7 @@ mod tests {
 
         let bytes = packet.to_bytes(None).unwrap();
         assert_eq!(
-            "0103000000000000000000000000000000000007080f",
+            "01030000000000000000000000000000000000000007080f",
             hex::encode(&bytes)
         );
         let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();

@@ -298,14 +298,14 @@ mod tests {
         context.session_key = Some([0u8; 64]);
 
         let encrypted = packet.to_bytes(Some(&mut config)).unwrap();
-        // 22 + 16 byte ciphertext (poly1305 tag is 16 bytes)
-        assert_eq!(22 + 16, encrypted.len());
+        // 20 + 16 byte ciphertext (poly1305 tag is 16 bytes)
+        assert_eq!(20 + 16, encrypted.len());
 
         let decrypted = PlabbleRequestPacket::from_bytes(&encrypted, Some(&mut config)).unwrap();
 
         // 22-byte plaintext (base+header (2b), 16 byte bucket id, 2x 2-byte number)
         assert_eq!(
-            "41021234567890abcdeffedcba098765432100010005",
+            "41021234567890abcdeffedcba09876543210105",
             hex::encode(decrypted.to_bytes(None).unwrap())
         );
         assert_eq!(packet, decrypted);
@@ -321,8 +321,8 @@ mod tests {
 
         // Ciphertext should be the same, but the poly1305 mac is different because the AAD is different
         assert_ne!(without_bucket_key, with_bucket_key);
-        assert!(with_bucket_key.starts_with("419400c34723ba6a67ac52aaa34c12862beae91764d9"));
-        assert!(without_bucket_key.starts_with("419400c34723ba6a67ac52aaa34c12862beae91764d9"));
+        assert!(with_bucket_key.starts_with("419400c34723ba6a67ac52aaa34c12862beae813"));
+        assert!(without_bucket_key.starts_with("419400c34723ba6a67ac52aaa34c12862beae813"));
 
         // Should automatically fall back on the bucket key if first decryption fails
         let decrypted = PlabbleRequestPacket::from_bytes(&encrypted, Some(&mut config)).unwrap();
