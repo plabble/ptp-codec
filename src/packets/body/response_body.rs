@@ -24,8 +24,7 @@ use crate::{
 /// - `Patch`: Represents a patch response body.
 /// - `Put`: Represents a put response body.
 /// - `Delete`: Represents a delete response body.
-/// - `Subscribe`: Represents a subscribe response body.
-/// - `Unsubscribe`: Represents an unsubscribe response body.
+/// - `Subscribe`: Represents a subscribe/unsubscribe response body.
 /// - `Register`: Represents a register response body.
 /// - `Identity`: Represents an identity response body.
 /// - `Proxy`: Represents a proxy response body.
@@ -50,7 +49,6 @@ pub enum PlabbleResponseBody {
         Option<BucketBody>,
     ) = 7,
     Subscribe = 8,
-    Unsubscribe = 9,
     Register(Certificate) = 10,
     Identity = 11,
     Proxy(#[variant_by = "init_session"] ProxyResponseBody) = 12,

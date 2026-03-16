@@ -164,6 +164,7 @@ pub enum RequestPacketType {
     /// Subscribe to changes on a bucket, or key(s)/key ranges
     /// - binary_keys: Indicate that the keys are in binary format.
     /// - range_mode_until: Use range mode until a specified key/index
+    /// - unsubscribe: Unsubscribe (from the range) instead
     Subscribe {
         #[serde(default)]
         #[toggles("binary_keys")]
@@ -171,18 +172,12 @@ pub enum RequestPacketType {
 
         #[serde(default)]
         range_mode_until: bool,
-    } = 8,
-    /// Unsubscribe from changes on a bucket, or key(s)/key ranges
-    /// - binary_keys: Indicate that the keys are in binary format.
-    /// - range_mode_until: Use range mode until a specified key/index
-    Unsubscribe {
-        #[serde(default)]
-        #[toggles("binary_keys")]
-        binary_keys: bool,
 
         #[serde(default)]
-        range_mode_until: bool,
-    } = 9,
+        unsubscribe: bool
+    } = 8,
+    /// Reserved
+    Reserved = 9,
     /// Create a new identity on the server
     Register = 10,
     /// Prove identity to the server for the current session
@@ -279,10 +274,10 @@ pub enum ResponsePacketType {
         #[toggles("binary_keys")]
         binary_keys: bool,
     } = 7,
-    /// Response to a subscribe request.
+    /// Response to a subscribe/unsubscribe request.
     Subscribe = 8,
-    /// Response to an unsubscribe request.
-    Unsubscribe = 9,
+    /// Reserved
+    Reserved = 9,
     /// Response to a register identity request.
     Register = 10,
     /// Response to an identify request.

@@ -502,7 +502,7 @@ mod tests {
     }
 
     #[test]
-    fn can_serialize_and_deserialize_subscribe_request_numeric() {
+    fn can_serialize_and_deserialize_unsubscribe_request_numeric() {
         let packet: PlabbleRequestPacket = toml::from_str(
             r#"
             version = 1
@@ -511,29 +511,7 @@ mod tests {
             [header]
             packet_type = "Subscribe"
             id = "AAAAAAAAAAAAAAAAAAAAAA"
-
-            [body]
-            range.Numeric = [5, 25]
-        "#,
-        )
-        .unwrap();
-
-        let serialized = packet.to_bytes(None).unwrap();
-        let deserialized = PlabbleRequestPacket::from_bytes(&serialized, None).unwrap();
-
-        assert_eq!(packet, deserialized);
-    }
-
-    #[test]
-    fn can_serialize_and_deserialize_unsubscribe_request_numeric() {
-        let packet: PlabbleRequestPacket = toml::from_str(
-            r#"
-            version = 1
-            use_encryption = true
-
-            [header]
-            packet_type = "Unsubscribe"
-            id = "AAAAAAAAAAAAAAAAAAAAAA"
+            unsubscribe = true
 
             [body]
             range.Numeric = [5, 25]

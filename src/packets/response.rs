@@ -194,7 +194,7 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
                 PlabbleResponseBody::Delete(raw.body.deserialize_into().unwrap())
             }
             ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
-            ResponsePacketType::Unsubscribe => PlabbleResponseBody::Unsubscribe,
+            ResponsePacketType::Reserved => todo!(),
             ResponsePacketType::Register => {
                 PlabbleResponseBody::Register(raw.body.deserialize_into().unwrap())
             }

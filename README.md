@@ -25,7 +25,7 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **6** [PUT](#put)
 - **7** [DELETE](#delete)
 - **8** [SUBSCRIBE](#subscribe)
-- **9** [UNSUBSCRIBE](#unsubscribe)
+- **9** [RESERVED]()
 - **10** [REGISTER](#register)
 - **11** [IDENTIFY](#identify)
 - **12** [PROXY](#proxy)
@@ -694,17 +694,18 @@ Response body (only if `return_deleted` is set):
 - `Delete` responses carry a `BucketBody` (see [implementation](./src/packets/body/bucket.rs)). For numeric buckets this is a key-value set with numbers and binary values, for binary it is a key-value set with both binary keys and values. - ONLY if `return_deleted` is set in the request.
 
 ## Subscribe
-- **Goal**: _Subscribe to updates_ for one or more keys or a key range inside a bucket.
+- **Goal**: _Subscribe to updates_ for one or more keys or a key range inside a bucket (or unsubscribe).
 - Implementation: [bucket.rs](./src/packets/body/bucket.rs)
 
 ### Subscribe flow
 1. The client sends a `Subscribe` request targeting a bucket and a range of keys.
-2. The server acknowledges and, depending on server semantics, starts delivering update messages for matching keys until the subscription is cancelled with an `Unsubscribe` request or the session ends.
+2. The server acknowledges and, depending on server semantics, starts delivering update messages for matching keys until the subscription is cancelled with an `Subscribe` request using the `unsubscribe` flag or the session ends.
 
 ### Subscribe request
 Request header flags:
 - **binary_keys**: keys in the request/response are UTF-8 strings instead of numeric slot indexes.
 - **range_mode_until**: treat a single provided range value as an "until" (end-only) bound.
+- **unsubscribe**: if set, unsubscribe from the specified range instead of subscribing.
 
 Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
@@ -720,6 +721,7 @@ use_encryption = true
 [header]
 packet_type = "Subscribe"
 id = "AAAAAAAAAAAAAAAAAAAAAA"
+unsubscribe = false
 
 [body]
 range.Numeric = [5, 25]
@@ -727,42 +729,6 @@ range.Numeric = [5, 25]
 
 ### Subscribe response
 Empty response without flags (server-specific subscription messages follow on updates).
-
-## Unsubscribe
-- **Goal**: _Cancel an active subscription_ for a bucket range or keys.
-- Implementation: [bucket.rs](./src/packets/body/bucket.rs)
-
-### Unsubscribe flow
-1. The client sends an `Unsubscribe` request for the previously subscribed bucket/range.
-2. The server stops sending update messages for that subscription and returns an empty response.
-
-### Unsubscribe request
-Request header flags:
-- **binary_keys**: keys in the request/response are UTF-8 strings instead of numeric slot indexes.
-- **range_mode_until**: treat a single provided range value as an "until" bound.
-
-Request header:
-- **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
-
-Request body:
-- **range**: a `BucketQuery` describing which keys to stop subscribing to.
-
-Example (numeric range):
-```toml
-version = 1
-use_encryption = true
-
-[header]
-packet_type = "Unsubscribe"
-id = "AAAAAAAAAAAAAAAAAAAAAA"
-
-[body]
-range.Numeric = [5, 25]
-```
-
-### Unsubscribe response
-Empty response without flags.
-
 
 ## Register
 - **Goal**: Create a new identity on the server (register a certificate).

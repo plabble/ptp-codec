@@ -29,8 +29,7 @@ use crate::packets::body::{
 /// - `Patch`: Represents a patch request body.
 /// - `Put`: Represents a put request body with a put request body.
 /// - `Delete`: Represents a delete request body with a bucket query.
-/// - `Subscribe`: Represents a subscribe request body with a bucket query.
-/// - `Unsubscribe`: Represents an unsubscribe request body with a bucket query.
+/// - `Subscribe`: Represents a subscribe/unsubscribe request body with a bucket query.
 /// - `Register`: Represents a register request body.
 /// - `Identify`: Represents an identify request body.
 /// - `Proxy`: Represents a proxy request body.
@@ -50,7 +49,6 @@ pub enum PlabbleRequestBody {
     Put(PutRequestBody) = 6,
     Delete(BucketQuery) = 7,
     Subscribe(BucketQuery) = 8,
-    Unsubscribe(BucketQuery) = 9,
     Register(RegisterRequestBody) = 10,
     Identify(IdentifyRequestBody) = 11,
     Proxy(#[variant_by = "init_session"] ProxyRequestBody) = 12,

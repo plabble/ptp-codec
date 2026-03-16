@@ -232,9 +232,7 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Subscribe { .. } => {
                 PlabbleRequestBody::Subscribe(raw.body.deserialize_into().unwrap())
             }
-            RequestPacketType::Unsubscribe { .. } => {
-                PlabbleRequestBody::Unsubscribe(raw.body.deserialize_into().unwrap())
-            }
+            RequestPacketType::Reserved => todo!(),
             RequestPacketType::Register => {
                 PlabbleRequestBody::Register(raw.body.deserialize_into().unwrap())
             }
