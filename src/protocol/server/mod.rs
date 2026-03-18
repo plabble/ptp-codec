@@ -5,6 +5,8 @@ use crate::{
     protocol::{PlabbleConnection, error::PlabbleProtocolError},
 };
 
+pub mod node;
+
 /// Server-side implementation of [`PlabbleConnection`].
 impl PlabbleConnection {
     /// Sends a response packet

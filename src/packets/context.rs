@@ -3,7 +3,8 @@ use std::sync::Arc;
 use crate::{
     core::BucketId,
     crypto::{derive_key, hash_256, hash_512},
-    packets::base::{PlabblePacketBase, settings::CryptoSettings}, providers::KeyProvider,
+    packets::base::{PlabblePacketBase, settings::CryptoSettings},
+    providers::KeyProvider,
 };
 
 /// Connection context for cryptography, counters, session etc.
@@ -223,7 +224,10 @@ pub mod helpers {
 mod tests {
     use std::sync::Arc;
 
-    use crate::packets::{base::PlabblePacketBase, context::{PlabbleConnectionContext, helpers::ExampleKeyProvider}};
+    use crate::packets::{
+        base::PlabblePacketBase,
+        context::{PlabbleConnectionContext, helpers::ExampleKeyProvider},
+    };
 
     #[test]
     fn keys_are_unique_by_alt_byte_and_is_request() {

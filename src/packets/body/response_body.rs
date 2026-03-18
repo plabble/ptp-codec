@@ -52,7 +52,7 @@ pub enum PlabbleResponseBody {
     Register(Certificate) = 10,
     Identity = 11,
     Proxy(#[variant_by = "init_session"] ProxyResponseBody) = 12,
-    Custom(CustomBody) = 13,
-    Opcode(OpCodeResponseBody) = 14,
+    Opcode(OpCodeResponseBody) = 13,
+    Custom(CustomBody) = 14,
     Error(PlabbleError) = 15,
 }

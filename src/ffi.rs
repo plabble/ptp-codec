@@ -3,10 +3,13 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender};
 use futures::lock::Mutex;
 
-use crate::{providers::KeyProvider, protocol::{
-    PlabbleConnection as InnerPlabbleConnection, deserialize_input, error::PlabbleProtocolError,
-    serialize_output,
-}};
+use crate::{
+    protocol::{
+        PlabbleConnection as InnerPlabbleConnection, deserialize_input,
+        error::PlabbleProtocolError, serialize_output,
+    },
+    providers::KeyProvider,
+};
 
 // ── Callback interfaces ─────────────────────────────────────────────────────
 
@@ -45,7 +48,8 @@ impl KeyProvider for KeyProviderBridge {
     }
 
     fn store_psk(&self, psk_id: [u8; 12], psk: [u8; 64], expiration: Option<u32>) {
-        self.inner.store_psk(psk_id.to_vec(), psk.to_vec(), expiration)
+        self.inner
+            .store_psk(psk_id.to_vec(), psk.to_vec(), expiration)
     }
 }
 

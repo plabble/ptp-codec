@@ -74,14 +74,18 @@ pub struct BucketPermissions {
     #[serde(default)]
     deny_existence: bool,
 
-    // If set, permissions cannot be updated
+    /// If set, permissions cannot be updated
     #[serde(default)]
     lock_permissions: bool,
 
-    // If set, ACL cannot be updated
+    /// If set, ACL cannot be updated
     #[serde(default)]
     lock_acl: bool,
-    // 4 reserved flags (total: 20/24 = 3 bytes)
+
+    /// If set, replication is allowed
+    #[serde(default)]
+    allow_replication: bool,
+    // 3 reserved flags (total: 21/24 = 3 bytes)
 }
 
 /// Bucket settings
@@ -146,6 +150,7 @@ mod tests {
             deny_existence = true
             lock_acl = false
             lock_permissions = true
+            allow_replication = true
         "#,
         )
         .unwrap();
@@ -180,7 +185,7 @@ mod tests {
                 // settings.permissions, 3 byte//
                 0b0010_0101, // wars_dwar
                 0b0110_1001, // sdwa_rbsd
-                0b0000_0110, // xxxx_pldb
+                0b0001_0110, // xxxr_pldb
                 1,           // ACL length
                 // 16-byte ID(s)
                 0,

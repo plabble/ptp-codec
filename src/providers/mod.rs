@@ -43,7 +43,8 @@ pub trait BlockchainProvider: Send + Sync {
     fn get_block_height(&self) -> Result<u64, PlabbleProtocolError>;
 
     /// Select transaction
-    fn select_transaction(&mut self, transaction_id: &[u8; 24]) -> Result<(), PlabbleProtocolError>;
+    fn select_transaction(&mut self, transaction_id: &[u8; 24])
+    -> Result<(), PlabbleProtocolError>;
 
     /// Select block in blockchain
     fn select_block(&self, block_id: &[u8; 24]) -> Result<(), PlabbleProtocolError>;

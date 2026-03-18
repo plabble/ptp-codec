@@ -34,7 +34,7 @@ pub struct Transaction {
 
     /// Transaction lock
     #[variant_by = "time_lock"]
-    pub lock: TransactionLock
+    pub lock: TransactionLock,
 }
 
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -53,8 +53,7 @@ mod tests {
 
     use crate::{
         blockchain::transaction::{
-            Transaction,
-            TransactionLock,
+            Transaction, TransactionLock,
             tx_input::TransactionInput,
             tx_output::{OutputType, TransactionOutput},
         },

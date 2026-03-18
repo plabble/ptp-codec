@@ -31,7 +31,7 @@ pub struct MerkleProof {
 
     /// Path in the merkle tree
     #[length_by = "hashes"]
-    pub path: Vec<bool>, 
+    pub path: Vec<bool>,
 }
 
 impl MerkleNode {
@@ -119,7 +119,11 @@ impl MerkleTree {
         let mut path = Vec::new();
         let mut hashes = Vec::new();
         if recurse(&self.root, target_hash, &mut path, &mut hashes) {
-            Some(MerkleProof { length: hashes.len() as u8, hashes, path })
+            Some(MerkleProof {
+                length: hashes.len() as u8,
+                hashes,
+                path,
+            })
         } else {
             None
         }
@@ -127,11 +131,7 @@ impl MerkleTree {
 
     /// Verify a Merkle inclusion proof.
     /// Returns `true` if the proof is valid and the hash is part of the tree.
-    pub fn verify_proof(
-        &self,
-        target_hash: [u8; 24],
-        proof: &MerkleProof
-    ) -> bool {
+    pub fn verify_proof(&self, target_hash: [u8; 24], proof: &MerkleProof) -> bool {
         let mut computed_hash = target_hash;
         for (i, sibling_hash) in proof.hashes.iter().enumerate() {
             computed_hash = if proof.path[i] {
@@ -159,13 +159,8 @@ mod tests {
         hash_192(false, vec![data])
     }
 
-    fn sample_hashes() -> Vec<[u8;24]> {
-        vec![
-            h(b"a"),
-            h(b"b"),
-            h(b"c"),
-            h(b"d"),
-        ]
+    fn sample_hashes() -> Vec<[u8; 24]> {
+        vec![h(b"a"), h(b"b"), h(b"c"), h(b"d")]
     }
 
     #[test]
@@ -238,11 +233,7 @@ mod tests {
 
     #[test]
     fn works_with_odd_number_of_leaves() {
-        let leaves = vec![
-            h(b"a"),
-            h(b"b"),
-            h(b"c"),
-        ];
+        let leaves = vec![h(b"a"), h(b"b"), h(b"c")];
 
         let tree = MerkleTree::new_from_hashes(false, leaves.clone());
 
@@ -267,14 +258,7 @@ mod tests {
 
     #[test]
     fn can_serialize_and_deserialize_proof() {
-        let leaves = vec![
-            h(b"a"),
-            h(b"b"),
-            h(b"c"),
-            h(b"d"),
-            h(b"e"),
-            h(b"f")
-        ];
+        let leaves = vec![h(b"a"), h(b"b"), h(b"c"), h(b"d"), h(b"e"), h(b"f")];
         let tree = MerkleTree::new_from_hashes(false, leaves.clone());
 
         let proof = tree.make_proof(leaves[1]).unwrap();

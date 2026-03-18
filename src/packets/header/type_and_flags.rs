@@ -174,7 +174,7 @@ pub enum RequestPacketType {
         range_mode_until: bool,
 
         #[serde(default)]
-        unsubscribe: bool
+        unsubscribe: bool,
     } = 8,
     /// Reserved
     Reserved = 9,
@@ -198,6 +198,16 @@ pub enum RequestPacketType {
         #[toggles("random_hops")]
         select_random_hops: bool,
     } = 12,
+    /// Execute a server-side opcode script
+    /// - allow_bucket_operations: Allow the script to perform bucket operations.
+    /// - allow_eval: Allow the script to use eval functionality (can be dangerous). Only if the server allows it too.
+    Opcode {
+        #[serde(default)]
+        allow_bucket_operations: bool,
+
+        #[serde(default)]
+        allow_eval: bool,
+    } = 13,
     /// Custom packet type for supporting sub-protocols
     Custom {
         #[serde(default)]
@@ -208,16 +218,6 @@ pub enum RequestPacketType {
         flag3: bool,
         #[serde(default)]
         flag4: bool,
-    } = 13,
-    /// Execute a server-side opcode script
-    /// - allow_bucket_operations: Allow the script to perform bucket operations.
-    /// - allow_eval: Allow the script to use eval functionality (can be dangerous). Only if the server allows it too.
-    Opcode {
-        #[serde(default)]
-        allow_bucket_operations: bool,
-
-        #[serde(default)]
-        allow_eval: bool,
     } = 14,
 }
 
@@ -289,6 +289,8 @@ pub enum ResponsePacketType {
         #[toggles("init_session")]
         init_session: bool,
     } = 12,
+    /// Response to an opcode execution request.
+    Opcode = 13,
     /// Custom packet type for supporting sub-protocols
     Custom {
         #[serde(default)]
@@ -299,9 +301,7 @@ pub enum ResponsePacketType {
         flag3: bool,
         #[serde(default)]
         flag4: bool,
-    } = 13,
-    /// Response to an opcode execution request.
-    Opcode = 14,
+    } = 14,
     /// Error response
     Error = 15,
 }

@@ -267,7 +267,8 @@ mod tests {
     use crate::{
         errors::DeserializationError,
         packets::{
-            base::settings::CryptoSettings, context::{PlabbleConnectionContext, helpers::ExampleKeyProvider},
+            base::settings::CryptoSettings,
+            context::{PlabbleConnectionContext, helpers::ExampleKeyProvider},
             request::PlabbleRequestPacket,
         },
     };

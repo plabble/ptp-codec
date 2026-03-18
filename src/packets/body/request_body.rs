@@ -33,8 +33,8 @@ use crate::packets::body::{
 /// - `Register`: Represents a register request body.
 /// - `Identify`: Represents an identify request body.
 /// - `Proxy`: Represents a proxy request body.
-/// - `Custom`: Represents a custom request body (for sub-protocols).
 /// - `Opcode`: Represents an opcode request body.
+/// - `Custom`: Represents a custom request body (for sub-protocols).
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(untagged)]
 #[no_discriminator]
@@ -52,6 +52,6 @@ pub enum PlabbleRequestBody {
     Register(RegisterRequestBody) = 10,
     Identify(IdentifyRequestBody) = 11,
     Proxy(#[variant_by = "init_session"] ProxyRequestBody) = 12,
-    Custom(CustomBody) = 13,
-    Opcode(OpCodeRequestBody) = 14,
+    Opcode(OpCodeRequestBody) = 13,
+    Custom(CustomBody) = 14,
 }

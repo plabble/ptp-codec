@@ -29,8 +29,8 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **10** [REGISTER](#register)
 - **11** [IDENTIFY](#identify)
 - **12** [PROXY](#proxy)
-- **13** [CUSTOM](#custom)
-- **14** [OPCODE](#opcode)
+- **13** [OPCODE](#opcode)
+- **14** [CUSTOM](#custom)
 - **15** [ERROR](#error)
 
 ## Plabble packet base
@@ -991,6 +991,59 @@ tunnel_id = 42
 packet = "9V0FzpQiZm9vYmFy"
 ```
 
+## Opcode
+- **Goal**: Execute a small, sandboxed server-side script (an OPCODE) and return its result.
+- Implementation: [opcode.rs](./src/packets/body/opcode.rs)
+
+> Warning: OPCODE execution can be dangerous. Servers MUST enforce strict limits (CPU, memory, allowed operations) and only enable `allow_eval` or `allow_bucket_operations` when explicitly permitted by policy.
+
+### Opcode flow
+1. The client sends an `Opcode` request containing a script to execute and optional flags requesting capabilities.
+2. The server validates the script and requested flags, enforces execution limits and permissions, then executes the script in a sandboxed environment.
+3. The server returns an `Opcode` response containing an optional binary `result` produced by the script or an [Error](#error) packet on failure.
+
+### Opcode request
+Request header flags:
+- **allow_bucket_operations**: boolean — allow the script to perform bucket operations (read/write/append) if the server permits it.
+- **allow_eval**: boolean — allow evaluation operations inside the script; this can be dangerous and servers may disallow it.
+
+Request header:
+- **packet_type**: `Opcode`
+
+Request body:
+- **script**: `OpcodeScript` — the script to run (sequence of opcodes). See `src/scripting/opcode_script.rs` for structure.
+
+Example (request):
+```toml
+version = 1
+
+[header]
+packet_type = "Opcode"
+allow_bucket_operations = false
+allow_eval = false
+
+[body.script]
+instructions = [{ PUSHINT = 5 }, { PUSHINT = 2 }, { PUSHINT = 3 }, "ADD", "EQ", { PUSH2 = "0102" }]
+```
+
+### Opcode response
+Response header flags:
+- **request_counter**: present when replying in a session to correlate the response.
+
+Response body:
+- **result**: `Option<Vec<u8>>` — optional binary result of the script execution. In TOML/JSON this is represented as a hex string.
+
+Example (response):
+```toml
+version = 1
+
+[header]
+packet_type = "Opcode"
+request_counter = 7
+
+[body]
+result = "0102030405"
+```
 
 ## Custom
 - **Goal**: _Allow for custom packet types_ that are not defined in the Plabble specification but still follow the general packet structure and can be encrypted and signed. This packets are used by so-called **sub-protocols**.
@@ -1051,60 +1104,6 @@ request_counter = 7
 [body]
 protocol = 42
 data = "AQIDBAU"
-```
-
-## Opcode
-- **Goal**: Execute a small, sandboxed server-side script (an OPCODE) and return its result.
-- Implementation: [opcode.rs](./src/packets/body/opcode.rs)
-
-> Warning: OPCODE execution can be dangerous. Servers MUST enforce strict limits (CPU, memory, allowed operations) and only enable `allow_eval` or `allow_bucket_operations` when explicitly permitted by policy.
-
-### Opcode flow
-1. The client sends an `Opcode` request containing a script to execute and optional flags requesting capabilities.
-2. The server validates the script and requested flags, enforces execution limits and permissions, then executes the script in a sandboxed environment.
-3. The server returns an `Opcode` response containing an optional binary `result` produced by the script or an [Error](#error) packet on failure.
-
-### Opcode request
-Request header flags:
-- **allow_bucket_operations**: boolean — allow the script to perform bucket operations (read/write/append) if the server permits it.
-- **allow_eval**: boolean — allow evaluation operations inside the script; this can be dangerous and servers may disallow it.
-
-Request header:
-- **packet_type**: `Opcode`
-
-Request body:
-- **script**: `OpcodeScript` — the script to run (sequence of opcodes). See `src/scripting/opcode_script.rs` for structure.
-
-Example (request):
-```toml
-version = 1
-
-[header]
-packet_type = "Opcode"
-allow_bucket_operations = false
-allow_eval = false
-
-[body.script]
-instructions = [{ PUSHINT = 5 }, { PUSHINT = 2 }, { PUSHINT = 3 }, "ADD", "EQ", { PUSH2 = "0102" }]
-```
-
-### Opcode response
-Response header flags:
-- **request_counter**: present when replying in a session to correlate the response.
-
-Response body:
-- **result**: `Option<Vec<u8>>` — optional binary result of the script execution. In TOML/JSON this is represented as a hex string.
-
-Example (response):
-```toml
-version = 1
-
-[header]
-packet_type = "Opcode"
-request_counter = 7
-
-[body]
-result = "0102030405"
 ```
 
 ## Error
