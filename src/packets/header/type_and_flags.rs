@@ -1,3 +1,4 @@
+use crate::core::default_true;
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
@@ -176,8 +177,22 @@ pub enum RequestPacketType {
         #[serde(default)]
         unsubscribe: bool,
     } = 8,
-    /// Reserved
-    Reserved = 9,
+    /// Replicate or mirror a bucket on another server, or send a state update to another server.
+    /// - unreplicate: Indicate that the bucket should be removed from replication (but not deleted).
+    /// - mirror: Indicate that the bucket should be mirrored (read-only replica) instead
+    /// - state_update: If set, this is not a replication request but a state update from server<->server
+    Replicate {
+        /// unreplicate: Indicate that the bucket should be removed from replication (but not deleted).
+        #[serde(default)]
+        unreplicate: bool,
+
+        #[serde(default = "default_true")]
+        mirror: bool,
+
+        #[serde(default)]
+        #[toggles("state_update")]
+        state_update: bool,
+    } = 9,
     /// Create a new identity on the server
     Register = 10,
     /// Prove identity to the server for the current session
@@ -276,8 +291,13 @@ pub enum ResponsePacketType {
     } = 7,
     /// Response to a subscribe/unsubscribe request.
     Subscribe = 8,
-    /// Reserved
-    Reserved = 9,
+    /// Replicate/unreplicate request response, or state update response for replication
+    /// - state_update: If set, this is not a replication response but a state update from server<->server
+    Replicate {
+        #[serde(default)]
+        #[toggles("state_update")]
+        state_update: bool,
+    } = 9,
     /// Response to a register identity request.
     Register = 10,
     /// Response to an identify request.

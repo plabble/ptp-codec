@@ -43,33 +43,25 @@ pub struct NodeInfo {
 #[serde_as]
 #[repr(u8)]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[discriminator_bits = 4]
 pub enum Whisper {
-    /// Way of saying "Here I am" or "I am alive"
     /// Broadcasted when a new node appears in the network
-    Hineni(NodeInfo) = 0,
+    Hello(NodeInfo) = 0,
 
-    /// Way of asking "who are you?"
+    /// Asking the network who is a specific node id
     WhoIs(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 16]) = 1,
 
     /// Telling other nodes about a new bucket
     NewBucket(PostRequestBody) = 2,
 
     /// Change the value of a slot
-    PutSlot {
-        #[toggles("binary_keys")]
-        binary_keys: bool,
-        body: PutRequestBody,
-    } = 3,
+    PutSlot(PutRequestBody) = 3,
 
     /// Append a slot to the bucket (slot number doesn't matter)
     AppendSlot { id: BucketId, data: Vec<u8> } = 4,
 
     /// Delete. Remember deletion to avoid resurrecting when receiving older messages
-    DeleteSlot {
-        #[toggles("binary_keys")]
-        binary_keys: bool,
-        query: BucketQuery,
-    } = 5,
+    DeleteSlot(BucketQuery) = 5,
 }
 
 /// Whisper message with conflict resolving
@@ -84,8 +76,13 @@ pub struct WhisperMessage {
     /// Node ID of the sender (same as certificate ID)
     #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
     pub from: [u8; 16],
+    
+    /// If applicable, indicates the keys in the message are in binary format (String)
+    #[toggles("binary_keys")]
+    pub binary_keys: bool,
 
     /// Whisper message
+    #[skip_bits(3)] // 3 reserved bits for future flags
     pub message: Whisper,
 
     /// Version number for conflict resolution
@@ -98,47 +95,4 @@ pub struct WhisperMessage {
     /// Signatures by the sender to ensure authenticity and integrity of the message
     #[multi_enum]
     pub signatures: Vec<CryptoSignature>,
-}
-
-pub struct SlotHistory {
-    pub version: u32,
-    pub last_update: PlabbleDateTime,
-    pub deleted: bool,
-}
-
-impl SlotHistory {
-    /// Check if the incoming message can be accepted based on version/timestamp/node ID
-    pub fn can_accept(&self, incoming: &WhisperMessage, self_id: &[u8; 16]) -> bool {
-        // Do not accept clock skewed (> 1 sec future) message
-        if incoming.timestamp.timestamp() > PlabbleDateTime::from_now(1).timestamp() {
-            return false;
-        }
-
-        // Do not allow skewed versions (+10 versions in the future)
-        if incoming.version > self.version + 10 {
-            return false;
-        }
-
-        // Do not accept older versions
-        if incoming.version < self.version {
-            return false;
-        }
-
-        // If version is equal (conflict), try to resolve
-        if incoming.version == self.version {
-            // If the incoming message is newer, reject (first come first serve)
-            if incoming.timestamp.timestamp() > self.last_update.timestamp() {
-                return false;
-            }
-
-            if incoming.timestamp.timestamp() == self.last_update.timestamp() {
-                // If the timestamps are equal, break ties by node ID (higher wins)
-                if &incoming.from < self_id {
-                    return false;
-                }
-            }
-        }
-
-        true
-    }
 }

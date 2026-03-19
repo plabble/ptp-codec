@@ -14,11 +14,8 @@ pub struct CryptoSettings {
     #[serde(default)]
     pub encrypt_with_aes: bool,
 
-    /// Reserved for future use
-    #[serde(default)]
-    pub flag_4: bool,
-
     /// Use Blake3 for hashing, MAC and key derivation instead of Blake2.
+    #[skip_bits(1)] // 1 bit reserved for future use
     #[serde(default)]
     pub use_blake3: bool,
 
@@ -112,7 +109,6 @@ impl Default for CryptoSettings {
         Self {
             encrypt_with_chacha: true,
             encrypt_with_aes: false,
-            flag_4: false,
             use_blake3: false,
             sign_ed25519: true,
             key_exchange_x25519: true,
@@ -133,7 +129,6 @@ mod tests {
         let toml = r#"
         encrypt_with_chacha = true
         encrypt_with_aes = false
-        flag_4 = true
         use_blake3 = false
         sign_ed25519 = true
         key_exchange_x25519 = true
@@ -154,7 +149,7 @@ mod tests {
 
         let deserialized_settings = BinaryDeserializer::<()>::from_bytes(&bytes, None).unwrap();
         assert_eq!(settings, deserialized_settings);
-        assert_eq!(vec![0b1011_0101, 0b0001_0101], bytes);
+        assert_eq!(vec![0b1011_0001, 0b0001_0101], bytes);
 
         assert_eq!(config.get_toggle("ed25519"), Some(true));
         assert_eq!(config.get_toggle("x25519"), Some(true));

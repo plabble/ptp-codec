@@ -2,17 +2,7 @@ use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
 use crate::packets::body::{
-    bucket::{BucketQuery, PutRequestBody},
-    certificate::CertificateRequestBody,
-    custom::CustomBody,
-    identify::IdentifyRequestBody,
-    opcode::OpCodeRequestBody,
-    patch::PatchRequestBody,
-    post::PostRequestBody,
-    proxy::ProxyRequestBody,
-    register::RegisterRequestBody,
-    session::SessionRequestBody,
-    stream::StreamRequestBody,
+    bucket::{BucketQuery, PutRequestBody}, certificate::CertificateRequestBody, custom::CustomBody, identify::IdentifyRequestBody, opcode::OpCodeRequestBody, patch::PatchRequestBody, post::PostRequestBody, proxy::ProxyRequestBody, register::RegisterRequestBody, replicate::ReplicateRequestBody, session::SessionRequestBody, stream::StreamRequestBody
 };
 
 /// An enumeration representing the different types of request bodies
@@ -30,6 +20,7 @@ use crate::packets::body::{
 /// - `Put`: Represents a put request body with a put request body.
 /// - `Delete`: Represents a delete request body with a bucket query.
 /// - `Subscribe`: Represents a subscribe/unsubscribe request body with a bucket query.
+/// - `Replicate`: Represents a replicate request body.
 /// - `Register`: Represents a register request body.
 /// - `Identify`: Represents an identify request body.
 /// - `Proxy`: Represents a proxy request body.
@@ -49,6 +40,7 @@ pub enum PlabbleRequestBody {
     Put(PutRequestBody) = 6,
     Delete(BucketQuery) = 7,
     Subscribe(BucketQuery) = 8,
+    Replicate(#[variant_by = "state_update"] ReplicateRequestBody) = 9,
     Register(RegisterRequestBody) = 10,
     Identify(IdentifyRequestBody) = 11,
     Proxy(#[variant_by = "init_session"] ProxyRequestBody) = 12,

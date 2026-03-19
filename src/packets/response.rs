@@ -194,7 +194,9 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
                 PlabbleResponseBody::Delete(raw.body.deserialize_into().unwrap())
             }
             ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
-            ResponsePacketType::Reserved => todo!(),
+            ResponsePacketType::Replicate { .. } => {
+                PlabbleResponseBody::Replicate(raw.body.deserialize_into().unwrap())
+            },
             ResponsePacketType::Register => {
                 PlabbleResponseBody::Register(raw.body.deserialize_into().unwrap())
             }
@@ -202,11 +204,11 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Proxy { .. } => {
                 PlabbleResponseBody::Proxy(raw.body.deserialize_into().unwrap())
             }
-            ResponsePacketType::Custom { .. } => {
-                PlabbleResponseBody::Custom(raw.body.deserialize_into().unwrap())
-            }
             ResponsePacketType::Opcode => {
                 PlabbleResponseBody::Opcode(raw.body.deserialize_into().unwrap())
+            }
+            ResponsePacketType::Custom { .. } => {
+                PlabbleResponseBody::Custom(raw.body.deserialize_into().unwrap())
             }
             ResponsePacketType::Error => {
                 PlabbleResponseBody::Error(raw.body.deserialize_into().unwrap())
