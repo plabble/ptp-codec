@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     crypto::certificate::Certificate,
     packets::body::{
-        bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody, error::PlabbleError, opcode::OpCodeResponseBody, proxy::ProxyResponseBody, replicate::ReplicateResponseBody, session::SessionResponseBody, stream::StreamResponseBody
+        bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody, error::PlabbleError, opcode::OpCodeResponseBody, proxy::ProxyResponseBody, whisper::WhisperResponseBody, session::SessionResponseBody, stream::StreamResponseBody
     },
 };
 
@@ -23,7 +23,7 @@ use crate::{
 /// - `Put`: Represents a put response body.
 /// - `Delete`: Represents a delete response body.
 /// - `Subscribe`: Represents a subscribe/unsubscribe response body.
-/// - `Replicate`: Represents a replicate response body.
+/// - `Whisper`: Represents a whisper response body.
 /// - `Register`: Represents a register response body.
 /// - `Identity`: Represents an identity response body.
 /// - `Proxy`: Represents a proxy response body.
@@ -48,7 +48,7 @@ pub enum PlabbleResponseBody {
         Option<BucketBody>,
     ) = 7,
     Subscribe = 8,
-    Replicate(#[variant_by = "state_update"] ReplicateResponseBody) = 9,
+    Whisper(#[variant_by = "type"] WhisperResponseBody) = 9,
     Register(Certificate) = 10,
     Identity = 11,
     Proxy(#[variant_by = "init_session"] ProxyResponseBody) = 12,

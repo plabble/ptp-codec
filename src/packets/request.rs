@@ -8,7 +8,7 @@ use crate::{
     errors::{DeserializationError, SerializationError},
     packets::{
         base::{PlabblePacketBase, read_base_packet, write_base_packet},
-        body::request_body::PlabbleRequestBody,
+        body::{request_body::PlabbleRequestBody, whisper::WhisperRequestBody},
         context::PlabbleConnectionContext,
         header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
     },
@@ -201,7 +201,7 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             body: serde_value::Value,
         }
 
-        let raw = RawPacket::deserialize(deserializer)?;
+        let mut raw = RawPacket::deserialize(deserializer)?;
         raw.header.preprocess();
 
         let body = match raw.header.packet_type {
@@ -232,8 +232,10 @@ impl<'de> Deserialize<'de> for PlabbleRequestPacket {
             RequestPacketType::Subscribe { .. } => {
                 PlabbleRequestBody::Subscribe(raw.body.deserialize_into().unwrap())
             }
-            RequestPacketType::Replicate { .. } => {
-                PlabbleRequestBody::Replicate(raw.body.deserialize_into().unwrap())
+            RequestPacketType::Whisper { .. } => {
+                let body: WhisperRequestBody = raw.body.deserialize_into().unwrap();
+                raw.header.packet_type = RequestPacketType::Whisper { whisper_type: body.get_discriminator() };
+                PlabbleRequestBody::Whisper(body)
             },
             RequestPacketType::Register => {
                 PlabbleRequestBody::Register(raw.body.deserialize_into().unwrap())

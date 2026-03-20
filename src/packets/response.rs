@@ -194,8 +194,8 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
                 PlabbleResponseBody::Delete(raw.body.deserialize_into().unwrap())
             }
             ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
-            ResponsePacketType::Replicate { .. } => {
-                PlabbleResponseBody::Replicate(raw.body.deserialize_into().unwrap())
+            ResponsePacketType::Whisper { .. } => {
+                PlabbleResponseBody::Whisper(raw.body.deserialize_into().unwrap())
             },
             ResponsePacketType::Register => {
                 PlabbleResponseBody::Register(raw.body.deserialize_into().unwrap())

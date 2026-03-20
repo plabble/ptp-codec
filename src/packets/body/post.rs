@@ -105,15 +105,15 @@ pub struct BucketSettings {
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PostRequestBody {
     /// The ID the user wants to assign to the bucket
-    id: BucketId,
+    pub id: BucketId,
 
     /// Bucket settings
-    settings: BucketSettings,
+    pub settings: BucketSettings,
 
     /// Bucket range, if subscribe flag is set
     #[toggled_by = "subscribe"]
     #[variant_by = "binary_keys"]
-    range: Option<BucketRange>,
+    pub range: Option<BucketRange>,
 }
 
 #[cfg(test)]

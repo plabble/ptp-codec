@@ -12,4 +12,4 @@ pub mod request_body;
 pub mod response_body;
 pub mod session;
 pub mod stream;
-pub mod replicate;
+pub mod whisper;

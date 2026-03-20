@@ -1,4 +1,3 @@
-use crate::core::default_true;
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
@@ -177,21 +176,13 @@ pub enum RequestPacketType {
         #[serde(default)]
         unsubscribe: bool,
     } = 8,
-    /// Replicate or mirror a bucket on another server, or send a state update to another server.
-    /// - unreplicate: Indicate that the bucket should be removed from replication (but not deleted).
-    /// - mirror: Indicate that the bucket should be mirrored (read-only replica) instead
-    /// - state_update: If set, this is not a replication request but a state update from server<->server
-    Replicate {
-        /// unreplicate: Indicate that the bucket should be removed from replication (but not deleted).
+    /// Whisper a message to another server (server<->server replication or custom server<->server communication)
+    /// - whisper_type: Type of whisper message
+    Whisper {
         #[serde(default)]
-        unreplicate: bool,
-
-        #[serde(default = "default_true")]
-        mirror: bool,
-
-        #[serde(default)]
-        #[toggles("state_update")]
-        state_update: bool,
+        #[bits(4)]
+        #[variant_for = "type"]
+        whisper_type: u8
     } = 9,
     /// Create a new identity on the server
     Register = 10,
@@ -291,12 +282,13 @@ pub enum ResponsePacketType {
     } = 7,
     /// Response to a subscribe/unsubscribe request.
     Subscribe = 8,
-    /// Replicate/unreplicate request response, or state update response for replication
-    /// - state_update: If set, this is not a replication response but a state update from server<->server
-    Replicate {
-        #[serde(default)]
-        #[toggles("state_update")]
-        state_update: bool,
+    /// Whisper response (e.g., for server<->server replication or custom server<->server communication)
+    /// - whisper_type: Type of whisper message
+    Whisper {
+        #[serde(skip_serializing, skip_deserializing)]
+        #[bits(4)]
+        #[variant_for = "type"]
+        whisper_type: u8
     } = 9,
     /// Response to a register identity request.
     Register = 10,

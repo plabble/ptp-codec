@@ -4,6 +4,7 @@ pub mod errors;
 pub mod packets;
 pub mod providers;
 pub mod scripting;
+pub mod network;
 
 #[cfg(feature = "protocol")]
 pub mod protocol;
