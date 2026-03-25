@@ -179,7 +179,7 @@ pub enum RequestPacketType {
     /// Whisper a message to another server (server<->server replication or custom server<->server communication)
     /// - whisper_type: Type of whisper message
     Whisper {
-        #[serde(default)]
+        #[serde(skip_serializing, skip_deserializing)]
         #[bits(4)]
         #[variant_for = "type"]
         whisper_type: u8

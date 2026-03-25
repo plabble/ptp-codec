@@ -39,7 +39,7 @@ mod tests {
     use crate::{
         core::{PlabbleDateTime, node_address::NodeAddress},
         crypto::algorithm::VerificationKey,
-        network::node_info::NodeInfo, packets::request::PlabbleRequestPacket,
+        network::node_info::NodeInfo,
     };
 
     #[test]

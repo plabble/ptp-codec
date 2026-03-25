@@ -61,13 +61,25 @@ pub enum WhisperRequestBody {
     WhoIs(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 16]) = 2,
 
     /// Telling other nodes about a new bucket
-    NewBucket(PostRequestBody, WhisperMetadata) = 3,
+    NewBucket {
+        bucket: PostRequestBody,
+        meta: WhisperMetadata,
+    } = 3,
 
     /// Telling other nodes to change the content of a slot in the bucket (with conflict resolution)
-    PutSlot(BucketId, PutRequestBody, WhisperMetadata) = 4,
+    PutSlot {
+        id: BucketId,
+        slots: PutRequestBody,
+        meta: WhisperMetadata,
+    } = 4,
 
     /// Telling other nodes to delete a slot in the bucket (with conflict resolution)
-    DeleteSlot(BucketId, BucketQuery, WhisperMetadata) = 5,
+    DeleteSlot {
+        id: BucketId,
+        query: BucketQuery,
+        meta: WhisperMetadata,
+    } = 5,
+    // 6-15 are reserved for future use
 }
 
 /// Whisper response body, used for server<->server messaging
@@ -92,15 +104,27 @@ pub enum WhisperResponseBody {
 
     /// Acknowledgment for a delete slot message (true if accepted, false if rejected)
     DeleteSlotAck(bool) = 5,
+    // 6-15 are reserved for future use
 }
 
 #[cfg(test)]
 mod tests {
-    use std::net::{Ipv4Addr, SocketAddrV4};
-
     use binary_codec::{BinaryDeserializer, BinarySerializer};
 
-    use crate::{core::{PlabbleDateTime, node_address::NodeAddress}, crypto::algorithm::VerificationKey, network::node_info::NodeInfo, packets::{body::request_body::PlabbleRequestBody, header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType}, request::PlabbleRequestPacket}};
+    use crate::{
+        core::{BucketId, PlabbleDateTime},
+        crypto::algorithm::CryptoSignature,
+        packets::{
+            body::{
+                post::PostRequestBody,
+                request_body::PlabbleRequestBody,
+                whisper::{WhisperMetadata, WhisperRequestBody},
+            },
+            header::{request_header::PlabbleRequestHeader, type_and_flags::RequestPacketType},
+            request::PlabbleRequestPacket,
+            response::PlabbleResponsePacket,
+        },
+    };
 
     #[test]
     fn can_serialize_and_deserialize_ping() {
@@ -113,14 +137,39 @@ mod tests {
 
             [body]
             Ping = 42
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
-        assert_eq!(request.header.packet_type, RequestPacketType::Whisper { whisper_type: 0 });
+        assert_eq!(
+            request.header.packet_type,
+            RequestPacketType::Whisper { whisper_type: 0 }
+        );
         let bytes = request.to_bytes(None).unwrap();
+        assert_eq!(bytes[1], 0b0000_1001);
         assert_eq!("01092a", hex::encode(&bytes));
-
         let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(request, deserialized);
+
+        let response: PlabbleResponsePacket = toml::from_str(
+            r#"
+            version = 1
+
+            [header]
+            packet_type = "Whisper"
+            request_counter = 7
+
+            [body]
+            Pong = 42
+        "#,
+        )
+        .unwrap();
+
+        let bytes = response.to_bytes(None).unwrap();
+        assert_eq!(bytes[1], 0b0000_1001);
+        assert_eq!("010900072a", hex::encode(&bytes));
+        let deserialized = PlabbleResponsePacket::from_bytes(&bytes, None).unwrap();
+        assert_eq!(response, deserialized);
     }
 
     #[test]
@@ -143,84 +192,124 @@ mod tests {
         )
         .unwrap();
 
-        println!("{}", toml::to_string(&req).unwrap());
+        let vkey: &str = "c97f3e07a9640647b982e48bcc359b6ac48b450e76e2652aed87b3433e187955";
 
-        let vkey = "c97f3e07a9640647b982e48bcc359b6ac48b450e76e2652aed87b3433e187955";
+        assert_eq!(
+            req.header.packet_type,
+            RequestPacketType::Whisper { whisper_type: 1 }
+        );
+        let bytes = req.to_bytes(None).unwrap();
+        assert_eq!(bytes[1], 0b0001_1001);
+        assert_eq!(
+            format!(
+                // 0119 header + whisper type 1
+                // 16x 01 ID
+                // 00 IPv4
+                // 7f000001 127.0.0.1
+                // 04d2 port 1234
+                // ffffffff timestamp
+                // 31 default crypto settings
+                "0119{}007f00000104d2ffffffff31{}",
+                "01".repeat(16),
+                vkey
+            ),
+            hex::encode(&bytes)
+        );
+
+        let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
+        assert_eq!(req, deserialized);
     }
 
-    /*
     #[test]
     fn can_serialize_and_deserialize_whois_request() {
-        let req = PlabbleRequestPacket {
-            base: Default::default(),
-            header: PlabbleRequestHeader::new(RequestPacketType::Whisper { whisper_type: 2 }, None),
-            body: PlabbleRequestBody::Whisper(crate::packets::body::whisper::WhisperRequestBody::WhoIs([0u8; 16])),
-        };
-
-        println!("{}", toml::to_string(&req).unwrap());
-        
-        let request: PlabbleRequestPacket = toml::from_str(
+        let req: PlabbleRequestPacket = toml::from_str(
             r#"
             version = 1
 
             [header]
             packet_type = "Whisper"
 
-            [body.WhoIs]
-            from = "AQEBAQEBAQEBAQEBAQEBAQ"
-            binary_keys = true
-            version = 3
-            timestamp = "2161-02-07T06:28:15Z"
+            [body]
+            WhoIs = "AQEBAQEBAQEBAQEBAQEBAQ"
+        "#,
+        )
+        .unwrap();
 
-            [body.StateUpdate.message]
-            WhoIs = "AgICAgICAgICAgICAgICAg"
-            
-            [[body.StateUpdate.signatures]]
+        assert_eq!(
+            req.header.packet_type,
+            RequestPacketType::Whisper { whisper_type: 2 }
+        );
+        let bytes = req.to_bytes(None).unwrap();
+        assert_eq!(bytes[1], 0b0010_1001);
+        assert_eq!("012901010101010101010101010101010101", hex::encode(&bytes));
+        let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
+        assert_eq!(req, deserialized);
+    }
+
+    #[test]
+    fn can_serialize_and_deserialize_new_bucket() {
+        let body = WhisperRequestBody::NewBucket {
+            bucket: PostRequestBody {
+                id: BucketId::parse("#test").unwrap(),
+                settings: Default::default(),
+                range: None,
+            },
+            meta: WhisperMetadata {
+                binary_keys: false,
+                has_from: false,
+                from: None,
+                version: 7,
+                timestamp: PlabbleDateTime::new(0),
+                signatures: vec![CryptoSignature::Ed25519([0u8; 64])],
+            },
+        };
+
+        let req = PlabbleRequestPacket {
+            base: Default::default(),
+            header: PlabbleRequestHeader::new(RequestPacketType::Whisper { whisper_type: 3 }, None),
+            body: PlabbleRequestBody::Whisper(body),
+        };
+
+        let req_toml: PlabbleRequestPacket = toml::from_str(
+            r#"
+            version = 1
+
+            [header]
+            packet_type = "Whisper"
+
+            [body.NewBucket.bucket]
+            id = "RKiZXdULZlegN6eDkwRTWw"
+
+            [body.NewBucket.meta]
+            binary_keys = false
+            has_from = false
+            version = 7
+            timestamp = "2025-01-01T00:00:00Z"
+
+            [[body.NewBucket.meta.signatures]]
             Ed25519 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         "#,
         )
         .unwrap();
 
-        let bytes = request.to_bytes(None).unwrap();
-        assert_eq!(bytes[1], 0b0110_1001);
-        assert_eq!(
-            format!(
-                "0169{}{}{}03ffffffff{}",
-                "01".repeat(16),
-                hex::encode(&[0b0001_0001]), // type = 0001 (WhoIs), binary_keys = 1
-                "02".repeat(16),
-                "00".repeat(64)
-            ),
-            hex::encode(&bytes)
-        );
+        assert_eq!(req, req_toml);
+
+        let bytes = req.to_bytes(None).unwrap();
+        assert_eq!(bytes[1], 0b0011_1001);
+        assert_eq!(format!(
+            "0139{}{}{}{}{}{}", 
+            "44a8995dd50b6657a037a7839304535b", // bucket ID
+            "21f80100", // default bucket settings
+            "00", // whisper metadata flags
+            "07", // version
+            "00000000", // timestamp
+            "00".repeat(64) // signature
+        ), hex::encode(&bytes));
 
         let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
-        assert_eq!(request, deserialized);
+        assert_eq!(req, deserialized);
     }
 
-    #[test]
-    fn can_serialize_and_deserialize_replicate_request_with_bucket() {
-        let request: PlabbleRequestPacket = toml::from_str(
-            r#"
-            version = 1
-
-            [header]
-            packet_type = "Replicate"
-            state_update = false
-            mirror = true
-
-            [body.Bucket]
-            id = "ceR2iLSzPCzaJkVqW2gN3A"
-        "#,
-        )
-        .unwrap();
-
-        let bytes = request.to_bytes(None).unwrap();
-        assert_eq!(bytes[1], 0b0010_1001);
-        assert_eq!("012971e47688b4b33c2cda26456a5b680ddc", hex::encode(&bytes));
-
-        let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
-        assert_eq!(request, deserialized);
-    }
-    */
+    // TODO: add tests for PutSlot and DeleteSlot, also for responses and other missing
+    // but they are not that interesting for all those structures are already tested in other places
 }

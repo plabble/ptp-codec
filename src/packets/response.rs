@@ -6,7 +6,7 @@ use crate::{
     errors::{DeserializationError, SerializationError},
     packets::{
         base::{PlabblePacketBase, read_base_packet, write_base_packet},
-        body::response_body::PlabbleResponseBody,
+        body::{response_body::PlabbleResponseBody, whisper::WhisperResponseBody},
         context::PlabbleConnectionContext,
         header::{response_header::PlabbleResponseHeader, type_and_flags::ResponsePacketType},
     },
@@ -171,7 +171,7 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             body: serde_value::Value,
         }
 
-        let raw = RawPacket::deserialize(deserializer)?;
+        let mut raw = RawPacket::deserialize(deserializer)?;
         raw.header.preprocess();
 
         let body = match raw.header.packet_type {
@@ -195,7 +195,9 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             }
             ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
             ResponsePacketType::Whisper { .. } => {
-                PlabbleResponseBody::Whisper(raw.body.deserialize_into().unwrap())
+                let body: WhisperResponseBody = raw.body.deserialize_into().unwrap();
+                raw.header.packet_type = ResponsePacketType::Whisper { whisper_type: body.get_discriminator() };
+                PlabbleResponseBody::Whisper(body)
             },
             ResponsePacketType::Register => {
                 PlabbleResponseBody::Register(raw.body.deserialize_into().unwrap())

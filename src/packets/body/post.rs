@@ -88,6 +88,34 @@ pub struct BucketPermissions {
     // 3 reserved flags (total: 21/24 = 3 bytes)
 }
 
+impl Default for BucketPermissions {
+    fn default() -> Self {
+        Self {
+            public_read: true,
+            public_append: false,
+            public_write: false,
+            public_delete: false,
+            public_script_execution: false,
+            protected_read: true,
+            protected_append: false,
+            protected_write: false,
+            protected_delete: false,
+            protected_script_execution: false,
+            protected_bucket_delete: false,
+            private_read: true,
+            private_append: true,
+            private_write: true,
+            private_delete: true,
+            private_script_execution: true,
+            private_bucket_delete: true,
+            deny_existence: false,
+            lock_permissions: false,
+            lock_acl: false,
+            allow_replication: false,
+        }
+    }
+}
+
 /// Bucket settings
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -97,8 +125,18 @@ pub struct BucketSettings {
 
     /// Access Control List (ACL) with user IDs
     #[serde_as(as = "Vec<Base64<UrlSafe, Unpadded>>")]
+    #[serde(default)]
     #[dyn_length]
     access_control_list: Vec<[u8; 16]>,
+}
+
+impl Default for BucketSettings {
+    fn default() -> Self {
+        Self {
+            permissions: Default::default(),
+            access_control_list: Vec::new(),
+        }
+    }
 }
 
 /// Bucket create request body
@@ -108,19 +146,31 @@ pub struct PostRequestBody {
     pub id: BucketId,
 
     /// Bucket settings
+    #[serde(default)]
     pub settings: BucketSettings,
 
     /// Bucket range, if subscribe flag is set
     #[toggled_by = "subscribe"]
     #[variant_by = "binary_keys"]
+    #[serde(default)]
     pub range: Option<BucketRange>,
 }
 
 #[cfg(test)]
 mod tests {
-    use binary_codec::{BinaryDeserializer, BinarySerializer};
+    use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
-    use crate::packets::request::PlabbleRequestPacket;
+    use crate::packets::{body::post::BucketSettings, request::PlabbleRequestPacket};
+
+    #[test]
+    fn can_serialize_default_settings() {
+        let settings = BucketSettings::default();
+        let serialized = settings.to_bytes(None::<&mut SerializerConfig>).unwrap();
+        assert_eq!("21f80100", hex::encode(&serialized));
+        let deserialized = BucketSettings::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
+
+        assert_eq!(deserialized, settings);
+    }
 
     #[test]
     fn can_serialize_and_deserialize_post_request() {
