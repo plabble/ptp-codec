@@ -262,7 +262,6 @@ mod tests {
         let tree = MerkleTree::new_from_hashes(false, leaves.clone());
 
         let proof = tree.make_proof(leaves[1]).unwrap();
-        println!("{:?}", proof.path);
 
         let config: Option<&mut SerializerConfig> = None;
         let bytes = proof.to_bytes(config).unwrap();

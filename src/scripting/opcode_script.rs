@@ -137,7 +137,11 @@ pub enum Opcode {
 
     ASSERT = 78, // Crash if top is not true
     RETURN = 79, // Stop execution, return stack as result
-    // 80 - 89
+
+    FUN(u8, u8) = 80, // Declare start of function X with Y parameters
+    NUF = 81, // End function declaration. Pulls function body from script and stores it in function map with ID from FUN opcode.
+    CALL(u8) = 82, // Call function with ID X (takes Y parameters from stack, where Y is determined by function declaration)
+    // 83 - 89
 
     // Stack manipulation
     DUP = 90,      // Duplicate top item of stack
@@ -161,7 +165,13 @@ pub enum Opcode {
     SWITCH = 106,   // Switches between current and alt stack
     CONCAT = 107,   // Merge top two items together as bytes
     COUNT = 108,    // Push number of items in stack to stack (excluding itself)
-    // 109 - 119
+
+    // Variables (memory or persistent storage, based on context of script)
+    STOREVAR(u8) = 109, // Store variable with ID (takes byte for variable ID from script, content from stack)
+    LOADVAR(u8) = 110, // Load variable with ID (takes byte for variable ID from script, pushes content to stack)
+    DELVAR(u8) = 111, // Delete variable with ID (takes byte for variable ID from script)
+
+    // 112 - 119
 
     // Casts
     NUMBER = 120, // Cast current value to number. This is only needed if you for instance want to compare a byte array as a number to a number
@@ -389,6 +399,8 @@ impl OpcodeScript {
     }
 
     /// Generate a jump target map for this script
+    // TODO: use this to speed up the interpreter when executing
+    // TODO: expand with function calls
     pub fn generate_jump_target_map(&self) -> Result<HashMap<usize, usize>, ScriptError> {
         let mut if_stack = Vec::new();
         let mut else_stack = Vec::new();

@@ -148,7 +148,7 @@ impl PlabbleConnection {
             .map_err(|e| JsValue::from_str(&format!("Serialize error: {:?}", e)))
     }
 
-    // TODO: same options as ffi.rs has
+    // TODO: same options as ffi.rs (client implementation) has
 
     /// Internal method to handle received packet bytes (called from JS)
     pub async fn handle_incoming(&self, data: Vec<u8>) {

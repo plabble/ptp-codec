@@ -1,4 +1,4 @@
-use std::{cmp, ops::Neg};
+use std::{cmp, collections::HashMap, ops::Neg};
 
 use binary_codec::{BinaryDeserializer, FromBytes, ToBytes};
 use chrono::Utc;
@@ -19,6 +19,7 @@ pub struct ScriptInterpreter {
     snapshot: Vec<StackData>,
     snapshot_memory: usize,
     settings: ScriptSettings,
+    functions: HashMap<u8, (u8, OpcodeScript)>, // function id to params count and script
 
     script: OpcodeScript,
     cursor: usize,
@@ -83,6 +84,7 @@ impl ScriptInterpreter {
             alt_stack: Vec::new(),
             snapshot: Vec::new(),
             snapshot_memory: 0,
+            functions: HashMap::new(),
 
             cursor: 0,
             script,
@@ -632,29 +634,30 @@ impl ScriptInterpreter {
                 let condition = self.pop_boolean()?;
                 if !condition {
                     // Search a ELSE or FI to skip to
+                    // open: IF, close: FI, or: ELSE
                     let pos =
-                        self.search(Opcode::IF, Opcode::FI, Some(Opcode::ELSE), None, false)?;
+                        self.search(71, 73, Some(72), None, false)?;
                     self.cursor = pos;
                 }
             }
             Opcode::ELSE => {
                 // a. Make sure a matching IF exists
-                self.search(Opcode::IF, Opcode::FI, None, None, true)?;
+                self.search(71, 73, None, None, true)?;
 
                 // Skip to FI
-                let pos = self.search(Opcode::IF, Opcode::FI, None, None, false)?;
+                let pos = self.search(71, 73, None, None, false)?;
                 self.cursor = pos;
             }
             Opcode::FI => {
                 // Validate there is a matching IF earlier
-                self.search(Opcode::IF, Opcode::FI, None, None, true)?;
+                self.search(71, 73, None, None, true)?;
             }
             Opcode::BREAK => {
                 // Ensure there's an enclosing LOOP (search backwards)
-                self.search(Opcode::LOOP, Opcode::POOL, None, None, true)?;
+                self.search(75, 76, None, None, true)?;
 
                 // Skip to next POOL (forward), taking nesting into account
-                let pos = self.search(Opcode::LOOP, Opcode::POOL, None, None, false)?;
+                let pos = self.search(75, 76, None, None, false)?;
                 self.cursor = pos;
             }
             Opcode::LOOP => {
@@ -662,7 +665,7 @@ impl ScriptInterpreter {
             }
             Opcode::POOL => {
                 // Jump back to the corresponding LOOP
-                let pos = self.search(Opcode::LOOP, Opcode::POOL, None, None, true)?;
+                let pos = self.search(75, 76, None, None, true)?;
                 self.cursor = pos;
             }
             Opcode::JMP => {
@@ -694,6 +697,28 @@ impl ScriptInterpreter {
                     stack_data.extend_from_slice(&buffer);
                 }
                 return Ok(Some(stack_data));
+            }
+            Opcode::FUN(id, params) => {
+                // Search for end of function declaration
+                let start = self.cursor;
+                let end = self.search(80, 81, None, None, false)?;
+
+                let body = OpcodeScript {
+                    instructions: self.script.instructions[start+1..end].to_vec(),
+                };
+
+                self.functions.insert(id, (params, body));
+                self.script.instructions.drain(start..=end); // Remove function declaration from script
+            }
+            Opcode::NUF => {
+                todo!()
+            }
+            Opcode::CALL(id) => {
+                // TODO: eval function but ONLY with the N arguments from the stack
+                // its kind of a fork, but with a clean stack (except for the N arguments) and shared memory, executions & searches count
+                // the result stack will be pushed back to the caller stack (in full)
+                // so its close to EVAL
+                todo!()
             }
             Opcode::DUP => {
                 self.ensure_stack_size(1)?;
@@ -838,6 +863,15 @@ impl ScriptInterpreter {
             Opcode::COUNT => {
                 let length = self.stack().len() as i128;
                 self.push(StackData::Number(length))?;
+            }
+            Opcode::STOREVAR(id) => {
+                todo!()
+            }
+            Opcode::LOADVAR(id) => {
+                todo!()
+            }
+            Opcode::DELVAR(id) => {
+                todo!()
             }
             Opcode::NUMBER => {
                 self.ensure_stack_size(1)?;
@@ -1035,13 +1069,13 @@ impl ScriptInterpreter {
         Ok(None)
     }
 
-    /// Search for a matching opCode and return the cursor difference (negative or positive value)
+    /// Search for a matching opCode (u8 value) and return the cursor difference (negative or positive value)
     fn search(
         &mut self,
-        open: Opcode,
-        close: Opcode,
-        or: Option<Opcode>,
-        stop: Option<Opcode>,
+        open: u8,
+        close: u8,
+        or: Option<u8>,
+        stop: Option<u8>,
         backwards: bool,
     ) -> Result<usize, ScriptError> {
         debug!(
@@ -1067,7 +1101,7 @@ impl ScriptInterpreter {
 
         let len = self.script.instructions.len() as isize;
         while cursor >= 0 && cursor < len {
-            let code = &self.script.instructions[cursor as usize];
+            let code = &self.script.instructions[cursor as usize].get_discriminator();
             trace!("Search cursor {} at {:?}", cursor, code);
 
             if *code == open {
@@ -2957,5 +2991,25 @@ mod tests {
         assert_eq!(i.exec(), Ok(None));
         // should count two occurrences of [2,3]
         assert_eq!(i.main_stack.last(), Some(&StackData::Number(2)));
+    }
+
+    #[test]
+    fn can_declare_and_use_a_sum2_function() {
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHINT(2),
+            Opcode::PUSHINT(3),
+            Opcode::FUN(1, 2),
+            Opcode::ADD,
+            Opcode::DUP,
+            Opcode::ADD,
+            Opcode::NUF,
+            Opcode::PUSHINT(10),
+            Opcode::CALL(1),
+            Opcode::EQ,
+            Opcode::ASSERT,
+        ]);
+
+        let mut i = ScriptInterpreter::new(script, None);
+        assert_eq!(i.exec(), Ok(None));
     }
 }

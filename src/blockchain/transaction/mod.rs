@@ -137,8 +137,6 @@ mod tests {
             hex::encode(&bytes)
         );
 
-        println!("---------------------------");
-
         let config: Option<&mut SerializerConfig> = None;
         let deserialized_tx = Transaction::from_bytes(&bytes, config).unwrap();
 

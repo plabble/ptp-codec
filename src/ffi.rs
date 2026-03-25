@@ -88,6 +88,23 @@ impl PlabbleConnection {
         data.key_provider = Some(Arc::new(KeyProviderBridge::new(provider)));
     }
 
+    /// Feed raw incoming bytes received from the transport layer into the connection.
+    pub fn handle_incoming(&self, bytes: Vec<u8>) -> Result<(), PlabbleProtocolError> {
+        self.rx
+            .try_send(bytes)
+            .map_err(|_| PlabbleProtocolError::SenderError)
+    }
+
+    /// Poll for the next outgoing packet (non-blocking).
+    /// Returns the raw bytes to send over the transport, or None if nothing is queued.
+    pub async fn poll_outgoing(&self) -> Option<Vec<u8>> {
+        self.tx.recv().await.ok()
+    }
+}
+
+#[cfg(feature = "client")]
+#[uniffi::export]
+impl PlabbleConnection {
     /// Send a request packet serialized as a JSON (or TOML) string.
     pub async fn send_request(&self, request: String) -> Result<(), PlabbleProtocolError> {
         let packet = deserialize_input(&request)?;
@@ -110,13 +127,6 @@ impl PlabbleConnection {
         serialize_output(&response)
     }
 
-    /// Feed raw incoming bytes received from the transport layer into the connection.
-    pub fn handle_incoming(&self, bytes: Vec<u8>) -> Result<(), PlabbleProtocolError> {
-        self.rx
-            .try_send(bytes)
-            .map_err(|_| PlabbleProtocolError::SenderError)
-    }
-
     /// Start a new session with the given options serialized as a JSON (or TOML) string. Returns the PSK ID as 12-byte array if a pre-shared key is created.
     pub async fn start_session(
         &self,
@@ -126,12 +136,6 @@ impl PlabbleConnection {
         let mut inner = self.inner.lock().await;
         let psk_id = inner.start_session(options).await?;
         Ok(psk_id.map(|id| id.to_vec()))
-    }
-
-    /// Poll for the next outgoing packet (non-blocking).
-    /// Returns the raw bytes to send over the transport, or None if nothing is queued.
-    pub async fn poll_outgoing(&self) -> Option<Vec<u8>> {
-        self.tx.recv().await.ok()
     }
 }
 
