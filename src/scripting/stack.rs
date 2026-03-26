@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToBytes, FromBytes)]
 pub enum StackData {
     Boolean(bool),
-    Number(i128),
+    Number(#[dyn_int] i128),
     Float(f64),
-    Buffer(Vec<u8>),
+    Buffer(#[dyn_length] Vec<u8>),
     Byte(u8),
 }
 

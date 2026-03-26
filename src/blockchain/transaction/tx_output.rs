@@ -9,7 +9,7 @@ pub struct TransactionOutput {
     #[toggles("monetary")]
     pub is_monetary: bool,
 
-    /// If set to true, the output is burned and can never be spent
+    /// If set to true, the output is burned and can never be spent or moved anymore
     #[toggles("burn")]
     pub burn: bool,
 
@@ -31,6 +31,7 @@ pub struct TransactionOutput {
 #[no_discriminator]
 pub enum OutputType {
     /// Asset transfer output, which represents a transfer of a specific asset on the blockchain
+    /// But also for instance, to pay for a smart contract that will be placed in the same block
     Asset([u8; 24]),
 
     /// Monetary transaction output, which represents a transfer in smallest currency unit
