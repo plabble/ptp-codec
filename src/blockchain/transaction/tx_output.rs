@@ -1,5 +1,8 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
+use serde_with::formats::Lowercase;
+use serde_with::hex::Hex;
+use serde_with::serde_as;
 
 use crate::scripting::opcode_script::OpcodeScript;
 
@@ -27,12 +30,13 @@ pub struct TransactionOutput {
     pub locking_script: Option<OpcodeScript>,
 }
 
+#[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[no_discriminator]
 pub enum OutputType {
     /// Asset transfer output, which represents a transfer of a specific asset on the blockchain
     /// But also for instance, to pay for a smart contract that will be placed in the same block
-    Asset([u8; 24]),
+    Asset(#[serde_as(as = "Hex<Lowercase>")] [u8; 24]),
 
     /// Monetary transaction output, which represents a transfer in smallest currency unit
     Monetary(#[dyn_int] u64),

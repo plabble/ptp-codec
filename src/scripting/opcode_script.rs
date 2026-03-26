@@ -220,34 +220,24 @@ pub enum Opcode {
 pub enum ScriptError {
     /// When the stack is empty while n items are required
     StackUnderflow(u32),
-
     /// When an operation expected a number but got something else
     NotANumber,
-
     /// When an operation expected a float but got something else
     NotAFloat,
-
     /// When an operation expected a boolean but got something else
     NotABoolean,
-
     /// When an operation expected UTF-8 bytes but got something else
     NotAString,
-
     /// When a mathematical operation fails (e.g., division by zero)
     MathError,
-
     /// When the script is not valid
     InvalidScript,
-
     /// When a not-existing address or index is provided
     OutOfBounds,
-
     /// When an assertion fails
     AssertionFailed,
-
     /// Failed to cast a value to the expected type
     InvalidType,
-
     /// Expected byte array with different size than actual
     InvalidSize,
 
@@ -277,6 +267,12 @@ pub enum ScriptError {
     MemoryLimitExceeded,
     SliceLimitExceeded,
     StackHeightLimitExceeded,
+
+    /// Any precondition failed
+    PreconditionFailed,
+
+    AlgorithmNotSupported,
+    CryptoOperationFailed,
 }
 
 // TODO: all algorithms in one, we can omit codes like HASH/SIGN etc and just have a few opcodes

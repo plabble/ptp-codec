@@ -145,6 +145,11 @@ impl_hash!(hash_512, 64, Blake2b512, |h: blake3::Hasher| {
     out
 });
 
+pub fn mac_poly1305(key: &[u8; 32], data: &[u8]) -> [u8; 16] {
+    let mac = <poly1305::Poly1305 as blake2::digest::KeyInit>::new(key.into()).compute_unpadded(data);
+    mac.as_slice().try_into().unwrap()
+}
+
 /// Calculate a MAC (Message Authentication Code) using keyed Blake2b-128 or Blake3
 ///
 /// # Parameters
@@ -211,5 +216,13 @@ mod tests {
             BASE64_STANDARD.encode(&res),
             "PiPfpmZbmso8hQM8U/pqeVzJ0C9THDubc5aultGQ4W5brnHKOWBf008vmBxodvL62BLIU5LSvXn+icjRou7MBw=="
         )
+    }
+
+    #[test]
+    fn can_hash_poly1305() {
+        let key = [1u8; 32];
+        let data = b"Hello, world! This is definitely bigger than 16 bytes.";
+        let mac = super::mac_poly1305(&key, data);
+        println!("{}", hex::encode(&mac));
     }
 }

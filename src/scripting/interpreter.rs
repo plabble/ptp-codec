@@ -1,10 +1,15 @@
-use std::{cmp, collections::HashMap, ops::Neg, sync::{Arc, Mutex}};
+use std::{
+    cmp,
+    collections::HashMap,
+    ops::Neg,
+    sync::{Arc, Mutex},
+};
 
-use binary_codec::BinaryDeserializer;
+use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 use chrono::Utc;
 
 use crate::{
-    core::PlabbleDateTime, providers::PlabbleBucketProvider, scripting::opcode_script::{Opcode, OpcodeScript, ScriptError, ScriptSettings}
+    core::PlabbleDateTime, crypto::{algorithm::{CryptoSignature, SigningKey, VerificationKey}, calculate_mac, hash_128, hash_192, hash_256, hash_512, mac_poly1305}, providers::PlabbleBucketProvider, scripting::opcode_script::{OpAlgorithm, Opcode, OpcodeScript, ScriptError, ScriptSettings}
 };
 use log::{debug, trace};
 
@@ -18,8 +23,8 @@ pub struct ScriptInterpreter {
     snapshot: Vec<StackData>,
     snapshot_memory: usize,
     settings: ScriptSettings,
-    functions: HashMap<u8, (u8, OpcodeScript)>, // function id to params count and script
-    variables: HashMap<u8, StackData>,          // variable store
+    pub functions: HashMap<u8, (u8, OpcodeScript)>, // function id to params count and script
+    pub variables: HashMap<u8, StackData>,          // variable store
     script: OpcodeScript,
     bucket_provider: Option<Arc<dyn PlabbleBucketProvider>>,
     #[cfg(feature = "blockchain")]
@@ -34,7 +39,7 @@ pub struct ScriptInterpreter {
 }
 
 impl ScriptInterpreter {
-    /// Create a new ScriptInterpreter instance with the given script and settings. 
+    /// Create a new ScriptInterpreter instance with the given script and settings.
     /// If settings is None, use default settings.
     pub fn new(script: OpcodeScript, settings: Option<ScriptSettings>) -> Self {
         ScriptInterpreter {
@@ -211,6 +216,7 @@ impl ScriptInterpreter {
 
     /// Pop an item from the stack and try to convert it to a number. Return an error if the stack is empty or if the item cannot be converted to a number.
     fn pop_number(&mut self) -> Result<i128, ScriptError> {
+        self.ensure_stack_size(1)?;
         self.pop()
             .and_then(|n| n.as_number())
             .ok_or(ScriptError::NotANumber)
@@ -218,6 +224,7 @@ impl ScriptInterpreter {
 
     /// Pop an item from the stack and try to convert it to a float. Return an error if the stack is empty or if the item cannot be converted to a float.
     fn pop_float(&mut self) -> Result<f64, ScriptError> {
+        self.ensure_stack_size(1)?;
         self.pop()
             .and_then(|n| n.as_float())
             .ok_or(ScriptError::NotAFloat)
@@ -225,6 +232,7 @@ impl ScriptInterpreter {
 
     /// Pop an item from the stack and try to convert it to a boolean. Return an error if the stack is empty or if the item cannot be converted to a boolean.
     fn pop_boolean(&mut self) -> Result<bool, ScriptError> {
+        self.ensure_stack_size(1)?;
         self.pop()
             .and_then(|b| b.as_boolean())
             .ok_or(ScriptError::NotABoolean)
@@ -232,11 +240,16 @@ impl ScriptInterpreter {
 
     /// Pop an item from the stack and try to convert it to a string. Return an error if the stack is empty or if the item cannot be converted to a string.
     fn pop_string(&mut self) -> Result<String, ScriptError> {
-        let bytes = self.pop()
-            .and_then(|s| s.as_buffer())
-            .ok_or(ScriptError::NotAString)?;
-
+        let bytes = self.pop_bytes()?;
         String::from_utf8(bytes).map_err(|_| ScriptError::NotAString)
+    }
+
+    /// Pop bytes from stack (if possible)
+    fn pop_bytes(&mut self) -> Result<Vec<u8>, ScriptError> {
+        self.ensure_stack_size(1)?;
+        self.pop()
+            .and_then(|s| s.as_buffer())
+            .ok_or(ScriptError::InvalidType)
     }
 
     /// Pop two items from the stack and check if they are equal, using the equality rules defined in the function.
@@ -487,22 +500,18 @@ impl ScriptInterpreter {
                 self.push(StackData::Float(a.max(b)))?;
             }
             Opcode::FLOOR => {
-                self.ensure_stack_size(1)?;
                 let a = self.pop_float()?;
                 self.push(StackData::Float(a.floor()))?;
             }
             Opcode::CEIL => {
-                self.ensure_stack_size(1)?;
                 let a = self.pop_float()?;
                 self.push(StackData::Float(a.ceil()))?;
             }
             Opcode::ROUND => {
-                self.ensure_stack_size(1)?;
                 let a = self.pop_float()?;
                 self.push(StackData::Float(a.round()))?;
             }
             Opcode::ROUNDE => {
-                self.ensure_stack_size(1)?;
                 let a = self.pop_float()?;
                 self.push(StackData::Float(a.round_ties_even()))?;
             }
@@ -638,7 +647,6 @@ impl ScriptInterpreter {
                 self.cursor = pos;
             }
             Opcode::JMP => {
-                self.ensure_stack_size(1)?;
                 let address = self.pop_number()?;
                 if address < 0 || (address as usize) >= self.script.instructions.len() {
                     return Err(ScriptError::OutOfBounds);
@@ -756,7 +764,6 @@ impl ScriptInterpreter {
                 self.pop();
             }
             Opcode::COPY => {
-                self.ensure_stack_size(1)?;
                 let n = self.pop_number()?;
                 if n < 0 || n as usize >= self.stack().len() {
                     return Err(ScriptError::OutOfBounds);
@@ -766,7 +773,6 @@ impl ScriptInterpreter {
                 self.push(item)?;
             }
             Opcode::BUBBLE => {
-                self.ensure_stack_size(1)?;
                 let n = self.pop_number()?;
                 if n < 0 || n as usize >= self.stack().len() {
                     return Err(ScriptError::OutOfBounds);
@@ -777,7 +783,6 @@ impl ScriptInterpreter {
                 self.stack().push(item);
             }
             Opcode::SINK => {
-                self.ensure_stack_size(1)?;
                 let n = self.pop_number()?;
                 if n < 0 || n as usize >= self.stack().len() {
                     return Err(ScriptError::OutOfBounds);
@@ -865,99 +870,111 @@ impl ScriptInterpreter {
                 }
             }
             Opcode::NUMBER => {
-                self.ensure_stack_size(1)?;
                 let num = self.pop_number()?;
                 self.push(StackData::Number(num))?;
             }
             Opcode::FLOAT => {
-                self.ensure_stack_size(1)?;
                 let num = self.pop_float()?;
                 self.push(StackData::Float(num))?;
             }
             Opcode::SERVER => {
-                self.ensure_stack_size(1)?;
                 let address = self.pop_string()?;
-                let provider = self.bucket_provider.as_ref()
+                let provider = self
+                    .bucket_provider
+                    .as_ref()
                     .ok_or(ScriptError::BucketProviderNotAvailable)?;
 
-                provider.connect(&address).map_err(|_| ScriptError::BucketConnectionFailed)?;
-            },
+                provider
+                    .connect(&address)
+                    .map_err(|_| ScriptError::BucketConnectionFailed)?;
+            }
             Opcode::SELECT => {
-                self.ensure_stack_size(1)?;
-                let bucket_id = self.pop().unwrap().as_buffer().ok_or(ScriptError::InvalidType)?;
+                let bucket_id = self.pop_bytes()?;
                 if bucket_id.len() != 16 {
                     return Err(ScriptError::InvalidSize);
                 }
 
-                let provider = self.bucket_provider.as_ref()
+                let provider = self
+                    .bucket_provider
+                    .as_ref()
                     .ok_or(ScriptError::BucketProviderNotAvailable)?;
 
-                provider.select_bucket(&bucket_id.try_into().unwrap()).map_err(|_| ScriptError::BucketConnectionFailed)?;
-            },
+                provider
+                    .select_bucket(&bucket_id.try_into().unwrap())
+                    .map_err(|_| ScriptError::BucketConnectionFailed)?;
+            }
             Opcode::READ => {
-                self.ensure_stack_size(1)?;
                 let key = self.pop_number()? as u32;
 
-                let provider = self.bucket_provider.as_ref()
+                let provider = self
+                    .bucket_provider
+                    .as_ref()
                     .ok_or(ScriptError::BucketProviderNotAvailable)?;
 
-                let value = provider.read(key).map_err(|_| ScriptError::BucketReadFailed)?;
+                let value = provider
+                    .read(key)
+                    .map_err(|_| ScriptError::BucketReadFailed)?;
                 self.push(StackData::Buffer(value))?;
-            },
+            }
             Opcode::WRITE => {
                 self.ensure_stack_size(2)?;
                 let key = self.pop_number()? as u32;
-                let value = self.pop().unwrap().as_buffer().ok_or(ScriptError::InvalidType)?;
+                let value = self.pop_bytes()?;
 
-                let provider = self.bucket_provider.as_ref()
+                let provider = self
+                    .bucket_provider
+                    .as_ref()
                     .ok_or(ScriptError::BucketProviderNotAvailable)?;
 
-                provider.write(key, value).map_err(|_| ScriptError::BucketWriteFailed)?;
-            },
+                provider
+                    .write(key, value)
+                    .map_err(|_| ScriptError::BucketWriteFailed)?;
+            }
             Opcode::APPEND => {
-                self.ensure_stack_size(1)?;
-                let value = self.pop().unwrap().as_buffer().ok_or(ScriptError::InvalidType)?;
+                let value = self.pop_bytes()?;
 
-                let provider = self.bucket_provider.as_ref()
+                let provider = self
+                    .bucket_provider
+                    .as_ref()
                     .ok_or(ScriptError::BucketProviderNotAvailable)?;
 
-                provider.append(value).map_err(|_| ScriptError::BucketWriteFailed)?;
-            },
+                provider
+                    .append(value)
+                    .map_err(|_| ScriptError::BucketWriteFailed)?;
+            }
             Opcode::DELETE => {
-                self.ensure_stack_size(1)?;
                 let key = self.pop_number()? as u32;
 
-                let provider = self.bucket_provider.as_ref()
+                let provider = self
+                    .bucket_provider
+                    .as_ref()
                     .ok_or(ScriptError::BucketProviderNotAvailable)?;
 
-                provider.delete(key).map_err(|_| ScriptError::BucketDeleteFailed)?;
-            },
+                provider
+                    .delete(key)
+                    .map_err(|_| ScriptError::BucketDeleteFailed)?;
+            }
             Opcode::LEN => {
-                self.ensure_stack_size(1)?;
-                let item = self.pop().unwrap();
-                let bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
-                let length = bytes.len() as i128;
+                let item = self.pop_bytes()?;
+                let length = item.len() as i128;
                 self.push(StackData::Number(length))?;
             }
             Opcode::REVERSE => {
-                self.ensure_stack_size(1)?;
-                let item = self.pop().unwrap();
-                let mut bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
-                bytes.reverse();
-                self.push(StackData::Buffer(bytes))?;
+                let mut item = self.pop_bytes()?;
+                item.reverse();
+                self.push(StackData::Buffer(item))?;
             }
             Opcode::SLICE => {
                 self.ensure_stack_size(3)?;
                 let length = self.pop_number()?;
                 let offset = self.pop_number()?;
-                let item = self.pop().unwrap();
-                let bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let item = self.pop_bytes()?;
 
-                if offset < 0 || length < 0 || (offset as usize) + (length as usize) > bytes.len() {
+                if offset < 0 || length < 0 || (offset as usize) + (length as usize) > item.len() {
                     return Err(ScriptError::OutOfBounds);
                 }
 
-                let slice = bytes
+                let slice = item
                     .get(offset as usize..(offset as usize) + (length as usize))
                     .unwrap()
                     .to_vec();
@@ -968,10 +985,8 @@ impl ScriptInterpreter {
                 self.ensure_stack_size(3)?;
                 let offset = self.pop_number()?;
                 let length = self.pop_number()?;
-                let item = self.pop().unwrap();
-                let splice_data = item.as_buffer().ok_or(ScriptError::InvalidType)?;
-                let item = self.pop().unwrap();
-                let mut bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let splice_data = self.pop_bytes()?;
+                let mut bytes = self.pop_bytes()?;
 
                 if offset < 0 || length < 0 || (offset as usize) + (length as usize) > bytes.len() {
                     return Err(ScriptError::OutOfBounds);
@@ -982,15 +997,12 @@ impl ScriptInterpreter {
             }
             Opcode::INDEXOF => {
                 self.ensure_stack_size(2)?;
-                let needle = self.pop().unwrap();
-                let haystack = self.pop().unwrap();
+                let needle = self.pop_bytes()?;
+                let haystack = self.pop_bytes()?;
 
-                let needle_bytes = needle.as_buffer().ok_or(ScriptError::InvalidType)?;
-                let haystack_bytes = haystack.as_buffer().ok_or(ScriptError::InvalidType)?;
-
-                let position = haystack_bytes
-                    .windows(needle_bytes.len())
-                    .position(|window| window == needle_bytes)
+                let position = haystack
+                    .windows(needle.len())
+                    .position(|window| window == needle)
                     .map(|pos| pos as i128)
                     .unwrap_or(-1);
 
@@ -998,26 +1010,23 @@ impl ScriptInterpreter {
             }
             Opcode::SPLIT => {
                 self.ensure_stack_size(2)?;
-                let separator = self.pop().unwrap();
-                let item = self.pop().unwrap();
+                let separator = self.pop_bytes()?;
+                let item = self.pop_bytes()?;
 
                 let mut parts: Vec<StackData> = Vec::new();
 
-                let separator_bytes = separator.as_buffer().ok_or(ScriptError::InvalidType)?;
-                let item_bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
-
                 let mut start = 0;
 
-                while let Some(pos) = item_bytes[start..]
-                    .windows(separator_bytes.len())
-                    .position(|w| w == separator_bytes)
+                while let Some(pos) = item[start..]
+                    .windows(separator.len())
+                    .position(|w| w == separator)
                 {
                     let abs = start + pos;
-                    parts.push(StackData::Buffer(item_bytes[start..abs].to_vec()));
-                    start = abs + separator_bytes.len();
+                    parts.push(StackData::Buffer(item[start..abs].to_vec()));
+                    start = abs + separator.len();
                 }
 
-                parts.push(StackData::Buffer(item_bytes[start..].to_vec()));
+                parts.push(StackData::Buffer(item[start..].to_vec()));
 
                 for part in parts.into_iter().rev() {
                     self.push(part)?;
@@ -1025,38 +1034,350 @@ impl ScriptInterpreter {
             }
             Opcode::SCOUNT => {
                 self.ensure_stack_size(2)?;
-                let needle = self.pop().unwrap();
-                let haystack = self.pop().unwrap();
+                let needle = self.pop_bytes()?;
+                let haystack = self.pop_bytes()?;
 
-                let needle_bytes = needle.as_buffer().ok_or(ScriptError::InvalidType)?;
-                let haystack_bytes = haystack.as_buffer().ok_or(ScriptError::InvalidType)?;
-
-                let count = haystack_bytes
-                    .windows(needle_bytes.len())
-                    .filter(|window| window == &needle_bytes)
+                let count = haystack
+                    .windows(needle.len())
+                    .filter(|window| window == &needle)
                     .count() as i128;
 
                 self.push(StackData::Number(count))?;
             }
-            Opcode::CRYPTO(_) => todo!(),
+            Opcode::CRYPTO(algorithm) => {
+                match algorithm {
+                    OpAlgorithm::Blake2_128 => {
+                        let hash = hash_128(false, vec![&self.pop_bytes()?]);
+                        self.push(StackData::Buffer(hash.to_vec()))?;
+                    },
+                    #[cfg(feature = "blake-3")]
+                    OpAlgorithm::Blake3_128 => {
+                        let hash = hash_128(true, vec![&self.pop_bytes()?]);
+                        self.push(StackData::Buffer(hash.to_vec()))?;
+                    },
+                    OpAlgorithm::Blake2_192 => {
+                        let hash = hash_192(false, vec![&self.pop_bytes()?]);
+                        self.push(StackData::Buffer(hash.to_vec()))?;
+                    },
+                    #[cfg(feature = "blake-3")]
+                    OpAlgorithm::Blake3_192 => {
+                        let hash = hash_192(true, vec![&self.pop_bytes()?]);
+                        self.push(StackData::Buffer(hash.to_vec()))?;
+                    },
+                    OpAlgorithm::Blake2_256 => {
+                        let hash = hash_256(false, vec![&self.pop_bytes()?]);
+                        self.push(StackData::Buffer(hash.to_vec()))?;
+                    },
+                    #[cfg(feature = "blake-3")]
+                    OpAlgorithm::Blake3_256 => {
+                        let hash = hash_256(true, vec![&self.pop_bytes()?]);
+                        self.push(StackData::Buffer(hash.to_vec()))?;
+                    },
+                    OpAlgorithm::Blake2_512 => {
+                        let hash = hash_512(false, vec![&self.pop_bytes()?]);
+                        self.push(StackData::Buffer(hash.to_vec()))?;
+                    },
+                    #[cfg(feature = "blake-3")]
+                    OpAlgorithm::Blake3_512 => {
+                        let hash = hash_512(true, vec![&self.pop_bytes()?]);
+                        self.push(StackData::Buffer(hash.to_vec()))?;
+                    },
+                    OpAlgorithm::Blake2Mac => {
+                        let key = self.pop_bytes()?;
+                        let data = self.pop_bytes()?;
+
+                        let mac = calculate_mac(false, &key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data, None);
+                        self.push(StackData::Buffer(mac.to_vec()))?;
+                    },
+                    OpAlgorithm::Blake2MacAssert => {
+                        let key = self.pop_bytes()?;
+                        let data = self.pop_bytes()?;
+                        let expected_mac = self.pop_bytes()?;
+
+                        let mac = calculate_mac(false, &key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data, None);
+                        if mac.to_vec() != expected_mac {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    #[cfg(feature = "blake-3")]
+                    OpAlgorithm::Blake3Mac => {
+                        let key = self.pop_bytes()?;
+                        let data = self.pop_bytes()?;
+
+                        let mac = calculate_mac(true, &key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data, None);
+                        self.push(StackData::Buffer(mac.to_vec()))?;
+                    },
+                    #[cfg(feature = "blake-3")]
+                    OpAlgorithm::Blake3MacAssert => {
+                        let key = self.pop_bytes()?;
+                        let data = self.pop_bytes()?;
+                        let expected_mac = self.pop_bytes()?;
+
+                        let mac = calculate_mac(true, &key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data, None);
+                        if mac.to_vec() != expected_mac {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    OpAlgorithm::Poly1305 => {
+                        let key = self.pop_bytes()?;
+                        let data = self.pop_bytes()?;
+
+                        let mac = mac_poly1305(&key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data);
+                        self.push(StackData::Buffer(mac.to_vec()))?;
+                    },
+                    OpAlgorithm::Poly1305Assert => {
+                        let key = self.pop_bytes()?;
+                        let data = self.pop_bytes()?;
+                        let expected_mac = self.pop_bytes()?;
+
+                        let mac = mac_poly1305(&key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data);
+                        if mac.to_vec() != expected_mac {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    OpAlgorithm::SignEd25519 => {
+                        let secret_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = SigningKey::Ed25519(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .sign(&message)
+                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                            .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                        self.push(StackData::Buffer(signature))?;
+                    },
+                    OpAlgorithm::VerifyEd25519 => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Ed25519(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Ed25519(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        self.push(StackData::Boolean(valid))?;
+                    },
+                    OpAlgorithm::VerifyAssertEd25519 => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Ed25519(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Ed25519(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        if !valid {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    OpAlgorithm::SignEd448 => {
+                        let secret_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = SigningKey::Ed448(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .sign(&message)
+                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                            .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                        self.push(StackData::Buffer(signature))?;
+                    },
+                    OpAlgorithm::VerifyEd448 => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Ed448(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Ed448(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        self.push(StackData::Boolean(valid))?;
+                    },
+                    OpAlgorithm::VerifyAssertEd448 => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Ed448(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Ed448(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        if !valid {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    #[cfg(feature = "pqc-lite")]
+                    OpAlgorithm::SignDsa44 => {
+                        let secret_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = SigningKey::Dsa44(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .sign(&message)
+                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                            .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                        self.push(StackData::Buffer(signature))?;
+                    },
+                    #[cfg(feature = "pqc-lite")]
+                    OpAlgorithm::VerifyDsa44 => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Dsa44(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Dsa44(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        self.push(StackData::Boolean(valid))?;
+                    },
+                    #[cfg(feature = "pqc-lite")]
+                    OpAlgorithm::VerifyAssertDsa44 => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Dsa44(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Dsa44(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        if !valid {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    #[cfg(feature = "pqc-lite")]
+                    OpAlgorithm::SignDsa65 => {
+                        let secret_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = SigningKey::Dsa65(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .sign(&message)
+                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                            .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                        self.push(StackData::Buffer(signature))?;
+                    },
+                    #[cfg(feature = "pqc-lite")]
+                    OpAlgorithm::VerifyDsa65 => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Dsa65(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Dsa65(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        self.push(StackData::Boolean(valid))?;
+                    },
+                    #[cfg(feature = "pqc-lite")]
+                    OpAlgorithm::VerifyAssertDsa65 => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Dsa65(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Dsa65(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        if !valid {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    #[cfg(feature = "pqc-heavy")]
+                    OpAlgorithm::SignFalcon => {
+                        let secret_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = SigningKey::Falcon(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .sign(&message)
+                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                            .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                        self.push(StackData::Buffer(signature))?;
+                    },
+                    #[cfg(feature = "pqc-heavy")]
+                    OpAlgorithm::VerifyFalcon => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Falcon(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Falcon(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        self.push(StackData::Boolean(valid))?;
+                    },
+                    #[cfg(feature = "pqc-heavy")]
+                    OpAlgorithm::VerifyAssertFalcon => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::Falcon(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::Falcon(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        if !valid {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    #[cfg(feature = "pqc-heavy")]
+                    OpAlgorithm::SignSlhDsaSha128s => {
+                        let secret_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = SigningKey::SlhDsaSha128s(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .sign(&message)
+                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                            .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                        self.push(StackData::Buffer(signature))?;
+                    },
+                    #[cfg(feature = "pqc-heavy")]
+                    OpAlgorithm::VerifySlhDsaSha128s => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::SlhDsaSha128s(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::SlhDsaSha128s(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        self.push(StackData::Boolean(valid))?;
+                    },
+                    #[cfg(feature = "pqc-heavy")]
+                    OpAlgorithm::VerifyAssertSlhDsaSha128s => {
+                        let public_key = self.pop_bytes()?;
+                        let message = self.pop_bytes()?;
+                        let signature = CryptoSignature::SlhDsaSha128s(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
+
+                        let valid = VerificationKey::SlhDsaSha128s(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
+                            .verify(&message, &signature)
+                            .is_some_and(|v|v);
+
+                        if !valid {
+                            return Err(ScriptError::AssertionFailed);
+                        }
+                    },
+                    OpAlgorithm::KeyStreamXChaCha20 => todo!(),
+                    OpAlgorithm::KeyStreamAes256 => todo!(),
+                    _ => return Err(ScriptError::AlgorithmNotSupported),
+                }
+            },
             Opcode::TIME => {
                 let now = PlabbleDateTime(Utc::now());
                 self.push(StackData::Number(now.timestamp() as i128))?;
             }
             Opcode::CHECKLOCK => {
                 todo!()
-            },
+            }
             Opcode::TXID => {
                 #[cfg(feature = "blockchain")]
                 {
-                    let provider = self.chain_provider.as_ref()
+                    let provider = self
+                        .chain_provider
+                        .as_ref()
                         .ok_or(ScriptError::BlockchainProviderNotAvailable)?;
-                    let txid = provider.get_current_txid().map_err(|_| ScriptError::BlockchainConnectionFailed)?;
+                    let txid = provider
+                        .get_current_txid()
+                        .map_err(|_| ScriptError::BlockchainConnectionFailed)?;
                     self.push(StackData::Buffer(txid.to_vec()))?;
                 }
 
                 return Err(ScriptError::BlockchainProviderNotAvailable);
-            },
+            }
             Opcode::SELBLOCK => todo!(),
             Opcode::SELTX => todo!(),
             Opcode::GETENTRY => todo!(),
@@ -1064,12 +1385,10 @@ impl ScriptInterpreter {
                 todo!()
             }
             Opcode::EVALSUB => {
-                self.ensure_stack_size(1)?;
-                let item = self.pop().unwrap();
-                let bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let item = self.pop_bytes()?;
 
                 let config: Option<&mut binary_codec::SerializerConfig> = None;
-                let script = OpcodeScript::from_bytes(&bytes, config)
+                let script = OpcodeScript::from_bytes(&item, config)
                     .map_err(|_| ScriptError::InvalidScript)?;
 
                 self.validate_script(&script)?;
@@ -1091,12 +1410,10 @@ impl ScriptInterpreter {
                 self.exec_unfork(sub_interpreter, true, false)?;
             }
             Opcode::EVAL => {
-                self.ensure_stack_size(1)?;
-                let item = self.pop().unwrap();
-                let bytes = item.as_buffer().ok_or(ScriptError::InvalidType)?;
+                let item = self.pop_bytes()?;
 
                 let config: Option<&mut binary_codec::SerializerConfig> = None;
-                let script = OpcodeScript::from_bytes(&bytes, config)
+                let script = OpcodeScript::from_bytes(&item, config)
                     .map_err(|_| ScriptError::InvalidScript)?;
 
                 self.validate_script(&script)?;
@@ -1119,7 +1436,7 @@ impl ScriptInterpreter {
         Ok(None)
     }
 
-        /// Create a new instance with a clean stack that uses the same memory, searches & executions count
+    /// Create a new instance with a clean stack that uses the same memory, searches & executions count
     pub fn fork(&self, subscript: OpcodeScript, settings: Option<ScriptSettings>) -> Self {
         let mut instance = self.clone();
         instance.script = subscript;
