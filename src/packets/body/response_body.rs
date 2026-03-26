@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     crypto::certificate::Certificate,
     packets::body::{
-        bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody, error::PlabbleError, opcode::OpCodeResponseBody, proxy::ProxyResponseBody, whisper::WhisperResponseBody, session::SessionResponseBody, stream::StreamResponseBody
+        bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody,
+        error::PlabbleError, opcode::OpCodeResponseBody, proxy::ProxyResponseBody,
+        session::SessionResponseBody, stream::StreamResponseBody, whisper::WhisperResponseBody,
     },
 };
 

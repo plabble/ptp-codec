@@ -182,7 +182,7 @@ pub enum RequestPacketType {
         #[serde(skip_serializing, skip_deserializing)]
         #[bits(4)]
         #[variant_for = "type"]
-        whisper_type: u8
+        whisper_type: u8,
     } = 9,
     /// Create a new identity on the server
     Register = 10,
@@ -288,7 +288,7 @@ pub enum ResponsePacketType {
         #[serde(skip_serializing, skip_deserializing)]
         #[bits(4)]
         #[variant_for = "type"]
-        whisper_type: u8
+        whisper_type: u8,
     } = 9,
     /// Response to a register identity request.
     Register = 10,

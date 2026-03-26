@@ -6,8 +6,6 @@ use serde_with::formats::Lowercase;
 use serde_with::hex::Hex;
 use serde_with::{TryFromInto, serde_as};
 
-use crate::scripting::interpreter::ScriptError;
-
 /**
  * The script engine uses Opcodes as the scripting language
  * The stack uses 4 data types: bytes, numbers, booleans and byte.
@@ -169,7 +167,7 @@ pub enum Opcode {
     // Variables (memory or persistent storage, based on context of script)
     STOREVAR(u8) = 109, // Store variable with ID (takes byte for variable ID from script, content from stack)
     LOADVAR(u8) = 110, // Load variable with ID (takes byte for variable ID from script, pushes content to stack)
-    DELVAR(u8) = 111, // Delete variable with ID (takes byte for variable ID from script)
+    DELVAR(u8) = 111,  // Delete variable with ID (takes byte for variable ID from script)
 
     // 112 - 119
 
@@ -204,14 +202,81 @@ pub enum Opcode {
     // Special: 200+
     TIME = 200, // Push the current time as a Plabble numeric timestamp to the stack
 
+    // Blockchain: 220-230
     // TODO: see how this should work out. At least, see providers.rs and integrate them in the interpreter.rs
-    CHECKLOCK = 201, // Takes a number from the stack and fails if it is bigger than the current transaction block height or time, depending on the transaction. (fails if not in the context of a transaction)
-    TXID = 202, // Push the current transaction ID to the stack (fails if not in the context of a transaction)
-    GETBLOCK = 204, // Take block ID from the stack and push raw block data back (fails if not in the context of a blockchain)
-    GETENTRY = 205, // Take entry / TX ID from the stack and push raw entry data back from blockchain (fails if not in the context of a blockchain)
+    CHECKLOCK = 220, // Takes a number from the stack and fails if it is bigger than the current transaction block height or time, depending on the transaction. (fails if not in the context of a transaction)
+    TXID = 221, // Push the current transaction ID to the stack (fails if not in the context of a transaction)
+    SELBLOCK = 222, // Take block ID from the stack and select block as context for other block-related operations (fails if not in the context of a blockchain)
+    SELTX = 223, // Take transaction ID from the stack and select transaction as context for other transaction-related operations (fails if not in the context of a blockchain)
+    GETENTRY = 224, // Take entry / TX ID from the stack and push raw entry data back from blockchain (fails if not in the context of a blockchain)
+    CALLEXT(u8, u8) = 225, // Call external function (in smart contract) with ID X and Y parameters (pops external script ID from stack)
 
     EVALSUB = 254, // Evaluate top stack item as if it is a script in a child process and push the result back
     EVAL = 255, // Evaluate stack bytes as if it is a script against the current stack (dangerous)
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, FromBytes, ToBytes, Clone)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
+pub enum ScriptError {
+    /// When the stack is empty while n items are required
+    StackUnderflow(u32),
+
+    /// When an operation expected a number but got something else
+    NotANumber,
+
+    /// When an operation expected a float but got something else
+    NotAFloat,
+
+    /// When an operation expected a boolean but got something else
+    NotABoolean,
+
+    /// When an operation expected UTF-8 bytes but got something else
+    NotAString,
+
+    /// When a mathematical operation fails (e.g., division by zero)
+    MathError,
+
+    /// When the script is not valid
+    InvalidScript,
+
+    /// When a not-existing address or index is provided
+    OutOfBounds,
+
+    /// When an assertion fails
+    AssertionFailed,
+
+    /// Failed to cast a value to the expected type
+    InvalidType,
+
+    /// Expected byte array with different size than actual
+    InvalidSize,
+
+    ControlFlowMalformed,
+    ClearNotAllowed,
+    ControlFlowNotAllowed,
+    FunctionDeclarationNotAllowed,
+    FunctionCallNotAllowed,
+    FunctionNotFound,
+    VariableNotFound,
+    JumpNotAllowed,
+    LoopNotAllowed,
+    NonPushNotAllowed,
+    EvalNotAllowed,
+    BucketActionsNotAllowed,
+    BucketProviderNotAvailable,
+    BucketConnectionFailed,
+    BucketReadFailed,
+    BucketWriteFailed,
+    BucketDeleteFailed,
+    BlockchainProviderNotAvailable,
+    BlockchainConnectionFailed,
+    MaxDepthExceeded,
+    SearchLimitExceeded,
+    ExecutionLimitExceeded,
+    OpcodeLimitExceeded,
+    MemoryLimitExceeded,
+    SliceLimitExceeded,
+    StackHeightLimitExceeded,
 }
 
 // TODO: all algorithms in one, we can omit codes like HASH/SIGN etc and just have a few opcodes
@@ -354,6 +419,10 @@ pub struct ScriptSettings {
     pub allow_eval: bool,
     pub allow_sandboxed_eval: bool,
     pub allow_bucket_actions: bool,
+
+    pub alllow_function_declaration: bool,
+    pub allow_function_calls: bool,
+    pub allow_external_function_calls: bool,
 }
 
 impl Default for ScriptSettings {
@@ -375,6 +444,9 @@ impl Default for ScriptSettings {
             allow_eval: false,
             allow_sandboxed_eval: false,
             allow_bucket_actions: false,
+            alllow_function_declaration: false,
+            allow_function_calls: false,
+            allow_external_function_calls: false,
         }
     }
 }
@@ -400,7 +472,7 @@ impl OpcodeScript {
 
     /// Generate a jump target map for this script
     // TODO: use this to speed up the interpreter when executing
-    // TODO: expand with function calls
+    // TODO: expand with function calls / subtract addresses from function declarations etc
     pub fn generate_jump_target_map(&self) -> Result<HashMap<usize, usize>, ScriptError> {
         let mut if_stack = Vec::new();
         let mut else_stack = Vec::new();

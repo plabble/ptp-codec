@@ -1,10 +1,10 @@
 pub mod core;
 pub mod crypto;
 pub mod errors;
+pub mod network;
 pub mod packets;
 pub mod providers;
 pub mod scripting;
-pub mod network;
 
 #[cfg(feature = "protocol")]
 pub mod protocol;

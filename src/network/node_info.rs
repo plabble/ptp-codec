@@ -84,13 +84,15 @@ mod tests {
             hex::encode(&serialized)
         );
 
-        let deserialized = NodeInfo::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
+        let deserialized =
+            NodeInfo::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
         assert_eq!(node_info, deserialized);
     }
 
     #[test]
     fn can_serialize_and_deserialize_nodeinfo_with_ipv6() {
-        let obj: NodeInfo = toml::from_str(r#"
+        let obj: NodeInfo = toml::from_str(
+            r#"
             id = "AAAAAAAAAAAAAAAAAAAAAA"
             last_seen = "2025-01-01T00:00:00Z"
 
@@ -99,12 +101,11 @@ mod tests {
 
             [[verification_keys]]
             Ed25519 = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
-       
-        let serialized = obj
-            .to_bytes(None::<&mut SerializerConfig>)
-            .unwrap();
+        let serialized = obj.to_bytes(None::<&mut SerializerConfig>).unwrap();
 
         assert_eq!(
             format!(
@@ -120,13 +121,15 @@ mod tests {
             hex::encode(&serialized)
         );
 
-        let deserialized = NodeInfo::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
+        let deserialized =
+            NodeInfo::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
         assert_eq!(obj, deserialized);
     }
 
     #[test]
     fn can_serialize_and_deserialize_nodeinfo_with_domain() {
-        let obj: NodeInfo = toml::from_str(r#"
+        let obj: NodeInfo = toml::from_str(
+            r#"
             id = "AAAAAAAAAAAAAAAAAAAAAA"
             last_seen = "2025-01-01T00:00:00Z"
 
@@ -135,12 +138,11 @@ mod tests {
 
             [[verification_keys]]
             Ed25519 = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
 
-       
-        let serialized = obj
-            .to_bytes(None::<&mut SerializerConfig>)
-            .unwrap();
+        let serialized = obj.to_bytes(None::<&mut SerializerConfig>).unwrap();
 
         assert_eq!(
             format!(
@@ -158,7 +160,8 @@ mod tests {
             hex::encode(&serialized)
         );
 
-        let deserialized = NodeInfo::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
+        let deserialized =
+            NodeInfo::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
         assert_eq!(obj, deserialized);
     }
 }

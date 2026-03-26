@@ -1,18 +1,17 @@
-use std::{cmp, collections::HashMap, ops::Neg};
+use std::{cmp, collections::HashMap, ops::Neg, sync::{Arc, Mutex}};
 
-use binary_codec::{BinaryDeserializer, FromBytes, ToBytes};
+use binary_codec::BinaryDeserializer;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::PlabbleDateTime,
-    scripting::opcode_script::{Opcode, OpcodeScript, ScriptSettings},
+    core::PlabbleDateTime, providers::PlabbleBucketProvider, scripting::opcode_script::{Opcode, OpcodeScript, ScriptError, ScriptSettings}
 };
 use log::{debug, trace};
 
 use super::stack::StackData;
 
-#[derive(Debug, Clone)]
+/// Plabble Opcode Script Interpreter data
+#[derive(Clone)]
 pub struct ScriptInterpreter {
     main_stack: Vec<StackData>,
     alt_stack: Vec<StackData>,
@@ -20,64 +19,23 @@ pub struct ScriptInterpreter {
     snapshot_memory: usize,
     settings: ScriptSettings,
     functions: HashMap<u8, (u8, OpcodeScript)>, // function id to params count and script
-
+    variables: HashMap<u8, StackData>,          // variable store
     script: OpcodeScript,
+    bucket_provider: Option<Arc<dyn PlabbleBucketProvider>>,
+    #[cfg(feature = "blockchain")]
+    chain_provider: Option<Arc<dyn crate::providers::BlockchainProvider>>,
     cursor: usize,
     use_alt_stack: bool,
     executions: usize,
     searches: usize,
     memory: usize,
+    variable_memory: usize,
     memory_peak: usize,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, FromBytes, ToBytes, Clone)]
-#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
-pub enum ScriptError {
-    /// When the stack is empty while n items are required
-    StackUnderflow(u32),
-
-    /// When an operation expected a number but got something else
-    NotANumber,
-
-    /// When an operation expected a float but got something else
-    NotAFloat,
-
-    /// When an operation expected a boolean but got something else
-    NotABoolean,
-
-    /// When a mathematical operation fails (e.g., division by zero)
-    MathError,
-
-    /// When the script is not valid
-    InvalidScript,
-
-    /// When a not-existing address or index is provided
-    OutOfBounds,
-
-    /// When an assertion fails
-    AssertionFailed,
-
-    /// Failed to cast a value to the expected type
-    InvalidType,
-
-    ControlFlowMalformed,
-    ClearNotAllowed,
-    ControlFlowNotAllowed,
-    JumpNotAllowed,
-    LoopNotAllowed,
-    NonPushNotAllowed,
-    EvalNotAllowed,
-    BucketActionsNotAllowed,
-    MaxDepthExceeded,
-    SearchLimitExceeded,
-    ExecutionLimitExceeded,
-    OpcodeLimitExceeded,
-    MemoryLimitExceeded,
-    SliceLimitExceeded,
-    StackHeightLimitExceeded,
-}
-
 impl ScriptInterpreter {
+    /// Create a new ScriptInterpreter instance with the given script and settings. 
+    /// If settings is None, use default settings.
     pub fn new(script: OpcodeScript, settings: Option<ScriptSettings>) -> Self {
         ScriptInterpreter {
             main_stack: Vec::new(),
@@ -85,7 +43,10 @@ impl ScriptInterpreter {
             snapshot: Vec::new(),
             snapshot_memory: 0,
             functions: HashMap::new(),
-
+            variables: HashMap::new(),
+            bucket_provider: None,
+            #[cfg(feature = "blockchain")]
+            chain_provider: None,
             cursor: 0,
             script,
             use_alt_stack: false,
@@ -93,26 +54,9 @@ impl ScriptInterpreter {
             searches: 0,
             memory: 0,
             memory_peak: 0,
+            variable_memory: 0,
             settings: settings.unwrap_or_default(),
         }
-    }
-
-    /// Create a new instance with a clean stack that uses the same memory, searches & executions count
-    pub fn fork(&self, subscript: OpcodeScript, settings: Option<ScriptSettings>) -> Self {
-        let mut instance = self.clone();
-        if let Some(settings) = settings {
-            instance.settings = settings;
-        }
-        instance.script = subscript;
-
-        // Reset stacks, cursor, snapshots
-        instance.main_stack.clear();
-        instance.alt_stack.clear();
-        instance.cursor = 0;
-        instance.snapshot.clear();
-        instance.snapshot_memory = 0;
-        instance.use_alt_stack = false;
-        instance
     }
 
     /// Validate a script against the current settings, without executing it. This is useful to check if a script is valid before forking or executing it.
@@ -139,6 +83,23 @@ impl ScriptInterpreter {
 
                     if !self.settings.allow_loop {
                         return Err(ScriptError::LoopNotAllowed);
+                    }
+                }
+                Opcode::FUN(_, _) | Opcode::NUF => {
+                    if !self.settings.alllow_function_declaration {
+                        return Err(ScriptError::FunctionDeclarationNotAllowed);
+                    }
+                }
+                Opcode::CALL(_) => {
+                    if !self.settings.allow_function_calls {
+                        return Err(ScriptError::FunctionCallNotAllowed);
+                    }
+                }
+                Opcode::CALLEXT(_, _) => {
+                    if !self.settings.allow_function_calls
+                        || !self.settings.allow_external_function_calls
+                    {
+                        return Err(ScriptError::FunctionCallNotAllowed);
                     }
                 }
                 Opcode::JMP => {
@@ -267,6 +228,15 @@ impl ScriptInterpreter {
         self.pop()
             .and_then(|b| b.as_boolean())
             .ok_or(ScriptError::NotABoolean)
+    }
+
+    /// Pop an item from the stack and try to convert it to a string. Return an error if the stack is empty or if the item cannot be converted to a string.
+    fn pop_string(&mut self) -> Result<String, ScriptError> {
+        let bytes = self.pop()
+            .and_then(|s| s.as_buffer())
+            .ok_or(ScriptError::NotAString)?;
+
+        String::from_utf8(bytes).map_err(|_| ScriptError::NotAString)
     }
 
     /// Pop two items from the stack and check if they are equal, using the equality rules defined in the function.
@@ -635,8 +605,7 @@ impl ScriptInterpreter {
                 if !condition {
                     // Search a ELSE or FI to skip to
                     // open: IF, close: FI, or: ELSE
-                    let pos =
-                        self.search(71, 73, Some(72), None, false)?;
+                    let pos = self.search(71, 73, Some(72), None, false)?;
                     self.cursor = pos;
                 }
             }
@@ -704,21 +673,31 @@ impl ScriptInterpreter {
                 let end = self.search(80, 81, None, None, false)?;
 
                 let body = OpcodeScript {
-                    instructions: self.script.instructions[start+1..end].to_vec(),
+                    instructions: self.script.instructions[start + 1..end].to_vec(),
                 };
 
                 self.functions.insert(id, (params, body));
                 self.script.instructions.drain(start..=end); // Remove function declaration from script
+                return Ok(None); // Skip the cursor increment at the end
             }
             Opcode::NUF => {
-                todo!()
+                // NUF is only a marker for the end of function declaration and should never be executed
+                return Err(ScriptError::ControlFlowMalformed);
             }
             Opcode::CALL(id) => {
-                // TODO: eval function but ONLY with the N arguments from the stack
-                // its kind of a fork, but with a clean stack (except for the N arguments) and shared memory, executions & searches count
-                // the result stack will be pushed back to the caller stack (in full)
-                // so its close to EVAL
-                todo!()
+                let (params, body) = self
+                    .functions
+                    .get(&id)
+                    .ok_or(ScriptError::FunctionNotFound)?
+                    .clone();
+
+                let params = params as usize;
+                self.ensure_stack_size(params)?;
+                let idx = self.stack().len() - params;
+
+                let mut sub_interpreter = self.fork(body, None);
+                sub_interpreter.main_stack = self.stack().drain(idx..).collect::<Vec<_>>();
+                self.exec_unfork(sub_interpreter, true, true)?;
             }
             Opcode::DUP => {
                 self.ensure_stack_size(1)?;
@@ -865,13 +844,25 @@ impl ScriptInterpreter {
                 self.push(StackData::Number(length))?;
             }
             Opcode::STOREVAR(id) => {
-                todo!()
+                let value = self.pop().unwrap();
+                self.variable_memory += value.memory();
+                if let Some(current) = self.variables.insert(id, value) {
+                    self.variable_memory -= current.memory();
+                }
             }
             Opcode::LOADVAR(id) => {
-                todo!()
+                if let Some(value) = self.variables.get(&id) {
+                    self.push(value.clone())?;
+                } else {
+                    return Err(ScriptError::VariableNotFound);
+                }
             }
             Opcode::DELVAR(id) => {
-                todo!()
+                if let Some(value) = self.variables.remove(&id) {
+                    self.variable_memory -= value.memory();
+                } else {
+                    return Err(ScriptError::VariableNotFound);
+                }
             }
             Opcode::NUMBER => {
                 self.ensure_stack_size(1)?;
@@ -883,12 +874,64 @@ impl ScriptInterpreter {
                 let num = self.pop_float()?;
                 self.push(StackData::Float(num))?;
             }
-            Opcode::SERVER => todo!(),
-            Opcode::SELECT => todo!(),
-            Opcode::READ => todo!(),
-            Opcode::WRITE => todo!(),
-            Opcode::APPEND => todo!(),
-            Opcode::DELETE => todo!(),
+            Opcode::SERVER => {
+                self.ensure_stack_size(1)?;
+                let address = self.pop_string()?;
+                let provider = self.bucket_provider.as_ref()
+                    .ok_or(ScriptError::BucketProviderNotAvailable)?;
+
+                provider.connect(&address).map_err(|_| ScriptError::BucketConnectionFailed)?;
+            },
+            Opcode::SELECT => {
+                self.ensure_stack_size(1)?;
+                let bucket_id = self.pop().unwrap().as_buffer().ok_or(ScriptError::InvalidType)?;
+                if bucket_id.len() != 16 {
+                    return Err(ScriptError::InvalidSize);
+                }
+
+                let provider = self.bucket_provider.as_ref()
+                    .ok_or(ScriptError::BucketProviderNotAvailable)?;
+
+                provider.select_bucket(&bucket_id.try_into().unwrap()).map_err(|_| ScriptError::BucketConnectionFailed)?;
+            },
+            Opcode::READ => {
+                self.ensure_stack_size(1)?;
+                let key = self.pop_number()? as u32;
+
+                let provider = self.bucket_provider.as_ref()
+                    .ok_or(ScriptError::BucketProviderNotAvailable)?;
+
+                let value = provider.read(key).map_err(|_| ScriptError::BucketReadFailed)?;
+                self.push(StackData::Buffer(value))?;
+            },
+            Opcode::WRITE => {
+                self.ensure_stack_size(2)?;
+                let key = self.pop_number()? as u32;
+                let value = self.pop().unwrap().as_buffer().ok_or(ScriptError::InvalidType)?;
+
+                let provider = self.bucket_provider.as_ref()
+                    .ok_or(ScriptError::BucketProviderNotAvailable)?;
+
+                provider.write(key, value).map_err(|_| ScriptError::BucketWriteFailed)?;
+            },
+            Opcode::APPEND => {
+                self.ensure_stack_size(1)?;
+                let value = self.pop().unwrap().as_buffer().ok_or(ScriptError::InvalidType)?;
+
+                let provider = self.bucket_provider.as_ref()
+                    .ok_or(ScriptError::BucketProviderNotAvailable)?;
+
+                provider.append(value).map_err(|_| ScriptError::BucketWriteFailed)?;
+            },
+            Opcode::DELETE => {
+                self.ensure_stack_size(1)?;
+                let key = self.pop_number()? as u32;
+
+                let provider = self.bucket_provider.as_ref()
+                    .ok_or(ScriptError::BucketProviderNotAvailable)?;
+
+                provider.delete(key).map_err(|_| ScriptError::BucketDeleteFailed)?;
+            },
             Opcode::LEN => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
@@ -1000,10 +1043,26 @@ impl ScriptInterpreter {
                 let now = PlabbleDateTime(Utc::now());
                 self.push(StackData::Number(now.timestamp() as i128))?;
             }
-            Opcode::CHECKLOCK => todo!(),
-            Opcode::TXID => todo!(),
-            Opcode::GETBLOCK => todo!(),
+            Opcode::CHECKLOCK => {
+                todo!()
+            },
+            Opcode::TXID => {
+                #[cfg(feature = "blockchain")]
+                {
+                    let provider = self.chain_provider.as_ref()
+                        .ok_or(ScriptError::BlockchainProviderNotAvailable)?;
+                    let txid = provider.get_current_txid().map_err(|_| ScriptError::BlockchainConnectionFailed)?;
+                    self.push(StackData::Buffer(txid.to_vec()))?;
+                }
+
+                return Err(ScriptError::BlockchainProviderNotAvailable);
+            },
+            Opcode::SELBLOCK => todo!(),
+            Opcode::SELTX => todo!(),
             Opcode::GETENTRY => todo!(),
+            Opcode::CALLEXT(id, params) => {
+                todo!()
+            }
             Opcode::EVALSUB => {
                 self.ensure_stack_size(1)?;
                 let item = self.pop().unwrap();
@@ -1028,17 +1087,8 @@ impl ScriptInterpreter {
                 };
 
                 // We want a child process, but have the same memory/search/execution limits
-                let mut sub_interpreter = self.fork(script, Some(sub_settings));
-                let result = sub_interpreter.exec()?;
-
-                if let Some(result_bytes) = result {
-                    self.push(StackData::Buffer(result_bytes))?;
-                }
-
-                self.executions = sub_interpreter.executions;
-                self.searches = sub_interpreter.searches;
-                self.memory = sub_interpreter.memory;
-                self.memory_peak = sub_interpreter.memory_peak;
+                let sub_interpreter = self.fork(script, Some(sub_settings));
+                self.exec_unfork(sub_interpreter, true, false)?;
             }
             Opcode::EVAL => {
                 self.ensure_stack_size(1)?;
@@ -1067,6 +1117,53 @@ impl ScriptInterpreter {
         self.cursor += 1;
 
         Ok(None)
+    }
+
+        /// Create a new instance with a clean stack that uses the same memory, searches & executions count
+    pub fn fork(&self, subscript: OpcodeScript, settings: Option<ScriptSettings>) -> Self {
+        let mut instance = self.clone();
+        instance.script = subscript;
+
+        if let Some(settings) = settings {
+            instance.settings = settings;
+        }
+
+        // Reset stacks, cursor, snapshots, variables
+        instance.main_stack.clear();
+        instance.alt_stack.clear();
+        instance.variables.clear();
+        instance.cursor = 0;
+        instance.snapshot.clear();
+        instance.snapshot_memory = 0;
+        instance.variable_memory = 0;
+        instance.use_alt_stack = false;
+        instance
+    }
+
+    /// Execute a sub-interpreter fork, optionally push result and/or copy stack back. Consumes the other interpreter.
+    /// Unfork by copying its memory, searches & executions count back to the parent interpreter,
+    pub fn exec_unfork(
+        &mut self,
+        mut other: ScriptInterpreter,
+        push_result: bool,
+        copy_result_stack: bool,
+    ) -> Result<(), ScriptError> {
+        let result = other.exec()?;
+
+        if push_result && let Some(result_bytes) = result {
+            self.push(StackData::Buffer(result_bytes))?;
+        }
+
+        if copy_result_stack {
+            self.stack().append(other.stack());
+        }
+
+        self.executions = other.executions;
+        self.searches = other.searches;
+        self.memory = other.memory;
+        self.memory_peak = other.memory_peak;
+
+        Ok(())
     }
 
     /// Search for a matching opCode (u8 value) and return the cursor difference (negative or positive value)
@@ -1147,6 +1244,7 @@ impl ScriptInterpreter {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod tests {
     use std::sync::Once;
 
@@ -2531,7 +2629,7 @@ mod tests {
     // Expected returned bytes: [0xDD]
     #[test]
     fn complex_nested_if_loop_break() {
-        init_logger();
+        // init_logger();
 
         let script = OpcodeScript::new(vec![
             Opcode::PUSHINT(1), // outer true
@@ -2996,20 +3094,47 @@ mod tests {
     #[test]
     fn can_declare_and_use_a_sum2_function() {
         let script = OpcodeScript::new(vec![
+            Opcode::PUSHINT(10),
             Opcode::PUSHINT(2),
             Opcode::PUSHINT(3),
-            Opcode::FUN(1, 2),
-            Opcode::ADD,
-            Opcode::DUP,
+            Opcode::NOP,
+            Opcode::FUN(1, 2), // function ID: 1, number of arguments: 2
+            Opcode::FUN(2, 2),
             Opcode::ADD,
             Opcode::NUF,
-            Opcode::PUSHINT(10),
+            Opcode::CALL(2), // call nested function to add
+            Opcode::DUP,
+            Opcode::CALL(2),
+            Opcode::NUF,
             Opcode::CALL(1),
+            Opcode::EQ,
+            Opcode::ASSERT,
+            Opcode::PUSHINT(3),
+            Opcode::PUSHINT(7),
+            Opcode::CALL(1),
+            Opcode::PUSHINT(20),
             Opcode::EQ,
             Opcode::ASSERT,
         ]);
 
-        let mut i = ScriptInterpreter::new(script, None);
-        assert_eq!(i.exec(), Ok(None));
+        let mut settings = ScriptSettings::default();
+        settings.allow_function_calls = true;
+        settings.alllow_function_declaration = true;
+
+        let mut i = ScriptInterpreter::new(script, Some(settings));
+        let res = i.exec();
+        assert_eq!(res, Ok(None));
+    }
+
+    #[test]
+    fn cannot_call_undeclared_function() {
+        let script = OpcodeScript::new(vec![Opcode::CALL(42)]);
+
+        let mut settings = ScriptSettings::default();
+        settings.allow_function_calls = true;
+
+        let mut i = ScriptInterpreter::new(script, Some(settings));
+        let res = i.exec();
+        assert_eq!(res, Err(ScriptError::FunctionNotFound));
     }
 }

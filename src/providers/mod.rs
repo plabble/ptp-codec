@@ -18,10 +18,10 @@ pub trait KeyProvider: Send + Sync {
 /// Plabble bucket provider, an interface for interacting with buckets on current or another server
 pub trait PlabbleBucketProvider: Send + Sync {
     /// Connect to a Plabble server at the given address (e.g. "example.com:1234").
-    fn connect(&mut self, address: &str) -> Result<(), PlabbleProtocolError>;
+    fn connect(&self, address: &str) -> Result<(), PlabbleProtocolError>;
 
     /// Select a bucket by its ID (16 bytes).
-    fn select_bucket(&mut self, bucket_id: &[u8; 16]) -> Result<(), PlabbleProtocolError>;
+    fn select_bucket(&self, bucket_id: &[u8; 16]) -> Result<(), PlabbleProtocolError>;
 
     /// Read numeric slot from selected bucket
     fn read(&self, slot: u32) -> Result<Vec<u8>, PlabbleProtocolError>;
@@ -43,8 +43,7 @@ pub trait BlockchainProvider: Send + Sync {
     fn get_block_height(&self) -> Result<u64, PlabbleProtocolError>;
 
     /// Select transaction
-    fn select_transaction(&mut self, transaction_id: &[u8; 24])
-    -> Result<(), PlabbleProtocolError>;
+    fn select_transaction(&self, transaction_id: &[u8; 24]) -> Result<(), PlabbleProtocolError>;
 
     /// Select block in blockchain
     fn select_block(&self, block_id: &[u8; 24]) -> Result<(), PlabbleProtocolError>;

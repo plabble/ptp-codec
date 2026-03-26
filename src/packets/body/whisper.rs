@@ -296,15 +296,18 @@ mod tests {
 
         let bytes = req.to_bytes(None).unwrap();
         assert_eq!(bytes[1], 0b0011_1001);
-        assert_eq!(format!(
-            "0139{}{}{}{}{}{}", 
-            "44a8995dd50b6657a037a7839304535b", // bucket ID
-            "21f80100", // default bucket settings
-            "00", // whisper metadata flags
-            "07", // version
-            "00000000", // timestamp
-            "00".repeat(64) // signature
-        ), hex::encode(&bytes));
+        assert_eq!(
+            format!(
+                "0139{}{}{}{}{}{}",
+                "44a8995dd50b6657a037a7839304535b", // bucket ID
+                "21f80100",                         // default bucket settings
+                "00",                               // whisper metadata flags
+                "07",                               // version
+                "00000000",                         // timestamp
+                "00".repeat(64)                     // signature
+            ),
+            hex::encode(&bytes)
+        );
 
         let deserialized = PlabbleRequestPacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(req, deserialized);

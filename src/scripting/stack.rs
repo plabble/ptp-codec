@@ -1,6 +1,8 @@
-use binary_codec::{BitStreamReader, BitStreamWriter};
+use binary_codec::{BitStreamReader, BitStreamWriter, FromBytes, ToBytes};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+/// Stack data that can be used in the script interpreter
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToBytes, FromBytes)]
 pub enum StackData {
     Boolean(bool),
     Number(i128),

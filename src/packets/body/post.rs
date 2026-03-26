@@ -167,7 +167,8 @@ mod tests {
         let settings = BucketSettings::default();
         let serialized = settings.to_bytes(None::<&mut SerializerConfig>).unwrap();
         assert_eq!("21f80100", hex::encode(&serialized));
-        let deserialized = BucketSettings::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
+        let deserialized =
+            BucketSettings::from_bytes(&serialized, None::<&mut SerializerConfig>).unwrap();
 
         assert_eq!(deserialized, settings);
     }

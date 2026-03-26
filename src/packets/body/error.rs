@@ -1,7 +1,7 @@
 use binary_codec::{FromBytes, ToBytes};
 use serde::{Deserialize, Serialize};
 
-use crate::scripting::interpreter::ScriptError;
+use crate::scripting::opcode_script::ScriptError;
 
 /// Plabble error code body
 /// The length is prefixed by a u8 in the packet body.

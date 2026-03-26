@@ -196,9 +196,11 @@ impl<'de> Deserialize<'de> for PlabbleResponsePacket {
             ResponsePacketType::Subscribe => PlabbleResponseBody::Subscribe,
             ResponsePacketType::Whisper { .. } => {
                 let body: WhisperResponseBody = raw.body.deserialize_into().unwrap();
-                raw.header.packet_type = ResponsePacketType::Whisper { whisper_type: body.get_discriminator() };
+                raw.header.packet_type = ResponsePacketType::Whisper {
+                    whisper_type: body.get_discriminator(),
+                };
                 PlabbleResponseBody::Whisper(body)
-            },
+            }
             ResponsePacketType::Register => {
                 PlabbleResponseBody::Register(raw.body.deserialize_into().unwrap())
             }
