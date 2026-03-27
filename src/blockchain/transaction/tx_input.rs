@@ -10,7 +10,7 @@ use crate::scripting::opcode_script::OpcodeScript;
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TransactionInput {
-    /// Reference to the previous transaction ID
+    /// Reference to a previous transaction ID
     #[serde_as(as = "Hex<Lowercase>")]
     pub transaction_id: [u8; 24],
 

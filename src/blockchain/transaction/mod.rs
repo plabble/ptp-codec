@@ -53,9 +53,7 @@ mod tests {
 
     use crate::{
         blockchain::transaction::{
-            Transaction, TransactionLock,
-            tx_input::TransactionInput,
-            tx_output::{OutputType, TransactionOutput},
+            Transaction, TransactionLock, tx_input::TransactionInput, tx_output::TransactionOutput,
         },
         scripting::opcode_script::{Opcode, OpcodeScript},
     };
@@ -81,27 +79,12 @@ mod tests {
                 },
             ],
             outputs: vec![
-                TransactionOutput {
-                    is_monetary: true,
-                    burn: false,
-                    not_replaceable: false,
-                    value: OutputType::Monetary(123),
-                    locking_script: Some(OpcodeScript::new(vec![Opcode::ASSERT])),
-                },
-                TransactionOutput {
-                    is_monetary: true,
-                    burn: true,
-                    not_replaceable: true,
-                    value: OutputType::Monetary(456),
-                    locking_script: None,
-                },
-                TransactionOutput {
-                    is_monetary: false,
-                    burn: false,
-                    not_replaceable: false,
-                    value: OutputType::Asset([0xFFu8; 24]),
-                    locking_script: Some(OpcodeScript::new(vec![Opcode::FALSE])),
-                },
+                TransactionOutput::Monetary { amount: 123, lock: OpcodeScript::new(vec![Opcode::ASSERT]) },
+                TransactionOutput::Fee(456),
+                TransactionOutput::Asset {
+                    id: [0xFFu8; 24],
+                    lock: OpcodeScript::new(vec![Opcode::FALSE])
+                }
             ],
             lock: TransactionLock::Time(PlabbleDateTime::new(10)),
         };
@@ -120,20 +103,20 @@ mod tests {
         // 01 script length
         // 0x01 TRUE
         // 03 output count
-        // 0000_0001 first output flags (monetary, not burnable, replaceable)
+        // 00 output type monetary
         // 0x7B value (123)
         // 01 script length
         // 0x4E ASSERT
-        // 0000_0111 second output flags (monetary, burnable, not replaceable)
+        // 04 output type fee
         // 0xc803 value (456)
-        // 0000_0000 third output flags (non-monetary, not burnable, replaceable)
+        // 01 output type asset
         // 24x 0xFF asset ID
         // 01 script length
         // 0x00 FALSE
         // 0000000a time lock
 
         assert_eq!(
-            "11020101010101010101010101010101010101010101010101010702464f02020202020202020202020202020202020202020202020203010103017b014e07c80300ffffffffffffffffffffffffffffffffffffffffffffffff01000000000a",
+            "11020101010101010101010101010101010101010101010101010702464f02020202020202020202020202020202020202020202020203010103007b014e04c80301ffffffffffffffffffffffffffffffffffffffffffffffff01000000000a",
             hex::encode(&bytes)
         );
 

@@ -2,7 +2,7 @@ use std::{
     cmp,
     collections::HashMap,
     ops::Neg,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
@@ -1353,6 +1353,7 @@ impl ScriptInterpreter {
                     },
                     OpAlgorithm::KeyStreamXChaCha20 => todo!(),
                     OpAlgorithm::KeyStreamAes256 => todo!(),
+                    #[allow(unreachable_patterns)]
                     _ => return Err(ScriptError::AlgorithmNotSupported),
                 }
             },
@@ -1569,7 +1570,7 @@ mod tests {
 
     use crate::scripting::{
         interpreter::ScriptInterpreter,
-        opcode_script::{Opcode, OpcodeScript, ScriptSettings},
+        opcode_script::{OpAlgorithm, Opcode, OpcodeScript, ScriptSettings},
         stack::StackData,
     };
 
@@ -3453,5 +3454,19 @@ mod tests {
         let mut i = ScriptInterpreter::new(script, Some(settings));
         let res = i.exec();
         assert_eq!(res, Err(ScriptError::FunctionNotFound));
+    }
+
+    #[test]
+    fn can_hash_data_with_script() {
+        let script = OpcodeScript::new(vec![
+            Opcode::PUSHINT(12345),
+            Opcode::CRYPTO(OpAlgorithm::Blake3_128),
+            Opcode::PUSHL1 { len: 16, data: hex::decode("3aaf9c252153d25e4908ba74afa99076").unwrap() },
+            Opcode::EQ,
+            Opcode::ASSERT
+        ]);
+
+        let mut int = ScriptInterpreter::new(script, None);
+        assert_eq!(Ok(None), int.exec());
     }
 }

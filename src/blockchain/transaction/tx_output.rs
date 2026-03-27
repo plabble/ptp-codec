@@ -6,38 +6,47 @@ use serde_with::serde_as;
 
 use crate::scripting::opcode_script::OpcodeScript;
 
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct TransactionOutput {
-    /// Indicates whether this output is a monetary transaction output (true) or an asset transfer output (false)
-    #[toggles("monetary")]
-    pub is_monetary: bool,
-
-    /// If set to true, the output is burned and can never be spent or moved anymore
-    #[toggles("burn")]
-    pub burn: bool,
-
-    /// If set to true, this specific output is not replaceable by fee (RBF) and must be included in the replacement transaction as is
-    pub not_replaceable: bool,
-
-    // 5 bits reserved for future use
-    /// Value of the transaction output in the smallest unit
-    #[variant_by = "monetary"]
-    pub value: OutputType,
-
-    /// Locking script to lock this output
-    #[toggled_by = "!burn"]
-    #[dyn_length]
-    pub locking_script: Option<OpcodeScript>,
-}
-
+/// Transaction output
+#[repr(u8)]
 #[serde_as]
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[no_discriminator]
-pub enum OutputType {
-    /// Asset transfer output, which represents a transfer of a specific asset on the blockchain
-    /// But also for instance, to pay for a smart contract that will be placed in the same block
-    Asset(#[serde_as(as = "Hex<Lowercase>")] [u8; 24]),
+pub enum TransactionOutput {
+    /// Monetary transaction output
+    Monetary {
+        /// Amount (in smallest currency unit)
+        #[dyn_int]
+        amount: u64,
 
-    /// Monetary transaction output, which represents a transfer in smallest currency unit
-    Monetary(#[dyn_int] u64),
+        /// Locking script
+        #[dyn_length]
+        lock: OpcodeScript
+    } = 0,
+
+    /// Transfer ownership of an asset on the blockchain
+    Asset {
+        /// Asset identifier
+        #[serde_as(as = "Hex<Lowercase>")]
+        id: [u8; 24],
+
+        /// Locking script
+        #[dyn_length]
+        lock: OpcodeScript
+    } = 1,
+
+    /// Deploy a smart contract - cannot be used as an input
+    DeployContract(#[serde_as(as = "Hex<Lowercase>")] [u8; 24]) = 2,
+
+    /// Invoke a on-chain smart contract - cannot be used as an input
+    InvokeContract {
+        /// Smart contract identifier
+        #[serde_as(as = "Hex<Lowercase>")]
+        id: [u8; 24],
+
+        /// Script to call functions on the contract
+        #[dyn_length]
+        script: OpcodeScript
+    } = 3,
+
+    /// Monetary fee value in smallest currency unit (can only be claimed by miner)
+    Fee(#[dyn_int] u64) = 4
 }
