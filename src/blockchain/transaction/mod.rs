@@ -1,13 +1,24 @@
 pub mod tx_input;
 pub mod tx_output;
 
-use binary_codec::{FromBytes, ToBytes};
+use binary_codec::{BinarySerializer, BitStreamWriter, FromBytes, SerializerConfig, ToBytes};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     blockchain::transaction::{tx_input::TransactionInput, tx_output::TransactionOutput},
     core::PlabbleDateTime,
+    crypto::hash_256,
 };
+
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[no_discriminator]
+pub enum TransactionLock {
+    /// Relative height lock, specifying the minimum number of blocks that must be mined after the transaction is included before it can be spent.
+    Height(#[dyn_int] u64),
+
+    /// Time lock, specifying the earliest time (as a Plabble timestamp) that the transaction can be included in a block.
+    Time(PlabbleDateTime),
+}
 
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Transaction {
@@ -37,14 +48,29 @@ pub struct Transaction {
     pub lock: TransactionLock,
 }
 
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[no_discriminator]
-pub enum TransactionLock {
-    /// Relative height lock, specifying the minimum number of blocks that must be mined after the transaction is included before it can be spent.
-    Height(#[dyn_int] u64),
+impl Transaction {
+    /// Get blake2b-256-bit integrity hash of entire transaction, excluding the input scripts
+    /// This hash can be used as a signature for the input
+    pub fn get_hash(&self) -> [u8; 32] {
+        let mut buffer = Vec::new();
+        let mut writer = BitStreamWriter::new(&mut buffer);
 
-    /// Time lock, specifying the earliest time (as a Plabble timestamp) that the transaction can be included in a block.
-    Time(PlabbleDateTime),
+        writer.write_byte(self.version);
+        writer.write_bit(self.has_time_lock);
+        writer.write_bit(self.replaceable_by_fee);
+
+        for input in self.inputs.iter() {
+            writer.write_bytes(&input.transaction_id);
+            writer.write_fixed_int(input.output_index);
+        }
+
+        for output in self.outputs.iter() {
+            writer.write_bytes(&output.to_bytes(None::<&mut SerializerConfig>).unwrap());
+        }
+        writer.write_bytes(&self.lock.to_bytes(None::<&mut SerializerConfig>).unwrap());
+
+        hash_256(false, vec![&buffer])
+    }
 }
 
 #[cfg(test)]
@@ -53,7 +79,9 @@ mod tests {
 
     use crate::{
         blockchain::transaction::{
-            Transaction, TransactionLock, tx_input::TransactionInput, tx_output::TransactionOutput,
+            Transaction, TransactionLock,
+            tx_input::TransactionInput,
+            tx_output::{OutputType, TransactionOutput},
         },
         scripting::opcode_script::{Opcode, OpcodeScript},
     };
@@ -79,12 +107,24 @@ mod tests {
                 },
             ],
             outputs: vec![
-                TransactionOutput::Monetary { amount: 123, lock: OpcodeScript::new(vec![Opcode::ASSERT]) },
-                TransactionOutput::Fee(456),
-                TransactionOutput::Asset {
-                    id: [0xFFu8; 24],
-                    lock: OpcodeScript::new(vec![Opcode::FALSE])
-                }
+                TransactionOutput {
+                    is_replacable: false,
+                    output_type: OutputType::Monetary {
+                        amount: 123,
+                        lock: OpcodeScript::new(vec![Opcode::ASSERT]),
+                    },
+                },
+                TransactionOutput {
+                    is_replacable: false,
+                    output_type: OutputType::Fee(456),
+                },
+                TransactionOutput {
+                    is_replacable: false,
+                    output_type: OutputType::Asset {
+                        id: [0xFFu8; 24],
+                        lock: OpcodeScript::new(vec![Opcode::FALSE]),
+                    },
+                },
             ],
             lock: TransactionLock::Time(PlabbleDateTime::new(10)),
         };
@@ -103,20 +143,20 @@ mod tests {
         // 01 script length
         // 0x01 TRUE
         // 03 output count
-        // 00 output type monetary
+        // 0000_0000 output type monetary
         // 0x7B value (123)
         // 01 script length
         // 0x4E ASSERT
-        // 04 output type fee
+        // 0100_0000 output type fee
         // 0xc803 value (456)
-        // 01 output type asset
+        // 0001_0000 output type asset
         // 24x 0xFF asset ID
         // 01 script length
         // 0x00 FALSE
         // 0000000a time lock
 
         assert_eq!(
-            "11020101010101010101010101010101010101010101010101010702464f02020202020202020202020202020202020202020202020203010103007b014e04c80301ffffffffffffffffffffffffffffffffffffffffffffffff01000000000a",
+            "11020101010101010101010101010101010101010101010101010702464f02020202020202020202020202020202020202020202020203010103007b014e40c80310ffffffffffffffffffffffffffffffffffffffffffffffff01000000000a",
             hex::encode(&bytes)
         );
 
