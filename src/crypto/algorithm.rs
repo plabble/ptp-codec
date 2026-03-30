@@ -125,12 +125,38 @@ pub enum VerificationKey {
 /// - Falcon: 2305 bytes key for Falcon-1024
 /// - SlhDsaSha128s: 64 bytes key for SLH-DSA-SHA128s
 #[serde_as]
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, FromBytes, ToBytes, Serialize, Deserialize, Clone)]
+#[no_discriminator]
 pub enum SigningKey {
+    #[toggled_by = "ed25519"]
     Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+
+    #[toggled_by = "ed448"]
     Ed448(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 57]),
+
+    #[toggled_by = "dsa44"]
     Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+
+    #[toggled_by = "dsa65"]
     Dsa65(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+
+    #[toggled_by = "falcon"]
     Falcon(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 2305]),
+
+    #[toggled_by = "slh_dsa"]
     SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 64]),
+}
+
+#[cfg(feature = "protocol")]
+impl SigningKey {
+    /// Get singature algorithm from signing key
+    pub fn get_algorithm(&self) -> crate::crypto::SignatureAlgorithm {
+        match self {
+            SigningKey::Ed25519(_) => crate::crypto::SignatureAlgorithm::Ed25519,
+            SigningKey::Ed448(_) => crate::crypto::SignatureAlgorithm::Ed448,
+            SigningKey::Dsa44(_) => crate::crypto::SignatureAlgorithm::Dsa44,
+            SigningKey::Dsa65(_) => crate::crypto::SignatureAlgorithm::Dsa65,
+            _ => panic!("Unsupported signing key algorithm"),
+        }
+    }
 }

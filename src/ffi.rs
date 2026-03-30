@@ -126,7 +126,11 @@ impl PlabbleConnection {
         let response = inner.recv_response().await?;
         serialize_output(&response)
     }
+}
 
+#[cfg(all(feature = "client", feature = "implementation"))]
+#[uniffi::export]
+impl PlabbleConnection {
     /// Start a new session with the given options serialized as a JSON (or TOML) string. Returns the PSK ID as 12-byte array if a pre-shared key is created.
     pub async fn start_session(
         &self,

@@ -79,6 +79,7 @@ pub fn set_crypto_settings(settings: &mut CryptoSettings, algorithms: Vec<String
     }
 }
 
+/// Get key exchange algorithm according to crypto settings
 pub fn get_key_exchange_algorithms(settings: &CryptoSettings) -> Vec<KeyExchangeAlgorithm> {
     let mut algs = Vec::new();
     if settings.key_exchange_x25519 {

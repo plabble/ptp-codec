@@ -59,6 +59,20 @@ pub enum KeyExchangeAlgorithm {
     Kem768,
 }
 
+/// Supported signature algorithms
+/// 
+/// - `Ed25519` is the standard EdDSA signature scheme over Curve25519.
+/// - `Ed448` is the EdDSA signature scheme over Curve448, which offers higher security but is less widely supported.
+/// - `Dsa44` and `Dsa65` are optional post-quantum signature algorithms provided when the `pqc-lite` feature is enabled.
+#[cfg(feature = "protocol")]
+#[derive(PartialEq)]
+pub enum SignatureAlgorithm {
+    Ed25519,
+    Ed448,
+    Dsa44,
+    Dsa65
+}
+
 /// A small stateful helper to run a key exchange for a chosen algorithm.
 ///
 /// The struct stores the selected algorithm and, for initiators, the

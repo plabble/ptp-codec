@@ -25,6 +25,9 @@ pub enum PlabbleError {
     /// The requested CUSTOM packet type is not supported by the server
     UnsupportedSubProtocol = 3,
 
+    /// The request is not valid
+    InvalidRequest = 4,
+
     /* bucket errors: 10-100 */
     /// Bucket by ID not found (or existence denied)
     BucketNotFound = 10,

@@ -5,6 +5,11 @@ use crate::{
     protocol::{PlabbleConnection, error::PlabbleProtocolError},
 };
 
+#[cfg(feature = "implementation")]
+pub mod implementation;
+#[cfg(feature = "implementation")]
+pub mod options;
+
 pub mod node;
 
 /// Server-side implementation of [`PlabbleConnection`].

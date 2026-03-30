@@ -7,7 +7,7 @@ use serde_with::serde_as;
 
 use crate::{
     core::PlabbleDateTime,
-    crypto::algorithm::{CryptoSignature, VerificationKey},
+    crypto::algorithm::{CryptoSignature, VerificationKey, SigningKey},
 };
 
 /// Plabble Certificate
@@ -24,7 +24,12 @@ pub struct Certificate {
     #[serde(default)]
     root_cert: bool,
 
-    // 4 bits reserved for future use
+    /// If set to true, the certificate includes secret keys
+    #[toggles("secret_keys")]
+    #[serde(default)]
+    with_secret_keys: bool,
+
+    // 3 bits reserved for future use
     /// The unique certificate ID - this is NOT a fingerprint for it does not contain the keys or signatures but only the data
     /// This is a hash of the following certificate data:
     /// - Blake2b_128(valid_from, valid_until, issuer_uri, data)
@@ -39,6 +44,19 @@ pub struct Certificate {
     #[toggled_by = "full_cert"]
     #[serde(flatten)]
     body: Option<CertificateBody>,
+}
+
+impl Certificate {
+    /// Get signing key for a specific signature algorithm, if present in the certificate body
+    #[cfg(feature = "protocol")]
+    pub fn get_signing_key(&self, algorithm: crate::crypto::SignatureAlgorithm) -> Option<&SigningKey> {
+        if let Some(keys) = self.body.as_ref().and_then(|b| b.secret_keys.as_ref()) {
+            let found = keys.iter().find(|k| k.get_algorithm() == algorithm);
+            found
+        } else {
+            None
+        }
+    }
 }
 
 /// Plabble Certificate body
@@ -69,6 +87,12 @@ pub struct CertificateBody {
     /// - Blake2b_128(valid_from, valid_to, issuer_uri, data)
     #[multi_enum]
     signatures: Vec<CryptoSignature>,
+
+    /// Secret keys, if present
+    #[multi_enum]
+    #[toggled_by = "secret_keys"]
+    #[serde(default)]
+    secret_keys: Option<Vec<SigningKey>>,
 }
 
 impl CertificateBody {
@@ -415,5 +439,43 @@ mod tests {
                 68
             ]
         );
+    }
+
+    #[test]
+    fn can_store_certificate_with_secret_keys() {
+        let cert: Certificate = toml::from_str(r#"
+            id = "AAAAAAAAAAAAAAAAAAAAAA"
+            uri = "https://certs.plabble.org/{id}.crt"
+
+            valid_from = "2025-05-15T12:30:00+00:00"
+            valid_until = "2161-02-07T06:28:15+00:00"
+            issuer_uri = "https://certs.plabble.org/root.crt"
+            data = "CA=P;CN=tst"
+            with_secret_keys = true
+
+            [[keys]]
+            Ed25519 = "PXCMlNZIKU-TI8BWCB8QsNSJp0bLdB1jDzhlSiLXxas"
+
+            [[signatures]]
+            Ed25519 = "GLr1ep-8O70YihvouWdnsFBAPP6poaAVC3TFyz1Lu60MjK_n5D29lYDWmUWit4JaSiN8SpNSpBNmdlFMu8gODQ"
+
+            [[secret_keys]]
+            Ed25519 = "r91Qx-o5PetYDFuO1T6NPW2Q4w1yL13fKmIj2vRQU9g"
+        "#).unwrap();
+
+        let key_p = "3D708C94D648294F9323C056081F10B0D489A746CB741D630F38654A22D7C5AB";
+        let key_s = "afdd50c7ea393deb580c5b8ed53e8d3d6d90e30d722f5ddf2a6223daf45053d8";
+        let sig = "18BAF57A9FBC3BBD188A1BE8B96767B050403CFEA9A1A0150B74C5CB3D4BBBAD0C8CAFE7E43DBD9580D69945A2B7825A4A237C4A9352A4136676514CBBC80E0D";
+
+        let mut config = SerializerConfig::<()>::new(None);
+        config.set_toggle("ed25519", true);
+
+        let mut config2 = config.clone();
+
+        let bytes = cert.to_bytes(Some(&mut config)).unwrap();
+        println!("{}", hex::encode(&bytes));
+
+        let deserialized = Certificate::from_bytes(&bytes, Some(&mut config2)).unwrap();
+        assert_eq!(cert, deserialized);
     }
 }
