@@ -105,6 +105,8 @@ impl PlabbleConnection {
                     shared_secrets,
                 );
 
+                // TODO: validate signatures
+
                 if with_psk {
                     let psk_id = body.psk_id.expect("Expected PSK ID");
                     if let Some(provider) = &context.key_provider {

@@ -127,7 +127,7 @@ pub fn derive_key(
     }
 
     // This is called Mac, but is actually useful for key derivation because of salt/personalization
-    let mut kdf = Blake2bMac512::new_with_salt_and_personal(ikm, salt, context)
+    let mut kdf = Blake2bMac512::new_with_salt_and_personal(Some(ikm), salt, context)
         .expect("Failed to create KDF hasher");
 
     if let Some(extra_key) = extra_key {
@@ -160,7 +160,8 @@ impl_hash!(hash_512, 64, Blake2b512, |h: blake3::Hasher| {
 });
 
 pub fn mac_poly1305(key: &[u8; 32], data: &[u8]) -> [u8; 16] {
-    let mac = <poly1305::Poly1305 as blake2::digest::KeyInit>::new(key.into()).compute_unpadded(data);
+    let mac =
+        <poly1305::Poly1305 as blake2::digest::KeyInit>::new(key.into()).compute_unpadded(data);
     mac.as_slice().try_into().unwrap()
 }
 
@@ -200,7 +201,7 @@ pub fn calculate_mac(
         return mac;
     }
 
-    let mut hasher = Blake2bMac128::new(key.into());
+    let mut hasher = <Blake2bMac128 as blake2::digest::KeyInit>::new(key.into());
     if let Some(extra_data) = extra_data {
         hasher.update(extra_data);
     }

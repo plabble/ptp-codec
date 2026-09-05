@@ -32,7 +32,7 @@ pub struct SessionOptions {
     pub psk_id: Option<[u8; 12]>,
 
     /// List of cryptographic algorithm names (lowercase) to (not) use. If emtpy, default crypto settings will be used
-    /// Examples: "!x25519", "aes256", "chacha20", "!ed25519", "blake3", "mldsa44", "mldsa65", "mlkem512", "mlkem768"
+    /// Examples: "!x25519", "aes256", "chacha20", "!ed448", "!ed25519", "blake3", "mldsa44", "mldsa65", "mlkem512", "mlkem768"
     #[serde(default)]
     pub algorithms: Vec<String>,
 }
@@ -60,6 +60,7 @@ pub fn set_crypto_settings(settings: &mut CryptoSettings, algorithms: Vec<String
             "chacha20" => settings.encrypt_with_chacha = set,
             "aes256" => settings.encrypt_with_aes = set,
             "ed25519" => settings.sign_ed25519 = set,
+            "ed448" => settings.sign_ed448 = set,
             "blake3" => settings.use_blake3 = set,
             "mldsa44" | "mldsa65" | "mlkem512" | "mlkem768" => {
                 let mut pq_settings = settings.post_quantum_settings.unwrap_or_default();

@@ -324,8 +324,11 @@ pub enum OpAlgorithm {
     /// Verify using Ed25519 (see above) and asserts true
     VerifyAssertEd25519 = 52,
 
+    /// Sign using Ed448 (takes secret key and message from stack, puts signature back)
     SignEd448 = 53,
+    /// Verify using Ed448 (takes public key, message, and signature from stack, puts boolean back)
     VerifyEd448 = 54,
+    /// Verify using Ed448 (see above) and asserts true
     VerifyAssertEd448 = 55,
 
     /// Sign using ML-DSA-44 (takes secret key and message from stack, puts signature back)

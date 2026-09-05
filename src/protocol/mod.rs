@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 
 pub mod error;
 
+#[cfg(feature = "implementation")]
+pub mod options;
+
 use crate::packets::{context::PlabbleConnectionContext, response::PlabbleResponsePacket};
 
 #[cfg(feature = "server")]
@@ -42,7 +45,7 @@ use crate::protocol::error::PlabbleProtocolError;
 pub fn deserialize_input<T: for<'a> Deserialize<'a>>(
     data: &str,
 ) -> Result<T, PlabbleProtocolError> {
-    #[cfg(all(feature = "use-json", not(feature = "use-toml")))]
+    #[cfg(feature = "use-json")]
     {
         serde_json::from_str(data).map_err(|_| PlabbleProtocolError::InputParsingFailed)
     }
@@ -51,11 +54,14 @@ pub fn deserialize_input<T: for<'a> Deserialize<'a>>(
     {
         toml::from_str(data).map_err(|_| PlabbleProtocolError::InputParsingFailed)
     }
+
+    #[cfg(not(any(feature = "use-json", feature = "use-toml")))]
+    Err(PlabbleProtocolError::InputParsingFailed)
 }
 
 /// Serialize an object to a JSON or TOML string (depending on enabled features).
 pub fn serialize_output<T: Serialize>(data: &T) -> Result<String, PlabbleProtocolError> {
-    #[cfg(all(feature = "use-json", not(feature = "use-toml")))]
+    #[cfg(feature = "use-json")]
     {
         serde_json::to_string(data).map_err(|_| PlabbleProtocolError::OutputSerializationFailed)
     }
@@ -64,4 +70,7 @@ pub fn serialize_output<T: Serialize>(data: &T) -> Result<String, PlabbleProtoco
     {
         toml::to_string(data).map_err(|_| PlabbleProtocolError::OutputSerializationFailed)
     }
+
+    #[cfg(not(any(feature = "use-json", feature = "use-toml")))]
+    Err(PlabbleProtocolError::OutputSerializationFailed)
 }

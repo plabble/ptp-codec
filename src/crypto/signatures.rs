@@ -149,10 +149,10 @@ mod tests {
     #[cfg(feature = "pqc-lite")]
     #[test]
     fn can_sign_and_verify_dsa44() {
-        use ml_dsa::{KeyGen, KeyPair, MlDsa44};
+        use ml_dsa::{Generate, Keypair, MlDsa44, SigningKey as MlDsaSigningKey};
 
         let data = [0u8; 16];
-        let kp: KeyPair<MlDsa44> = MlDsa44::key_gen(&mut rand::rng());
+        let kp = MlDsaSigningKey::<MlDsa44>::generate();
 
         let sig = SigningKey::Dsa44(kp.to_seed().into());
 
@@ -170,10 +170,10 @@ mod tests {
     #[cfg(feature = "pqc-lite")]
     #[test]
     fn can_sign_and_verify_dsa65() {
-        use ml_dsa::{KeyGen, KeyPair, MlDsa65};
+        use ml_dsa::{Generate, Keypair, MlDsa65, SigningKey as MlDsaSigningKey};
 
         let data = [0u8; 16];
-        let kp: KeyPair<MlDsa65> = MlDsa65::key_gen(&mut rand::rng());
+        let kp = MlDsaSigningKey::<MlDsa65>::generate();
 
         let sig = SigningKey::Dsa65(kp.to_seed().into());
 
