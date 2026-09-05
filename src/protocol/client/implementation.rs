@@ -1,19 +1,13 @@
 use crate::{
-    core::PlabbleDateTime,
-    crypto::KeyExchange,
-    packets::{
-        base::{PlabblePacketBase, settings::CryptoSettings},
-        body::{
+    core::PlabbleDateTime, crypto::KeyExchange, packets::{
+        base::{PlabblePacketBase, settings::CryptoSettings}, body::{
             error::PlabbleError, request_body::PlabbleRequestBody,
             response_body::PlabbleResponseBody, session::SessionRequestBody,
-        },
-        header::{
+        }, context::PlabbleConnectionContext, header::{
             request_header::PlabbleRequestHeader,
             type_and_flags::{RequestPacketType, ResponsePacketType},
-        },
-        request::PlabbleRequestPacket,
-    },
-    protocol::{
+        }, request::PlabbleRequestPacket,
+    }, protocol::{
         PlabbleConnection,
         client::options::{
             SessionOptions, get_key_exchange_algorithms, is_valid_algorithm, set_crypto_settings,
@@ -33,6 +27,7 @@ impl PlabbleConnection {
         &mut self,
         options: Option<SessionOptions>,
     ) -> Result<Option<[u8; 12]>, PlabbleProtocolError> {
+        // Validate the provided session options and initialize the crypto settings
         let options = options.unwrap_or_default();
         if let Some(name) = options.algorithms.iter().find_map(|algorithm| {
             let name = algorithm.strip_prefix('!').unwrap_or(algorithm);
@@ -44,6 +39,7 @@ impl PlabbleConnection {
             .into());
         }
 
+        // Retrieve the current crypto settings from the connection context, if present or use default
         let mut settings = self
             .config
             .data
@@ -51,8 +47,10 @@ impl PlabbleConnection {
             .and_then(|context| context.crypto_settings)
             .unwrap_or_default();
 
+        // Apply the session request options to the crypto settings
         set_crypto_settings(&mut settings, options.algorithms);
 
+        // Check if any of the applied algorithms are unsupported
         if let Some(name) = unsupported_algorithm(&settings) {
             return Err(PlabbleError::UnsupportedAlgorithm {
                 name: name.to_owned(),
@@ -60,11 +58,13 @@ impl PlabbleConnection {
             .into());
         }
 
+        // Retrieve the list of key exchange algorithms from the crypto settings
         let key_exchange_algorithms = get_key_exchange_algorithms(&settings);
         if key_exchange_algorithms.is_empty() {
             return Err(PlabbleError::InvalidRequest.into());
         }
 
+        // Initialize key exchanges for each selected key exchange algorithm
         let mut key_exchanges: Vec<KeyExchange> = key_exchange_algorithms
             .into_iter()
             .map(KeyExchange::new)
@@ -78,11 +78,13 @@ impl PlabbleConnection {
 
         let mut base = PlabblePacketBase::default();
 
+        // Prepare the base packet with default values and apply crypto settings if necessary
         if settings != CryptoSettings::default() {
             base.specify_crypto_settings = true;
             base.crypto_settings = Some(settings);
         }
 
+        // If a PSK ID is provided in the options, configure the base packet accordingly
         if let Some(psk_id) = options.psk_id {
             base.pre_shared_key = true;
             base.use_encryption = true;
@@ -125,6 +127,7 @@ impl PlabbleConnection {
 
         // TODO: better errors i.e. UntrustedHost
 
+        // Verify that the response packet's base fields match the signing request's base fields
         if res.base.version != signing_request.base.version
             || res.base.fire_and_forget
             || res.base.use_encryption != signing_request.base.use_encryption
@@ -135,12 +138,14 @@ impl PlabbleConnection {
             return Err(PlabbleProtocolError::UnexpectedResponse);
         }
 
+        // Verify that the response packet's crypto settings match the expected settings if present
         if let Some(response_settings) = res.base.crypto_settings
             && response_settings != settings
         {
             return Err(PlabbleProtocolError::UnexpectedResponse);
         }
 
+        // Extract the PSK and salt flags from the response packet header
         let (with_psk, with_salt) = match res.header.packet_type {
             ResponsePacketType::Session {
                 with_psk,
@@ -149,11 +154,13 @@ impl PlabbleConnection {
             _ => return Err(PlabbleProtocolError::UnexpectedResponse),
         };
 
+        // Extract the session response body from the response packet
         let body = match res.body {
             PlabbleResponseBody::Session(body) => body,
             _ => return Err(PlabbleProtocolError::UnexpectedResponse),
         };
 
+        // Verify that the PSK and salt flags in the response match the expected values and the number of key exchanges is correct
         if with_psk != body.psk_id.is_some()
             || with_psk != options.stored_key_lifetime.is_some()
             || with_salt != body.salt.is_some()
@@ -163,6 +170,7 @@ impl PlabbleConnection {
             return Err(PlabbleProtocolError::UnexpectedResponse);
         }
 
+        // Retrieve the list of signature algorithms supported by the current settings
         let signature_algorithms = get_signature_algorithms(&settings);
         if body.signatures.len() != signature_algorithms.len()
             || body
@@ -176,6 +184,7 @@ impl PlabbleConnection {
 
         let signed_bytes = body.signing_bytes(&signing_request, &settings)?;
 
+        // Signature verification for the response using the available verification keys and algorithms
         let context = self.config.data.as_ref().unwrap();
         if !context.verification_keys.is_empty() {
             for (algorithm, signature) in signature_algorithms.iter().zip(&body.signatures) {
@@ -190,6 +199,7 @@ impl PlabbleConnection {
             }
         }
 
+        // Process the key exchange responses and derive the shared secrets from each key exchange
         let shared_secrets = body
             .keys
             .iter()
@@ -201,7 +211,8 @@ impl PlabbleConnection {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let session_key = crate::packets::context::PlabbleConnectionContext::derive_session_key(
+        // Derive the session key from the collected shared secrets and salts
+        let session_key = PlabbleConnectionContext::derive_session_key(
             settings.use_blake3,
             client_salt,
             body.salt,
@@ -212,6 +223,7 @@ impl PlabbleConnection {
         context.crypto_settings = Some(settings);
         context.activate_session(session_key, options.enable_full_encryption);
 
+        // Store the PSK in the key provider if a PSK ID is present and a key provider is available
         if let Some(psk_id) = body.psk_id
             && let Some(provider) = &context.key_provider
         {

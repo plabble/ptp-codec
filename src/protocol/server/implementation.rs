@@ -37,22 +37,26 @@ impl PlabbleConnection {
                 with_salt,
                 request_salt,
             } => {
+                // Increment request counter, also if an error occurs
                 let context = self.config.data.as_ref().unwrap();
                 let counter = context
                     .client_counter
                     .checked_sub(1)
                     .ok_or(PlabbleProtocolError::UnexpectedRequest)?;
 
+                // Get settings from the request or fall back to context session (this will only be if a session was already created). Else, use default.
                 let settings = req
                     .base
                     .crypto_settings
                     .or(context.crypto_settings)
                     .unwrap_or_default();
 
+                // Disallow Fire-and-Forget requests for SESSION packets
                 if req.base.fire_and_forget {
                     return Err(PlabbleError::InvalidRequest.into());
                 }
 
+                // If any of the requested algorithms are unsupported, return an error
                 if let Some(name) = unsupported_algorithm(&settings) {
                     return Err(PlabbleError::UnsupportedAlgorithm {
                         name: name.to_owned(),
@@ -60,6 +64,7 @@ impl PlabbleConnection {
                     .into());
                 }
 
+                // If full packet encryption is requested but no encryption algorithm is chosen, return error
                 if enable_encryption && !settings.encrypt_with_chacha && !settings.encrypt_with_aes
                 {
                     return Err(PlabbleError::UnsupportedAlgorithm {
@@ -68,21 +73,25 @@ impl PlabbleConnection {
                     .into());
                 }
 
+                // Check if body is a SESSION request and extract it
                 let body = match &req.body {
                     PlabbleRequestBody::Session(body) => body,
                     _ => return Err(PlabbleProtocolError::UnexpectedRequest),
                 };
 
+                // Validate that the presence of PSK and salt in the request matches the expected flags
                 if persist_key != body.psk_expiration.is_some() || with_salt != body.salt.is_some()
                 {
                     return Err(PlabbleError::InvalidRequest.into());
                 }
 
+                // Get the list of key exchange algorithms selected by the current crypto settings
                 let exchange_algorithms = get_key_exchange_algorithms(&settings);
                 if exchange_algorithms.is_empty() || body.keys.len() != exchange_algorithms.len() {
                     return Err(PlabbleError::InvalidRequest.into());
                 }
 
+                // Get the list of signature algorithms selected by the current crypto settings and ensure we have the corresponding signing keys
                 let signature_algorithms = get_signature_algorithms(&settings);
                 for algorithm in &signature_algorithms {
                     if !context
@@ -97,16 +106,19 @@ impl PlabbleConnection {
                     }
                 }
 
+                // If any key should be persisted, ensure we have a key provider available (server error)
                 let key_provider = context.key_provider.clone();
                 if persist_key && key_provider.is_none() {
                     return Err(PlabbleError::InvalidRequest.into());
                 }
 
+                // Initialize key exchanges for each selected key exchange algorithm
                 let mut key_exchanges: Vec<KeyExchange> = exchange_algorithms
                     .into_iter()
                     .map(KeyExchange::new)
                     .collect();
 
+                // Process each key exchange request and generate the corresponding response
                 let exchanges = body
                     .keys
                     .iter()
@@ -118,8 +130,12 @@ impl PlabbleConnection {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
+                // If server salt is requested, generate a random value
                 let server_salt = request_salt.then(rand::random);
+                // Collect the shared secrets from each key exchange
                 let shared_secrets: Vec<_> = exchanges.iter().map(|(secret, _)| *secret).collect();
+                
+                // Generate the session key from the collected shared secrets and salts
                 let session_key = PlabbleConnectionContext::derive_session_key(
                     settings.use_blake3,
                     body.salt,
@@ -127,7 +143,9 @@ impl PlabbleConnection {
                     &shared_secrets,
                 );
 
+                // If the session key should be persisted, generate a random PSK ID
                 let psk_id = persist_key.then(rand::random);
+
                 let mut response_body = SessionResponseBody {
                     psk_id,
                     salt: server_salt,
@@ -138,7 +156,10 @@ impl PlabbleConnection {
                     signatures: Vec::new(),
                 };
 
+                // Sign the response and request for authenticity and integrity
                 let signed_bytes = response_body.signing_bytes(&req, &settings)?;
+
+                // Generate the signatures for the response using the available signing keys and algorithms
                 response_body.signatures = signature_algorithms
                     .iter()
                     .map(|algorithm| {
@@ -151,11 +172,13 @@ impl PlabbleConnection {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
+                // Store the updated crypto settings and pending session information in the server context
                 let context = self.config.data.as_mut().unwrap();
                 context.crypto_settings = Some(settings);
                 context.pending_session_key = Some(session_key);
                 context.pending_full_encryption = Some(enable_encryption);
 
+                // If a PSK ID was generated, store the PSK in the key provider
                 if let Some(psk_id) = psk_id {
                     key_provider.unwrap().store_psk(
                         psk_id,

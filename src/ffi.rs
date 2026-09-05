@@ -161,8 +161,6 @@ impl PlabbleConnection {
     }
 }
 
-// ── Free functions ──────────────────────────────────────────────────────────
-
 /// Returns the library version string.
 #[uniffi::export]
 pub fn plabble_version() -> String {
