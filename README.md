@@ -1,14 +1,14 @@
 # Plabble Transport Protocol
 This repository provides a Rust implementation of the Plabble Transport Protocol.
 
-You can read the old spec [here](./PLABBLE.md)
+> Implementation status: the packet models and codec layer are the primary implemented part. The optional high-level server dispatcher is still a work in progress; most request handlers are not implemented yet.
 
 # Plabble Protocol
 
 ## Packets
 The Plabble Protocol works with messages called **packets**. There are two groups of packets: [request packets](#plabble-request-packet) and [response packets](#plabble-response-packet). Request packets are the packets that are sent from the client to the server and response packets are packets that are sent from the server to the client. We cannot make it easier for you!
 
-Plabble packets can be used in two forms: TOML and binary. The TOML variant is only used for unencrypted payloads or to communicate with a library or service that translates the packets to encrypted, binary payloads. The TOML variant is not meant to be sent over the Plabble network, but can be used with [Plabble-over-HTTP(S)](#plabble-over-https-poh). In this documentation we use the TOML variant a lot because it is very human-readable and easy to explain.
+Plabble packets use a binary wire format. With the `use-toml` or `use-json` Cargo feature, the protocol API can also translate packets to and from TOML or JSON. These text formats are intended for library/API boundaries and debugging, not for transport over the Plabble network. This documentation primarily uses TOML because it is human-readable.
 
 Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the **header** and the **body**. The header and body are different depending on if it is a request or response and the [packet type](#packet-type).
 
@@ -25,7 +25,7 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - **6** [PUT](#put)
 - **7** [DELETE](#delete)
 - **8** [SUBSCRIBE](#subscribe)
-- **9** [RESERVED]()
+- **9** [WHISPER](#whisper)
 - **10** [REGISTER](#register)
 - **11** [IDENTIFY](#identify)
 - **12** [PROXY](#proxy)
@@ -37,7 +37,7 @@ Every Plabble packet contains of 3 parts, the [base](#plabble-packet-base), the 
 - Every packet extends the Plabble **packet base**.
 - Implementation: [base/mod.rs](./src/packets/base/mod.rs)
 
-The base of a packet will not be encrypted for it is required for the processing and decryption of the packet. It also does not contain any sensitive information. However, all encryption methods SHOULD make sure the base cannot be tampered by using a [MAC or authenticated data](#authentication).
+The base is normally sent as plaintext because it is required for packet processing and decryption. It is encrypted when full packet encryption is enabled for a session. In either mode, the base SHOULD be protected from tampering through a [MAC or authenticated data](#authentication).
 
 A Plabble packet base has the following base structure:
 
@@ -45,7 +45,7 @@ A Plabble packet base has the following base structure:
 # [u4] the version number of Plabble. 0 = debug. Serialized as first 4 bits of Plabble packet
 version = 1 
 
-# [bit] 1st bit flag. If set to true, the packet is sent outside of a session and no or only a single response is expected
+# [bit] 1st bit flag. If true, the packet is sent outside a session and no response is expected
 fire_and_forget = false
 
 # [bit] 2nd bit flag. If set to true, the packet uses a pre-shared key for the encryption of this packet. The PSK ID MUST be included if this flag is set
@@ -54,8 +54,8 @@ pre_shared_key = false
 # [bit] 3rd bit flag. If set to true, this packet uses the Plabble encryption. If set to false, a MAC MUST be included
 use_encryption = false
 
-# [bit] 4th bit flag. If set to true, next byte will contain 7 flags for cryptography settings. If not set, the defaults will be used.
-specifiy_crypto_settings = true
+# [bit] 4th bit flag. If true, the next byte contains cryptography settings. If false, defaults or session settings are used.
+specify_crypto_settings = true
 
 # [12B] required if pre_shared_key flag is set.
 psk_id = "base64url (no padding) pre-shared key ID"
@@ -65,20 +65,20 @@ psk_salt = "base64url (no padding) random generated salt"
 
 # [1B] required if specify_crypto_settings is true
 [crypto_settings]
-encrypt_with_chacha = true   # default true, use ChaCha20(Poly1305)
-encrypt_with_aes = false        # use AES 256 (CTR/GCM) for encryption
+encrypt_with_chacha = true      # default true, use XChaCha20/XChaCha20-Poly1305
+encrypt_with_aes = false        # use AES-256-CTR/AES-256-GCM
 # 1 reserved flag for future use
 use_blake3 = false              # use Blake3 instead of Blake2
 sign_ed25519 = true             # default true, use Ed25519 for signing
 key_exchange_x25519 = true      # default true, use X25519 for exchange
-# 1 reserved flag for future use
-use_post_quantum = false        # if set, include another byte with PQ eencryption settings
+sign_ed448 = false              # use Ed448 for signing
+use_post_quantum = false        # if set, include another byte with post-quantum settings
 
 # [1B] required if crypto_settings.use_post_quantum is set
 [crypto_settings.post_quantum_settings]
-sign_pqc_dsa_44 = false          # use DSA44 for signing
-sign_pqc_dsa_65 = false          # use DSA65 for siging
-sign_pqc_falcon = false          # use Falcom-1024 for signing
+sign_pqc_dsa_44 = false          # use ML-DSA-44 for signing
+sign_pqc_dsa_65 = false          # use ML-DSA-65 for signing
+sign_pqc_falcon = false          # use Falcon-1024 for signing
 sign_pqc_slh_dsa = false         # use SLH-DSA-SHA128s for signing
 key_exchange_pqc_kem_512 = false # use ML-KEM-512 for key exchange
 key_exchange_pqc_kem_768 = false # use ML-KEM-768 for key exchange
@@ -139,8 +139,8 @@ request_counter = 1     # counter of the request to reply to (the server counts 
 
 ### Certificate request
 Request header flags:
-- **full_chain**: if set, the server does not only return 1 certificate but all certificates in the certificate chain
-- **full_certs**: if set, the server will return the full certificates of the chain. If not set, the chain certificates (all certificates above the certificate that is requested) are not fully sent, but only in a compact form (without body)
+- **full_chain**: if set, the server does not only return one certificate but all certificates in the certificate chain (default: `false`)
+- **full_certs**: if set, the server will return the full certificates of the chain. If not set, the chain certificates (all certificates above the certificate that is requested) are only sent in compact form, without a body (default: `false`)
 - **challenge**: if set, the client sends a 16-byte random challenge to the server to sign
 - **query_mode**: if set, the client specifies the certificate to retrieve by its certificate ID
 
@@ -155,8 +155,8 @@ use_encryption = true
 
 [header]
 packet_type = "Certificate"
-full_chain = true # this is the default
-full_certs = true # this is the default
+full_chain = true # default is false
+full_certs = true # default is false
 challenge = true  # default is false
 query_mode = true # default is false
 
@@ -233,7 +233,7 @@ Request body:
 Example:
 ```toml
 version = 1
-specifiy_crypto_settings = true
+specify_crypto_settings = true
 
 [crypto_settings]
 key_exchange_x25519 = true # this is the default
@@ -261,7 +261,7 @@ X25519 = "..."
 Kem512 = "..."
 
 [[body.keys]]
-Kem786 = "..."
+Kem768 = "..."
 ```
 
 > The server SHOULD respect the cryptography settings of the client. If the server does not support the cryptographic algorithms the client asked for, it MUST abort the connection with an error code.
@@ -271,7 +271,7 @@ Response header flags:
 - **with_psk**: If set, the client requested to store the session key as a PSK. This is a 12-byte ID.
 - **with_salt**: If set to true, the response contains a 16-byte random generated salt by the server.
 
-Response header body:
+Response body:
 - **psk_id**: 12-byte ID the server assigned to the stored key derived from the shared secret of this session. REQUIRED if *with_psk* is set.
 - **salt**: 16-byte salt generated by server. REQUIRED if *with_salt* is set.
 - **keys**: List of public keys or encapsulated secrets the server generated according to the request. Similar to the request.
@@ -326,8 +326,8 @@ Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64/URL-safe when using the TOML representation).
 
 Request body:
-- **limit**: optional integer to limit the number of returned entries ([dynint](#plabble-dynamic-int) `u64` if present), can be used for pagination when combined with `range`
-- **range**: either `Numeric(start?, end?)` or `Binary(start_key?, end_key?)` (both bounds are optional). Numeric ranges use [dynint](#plabble-dynamic-int) `u64` slots; binary ranges use UTF-8 keys.
+- **limit**: optional integer to limit the number of returned entries ([dynint](#plabble-dynamic-int) `u32` if present), can be used for pagination when combined with `range`
+- **range**: either `Numeric(start?, end?)` or `Binary(start_key?, end_key?)` (both bounds are optional). Numeric ranges use [dynint](#plabble-dynamic-int) `u32` slots; binary ranges use UTF-8 keys.
 
 Example (numeric range):
 ```toml
@@ -476,11 +476,8 @@ Request header flags:
 - **range_mode_until**: Use "until" range mode when subscribing to the bucket
 - **do_not_persist**: Create a **Memory bucket** instead, not persisting the bucket to the server storage but keeping it in RAM (not all servers will allow this)
 
-Request header
-- **id**: the [Bucket ID](#bucket-id) you would like to use for this bucket. If it already exists you'll get an [error](#errors).
-
-
 Request body:
+- **id**: the [Bucket ID](#bucket-id) you would like to use for this bucket. Unlike the other bucket operations, `Post` stores this ID in the body for security reasons, to keep the ID private also in non-full packet encrypted sessions. If it already exists, the server returns an [error](#errors).
 - **settings**: The [bucket settings](#bucket-permissions) and permissions you want to use
 - **range**: Range if you want to subscribe to the bucket, REQUIRED if _subscribe_ is set.
 
@@ -593,14 +590,14 @@ Empty response without flags.
 Request header flags:
 - **binary_keys**: Use string keys instead of numeric slot indexes.
 - **subscribe**: Also subscribe to updates for the provided keys after the write.
-- **assert_keys**: Fail if any provided keys already exist (useful for insert-only semantics).
-- **append**: Append to existing slot values instead of overwriting.
+- **assert_keys**: In append mode, use the supplied keys and fail if any of them already exist.
+- **append**: Ask the server to append new entries rather than overwrite existing slots.
 
 Request header:
 - **id**: the [Bucket ID](#bucket-id) identifying the target bucket.
 
 Request body:
-- **body**: the `BucketBody` to write; use `Numeric` for [dynint](#plabble-dynamic-int) u64 slot indexes or `Binary` for string keys.
+- **body**: the `BucketBody` to write; use `Numeric` for [dynint](#plabble-dynamic-int) `u32` slot indexes or `Binary` for string keys.
 
 Example (numeric keys, overwrite):
 ```toml
@@ -653,8 +650,8 @@ Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
 
 Request body:
-- **limit**: optional integer to limit the number of entries to be deleted in the range (`u64` [dynint](#plabble-dynamic-int) if present). Can be used for popping values when combined with `range`.
-- **range**: a `BucketQuery` describing which slots to delete. Use `Numeric(start?, end?)` for [dynint](#plabble-dynamic-int) u64 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets. If the range is empty, the entire bucket will be deleted.
+- **limit**: optional integer to limit the number of entries to be deleted in the range (`u32` [dynint](#plabble-dynamic-int) if present). Can be used for popping values when combined with `range`.
+- **range**: a `BucketQuery` describing which slots to delete. Use `Numeric(start?, end?)` for [dynint](#plabble-dynamic-int) `u32` ranges or `Binary(start_key?, end_key?)` for string-keyed buckets. If the range is empty, the entire bucket will be deleted.
 
 Example (numeric range):
 ```toml
@@ -711,7 +708,7 @@ Request header:
 - **id**: 16-byte [bucket identifier](#bucket-id) (base64url when using TOML).
 
 Request body:
-- **range**: a `BucketQuery` describing which keys to subscribe to. Use `Numeric(start?, end?)` for [dynint](#plabble-dynamic-int) u64 ranges or `Binary(start_key?, end_key?)` for string-keyed buckets.
+- **range**: a `BucketQuery` describing which keys to subscribe to. Use `Numeric(start?, end?)` for [dynint](#plabble-dynamic-int) `u32` ranges or `Binary(start_key?, end_key?)` for string-keyed buckets.
 
 Example (numeric range):
 ```toml
@@ -729,6 +726,96 @@ range.Numeric = [5, 25]
 
 ### Subscribe response
 Empty response without flags (server-specific subscription messages follow on updates).
+
+## Whisper
+- **Goal**: Exchange node-discovery, liveness and bucket-replication messages between servers.
+- Implementation: [whisper.rs](./src/packets/body/whisper.rs)
+
+WHISPER uses the upper four header bits as a subtype discriminator. In TOML/JSON, the codec derives that subtype from the body variant; `whisper_type` is therefore not written in the header.
+
+### Whisper flow
+1. A node sends a `Whisper` request containing one of the request variants below.
+2. Discovery messages (`Ping`, `Hello` and `WhoIs`) are processed directly. Replication messages also contain `WhisperMetadata` for authentication and conflict resolution.
+3. The receiving node returns the response variant with the same subtype.
+
+For conflicting replication messages, the implementation accepts a higher version and rejects a lower version. For equal versions, the earlier timestamp wins. If both are equal, the higher sender node ID wins the tie. Messages more than two seconds in the future and versions more than ten steps ahead of the local version are rejected.
+
+### Whisper request
+Request header flags:
+- There are no public WHISPER flags. The four bits that normally hold flags contain the body subtype (`0` through `5`).
+
+Request body variants:
+- **Ping (0)**: `u8` random value used to check whether another node is alive.
+- **Hello (1)**: `NodeInfo` containing the node's 16-byte ID, address, last-seen timestamp, crypto settings and verification keys.
+- **WhoIs (2)**: 16-byte node ID to look up, encoded as base64url without padding in text formats.
+- **NewBucket (3)**: `bucket: PostRequestBody` plus replication `meta`.
+- **PutSlot (4)**: bucket `id`, `slots: PutRequestBody` and replication `meta`.
+- **DeleteSlot (5)**: bucket `id`, `query: BucketQuery` and replication `meta`.
+- Subtypes `6` through `15` are reserved.
+
+Replication metadata:
+- **binary_keys**: whether keys in the replicated operation use the binary/string-keyed bucket representation.
+- **has_from**: whether `from` is present.
+- **from**: optional 16-byte sender node ID (the same ID as its certificate), encoded as base64url without padding.
+- **version**: [dynamic `u32`](#plabble-dynamic-int) version used for conflict resolution.
+- **timestamp**: time at which the message was sent.
+- **signatures**: signatures supplied by the sender for authenticity and integrity.
+
+Example (ping):
+```toml
+version = 1
+
+[header]
+packet_type = "Whisper"
+
+[body]
+Ping = 42
+```
+
+Example (new bucket replication):
+```toml
+version = 1
+
+[header]
+packet_type = "Whisper"
+
+[body.NewBucket.bucket]
+id = "RKiZXdULZlegN6eDkwRTWw"
+
+[body.NewBucket.meta]
+binary_keys = false
+has_from = true
+from = "AQEBAQEBAQEBAQEBAQEBAQ"
+version = 7
+timestamp = "2025-01-01T00:00:00Z"
+
+[[body.NewBucket.meta.signatures]]
+Ed25519 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+```
+
+### Whisper response
+Response header flags:
+- As in the request, the upper four bits contain the subtype and there are no public WHISPER flags.
+
+Response body variants:
+- **Pong (0)**: echoes the `u8` value from `Ping`.
+- **Hello (1)**: empty acknowledgement of `Hello`.
+- **WhoIs (2)**: the matching `NodeInfo`, or no value if the node is unknown.
+- **NewBucketAck (3)**: boolean indicating whether the replicated bucket was accepted.
+- **PutSlotAck (4)**: boolean indicating whether the slot update was accepted.
+- **DeleteSlotAck (5)**: boolean indicating whether the deletion was accepted.
+
+Example (pong):
+```toml
+version = 1
+
+[header]
+packet_type = "Whisper"
+request_counter = 7
+
+[body]
+Pong = 42
+```
 
 ## Register
 - **Goal**: Create a new identity on the server (register a certificate).
@@ -770,24 +857,31 @@ Ed25519 = "8KIgA6PQbtFvWSCgPBKXx0LCgb2kiV6nyspoLCdr8Jg"
 
 ### Register response
 Response body:
-- **certificate**: `Certificate` — the issued certificate for the new identity (see `certificate.rs`).
+- The body is the issued `Certificate` directly (see [certificate.rs](./src/crypto/certificate.rs)); it is not nested below a `certificate` property.
 
 Example:
 ```toml
+version = 1
+
 [header]
 packet_type = "Register"
-response_to = 0
+request_counter = 0
 
-[body.certificate]
+[body]
 full_cert = true
 root_cert = false
-keys = ["<public key base64>"]
+id = "AAAAAAAAAAAAAAAAAAAAAA"
+uri = "https://certs.plabble.org/{id}.crt"
 valid_from = "2026-01-01T00:00:00+00:00"
 valid_until = "2027-01-01T00:00:00+00:00"
-signatures = ["<CA signature base64>"]
 data = "CA=plabble;CN=Username"
-uri = "https://certs.plabble.org/certs/test.cert"
-parent_uri = "plabble://chat.plabble.org/certificate?id=..."
+issuer_uri = "https://certs.plabble.org/root.crt"
+
+[[body.keys]]
+Ed25519 = "VHaAg2DtpB267PC0X9mF8gmrLlh0nQtPPbGS_z0N1VE"
+
+[[body.signatures]]
+Ed25519 = "3eOHFAPx5lMev8MJ-gXEPdlRMLBM3IUTnOxRIyvjtcvYhOFv7SUv0byqc5EKy6XWqAbNNYGHoMhWh5vRwlEARA"
 ```
 
 ## Identify
@@ -1090,7 +1184,7 @@ Response header flags:
 - **request_counter**: standard response counter when replying in a session
 
 Response body:
-- **protocol**: `u16` — the protocol id echoed back (optional, handlers may include it)
+- **protocol**: `u16` — the protocol ID returned by the handler (required by the codec)
 - **data**: `Vec<u8>` — protocol-specific response bytes
 
 Example (response):
@@ -1154,11 +1248,13 @@ max_version = 3
 1. **UnsupportedVersion**: Requested Plabble protocol version not supported by server. Body: `min_version` (min supported version by server), `max_version` (max supported version by server). _Occurence_: every request Plabble packet.
 2. **UnsupportedAlgorithm**: Requested algotithm (in cryptography settings) is not supported by the server. Body: `name` The name of the algorithm(s) that is not supported, UTF-8 [dynint](#plabble-dynamic-int) length encoded. _Occurence_: any packet, but especially [Session](#session), [Certificate](#certificate) and other packets that use cryptography settings. 
 3. **UnsupportedSubProtocol**: Requested [subprotocol](#custom) is not supported. _Occurence_: only in [Custom](#custom) packets.
+4. **InvalidRequest**: The request is malformed or invalid for the requested operation.
 10. **BucketNotFound**: Requested bucket was not found
 11. **BucketAlreadyExists**: Bucket with that ID already exists. _Occurence_: [Post](#post)
 110. **CertificateNotFound**: Requested certificate (by id) was not found. _Occurence_: [Certificate](#certificate-request)
 111. **CertificateInvalid**: Requested certificate was not valid. _Occurence_: [Certificate](#certificate)
 210. **OpcodeScriptError**: An error occurred during OPCODE script execution. Body: `ScriptError` (see `interpreter.rs` for details). _Occurence_: [OPCODE](#opcode)
+255. **InternalServerError**: The server encountered an internal or unknown error.
 
 ## Concepts
 
@@ -1167,7 +1263,7 @@ The Plabble Protocol is built around the concept of a **bucket**. A bucket is an
 
 #### Bucket key types
 There are two types of keys:
-- **Numeric keys**: A _uint16_ value between 0 and 65535. So numeric buckets have a maximum amount of slots, exactly 65536. The big advantage of numeric slots is that they are very small to send (only 2 bytes) and that they follow a numeric order.
+- **Numeric keys**: A `u32` value encoded as a [dynamic integer](#plabble-dynamic-int). Numeric buckets can address up to 2^32 distinct slot numbers while small numbers remain compact on the wire.
 - **Binary keys**: A _utf-8_ encoded string. This gives the protocol more flexibility when working with buckets. The disadvantages are bigger requests and the dynamic length, so we need to prefix the keys with a [dynint](#plabble-dynamic-int) to encode the length in Plabble packets when using binary keys.
 
 #### Bucket ID
@@ -1212,9 +1308,12 @@ The following list of settings/permissions with their default values is supporte
 - **private_append**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [append](#put) a slot to the bucket
 - **private_write**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [update](#put) a slot
 - **private_delete**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [remove](#delete) a slot
-- **private_script_execution**: (default _false_), allow _users owning the [bucket key](#bucket-key)_ to execute [opcode](#opcode) scripts interacting with this bucket (read/write/append/delete)
+- **private_script_execution**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to execute [opcode](#opcode) scripts interacting with this bucket (read/write/append/delete)
 - **private_bucket_delete**: (default _true_), allow _users owning the [bucket key](#bucket-key)_ to [delete](#delete) this bucket
 - **deny_existence**: (default: _false_) If public read is off and a user queries this bucket, let the server tell them this bucket does not exist
+- **lock_permissions**: (default _false_), prevent later permission changes
+- **lock_acl**: (default _false_), prevent later ACL changes
+- **allow_replication**: (default _false_), allow this bucket to be replicated between nodes
 
 ### Plabble-over-HTTPS (PoH)
 
@@ -1224,9 +1323,9 @@ The session key is used as key material for cryptographic functions during the s
 
 This is how to create a session key:
 1. For each algorithm specified in the request, create a shared secret. Create a _hasher_ using the `blake2b-512` or `blake3` algorithm. Use blake3 if this is set in the crypto settings in the request. For each shared secret, _update_ the hash function. _Finalize_ the hasher into a 64-byte hash that will serve as the _input key material_.
-3. If the client **provided a salt** in the [session request](#session-request), provide it as the _salt_. If the client did NOT provide a salt but asked the server for a salt, use the **server salt**. If also no server salt is available, use the ASCII equivalent of the string value `PLABBLE-PROTOCOL` (which is exactly 16 bytes)
-4. If the client asked the server to **create a salt** in the [session request](#session-request), provide it as the _context_. If not, use the ASCII equivalent of the string value `PROTOCOL.PLABBLE` (which is be exactly 16 bytes)
-5. Pass the `input key material`, `salt` and `context` to the [key generation function](#key-generation)
+2. If the client **provided a salt** in the [session request](#session-request), provide it as the _salt_. If the client did NOT provide a salt but asked the server for a salt, use the **server salt**. If also no server salt is available, use the ASCII equivalent of the string value `PLABBLE-PROTOCOL` (which is exactly 16 bytes).
+3. If the client asked the server to **create a salt** in the [session request](#session-request), provide it as the _context_. If not, use the ASCII equivalent of the string value `PROTOCOL.PLABBLE` (which is exactly 16 bytes).
+4. Pass the `input key material`, `salt` and `context` to the [key generation function](#key-generation).
 5. Derive a 64-byte session key and keep it in memory for the connection. If the user asked in the session request to store it, generate a random 12-byte [_PSK ID_](#psk-id) and return it to the client.
 
 ### PSK ID
@@ -1237,15 +1336,13 @@ Plabble has two ways of ensuring the integrity of packets.
 When the `use_encryption` flag in the base packet is off, it will use a Message Authentication Code (MAC).
 If the encryption flag is on, Plabble uses Authenticated Encryption with Associated Data (AEAD).
 
-For each request
-
 ### Key generation
-- Implementation: [context.rs](./src/crypto/mod.rs)
+- Implementation: [crypto/mod.rs](./src/crypto/mod.rs) and [packets/context.rs](./src/packets/context.rs)
 
 Plabble keys are generated using the `blake2b-512` or `blake3` functions.
 The key derivation mechanism accepts 3 input parameters: `ikm` (64-byte input key material/existing key), `salt` (16-byte salt)
 and `context` (16-byte unique(!) context)
-For `blake3`, the context is passed to the *derive_key* mode/KDF mode of blake3 as a `base64-url (no padding)`-encoded UTF-8 string,and the hash is updated with the `ikm` first and then the `salt` before the hasher is finalized.
+For `blake3`, the context is passed to the *derive_key* mode/KDF mode of blake3 as a `base64-url (no padding)`-encoded UTF-8 string, and the hash is updated with the `ikm` first and then the `salt` before the hasher is finalized.
 For `blake2b-512`, the _MAC mode_ is used accepting directly a `key`, `salt` and `persona`. The context is passed to the persona.
 
 ### Encrypted client-server communication

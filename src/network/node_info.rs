@@ -4,8 +4,9 @@ use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
-use crate::core::{PlabbleDateTime, node_address::NodeAddress};
+use crate::core::PlabbleDateTime;
 use crate::crypto::algorithm::VerificationKey;
+use crate::network::node_address::NodeAddress;
 use crate::packets::base::settings::CryptoSettings;
 
 #[serde_as]
@@ -37,9 +38,7 @@ mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
     use crate::{
-        core::{PlabbleDateTime, node_address::NodeAddress},
-        crypto::algorithm::VerificationKey,
-        network::node_info::NodeInfo,
+        core::PlabbleDateTime, crypto::algorithm::VerificationKey, network::{node_address::NodeAddress, node_info::NodeInfo},
     };
 
     #[test]
