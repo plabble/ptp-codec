@@ -99,16 +99,8 @@ pub fn read_base_packet(
 
     let base = PlabblePacketBase::read_bytes(stream, Some(config))?;
 
-    // If crypto settings are provided in the packet, overwrite context settings
-    if let Some(settings) = &base.crypto_settings
-        && let Some(ctx) = config.data.as_mut()
-    {
-        ctx.crypto_settings = base.crypto_settings;
-        settings.apply_to(config);
-    } else {
-        // TODO: investigate if this is correct. Don't we want to persist crypto settings in connection? if so, document that.
-        CryptoSettings::default().apply_to(config);
-    }
+    // If the packet omits crypto settings, keep using the negotiated settings from the connection.
+    apply_effective_crypto_settings(config, base.crypto_settings);
 
     // If encryption enabled (and context provided), try set it (might overwrite the full packet encryption key, if that was the case)
     if base.use_encryption
@@ -152,15 +144,8 @@ pub fn write_base_packet(
     // Write base packet
     base.write_bytes(stream, Some(config))?;
 
-    // If crypto settings are provided in the packet, overwrite context settings
-    if let Some(settings) = &base.crypto_settings
-        && let Some(ctx) = config.data.as_mut()
-    {
-        ctx.crypto_settings = base.crypto_settings;
-        settings.apply_to(config);
-    } else {
-        CryptoSettings::default().apply_to(config);
-    }
+    // If the packet omits crypto settings, keep using the negotiated settings from the connection.
+    apply_effective_crypto_settings(config, base.crypto_settings);
 
     // If encryption enabled (and context provided), try set it (might overwrite the full packet encryption key, if that was the case)
     if base.use_encryption
@@ -172,11 +157,34 @@ pub fn write_base_packet(
     Ok(())
 }
 
+/// Apply active crypto settings to serializer toggles.
+///
+/// Precedence:
+/// 1. If the packet specifies crypto settings, they are applied immediately and persisted to context.
+/// 2. Else, previously negotiated context settings are reused.
+/// 3. Else, protocol defaults are used.
+fn apply_effective_crypto_settings(
+    config: &mut SerializerConfig<PlabbleConnectionContext>,
+    packet_settings: Option<CryptoSettings>,
+) {
+    if let Some(ctx) = config.data.as_mut()
+        && let Some(settings) = packet_settings
+    {
+        ctx.crypto_settings = Some(settings);
+    }
+
+    let settings = packet_settings
+        .or_else(|| config.data.as_ref().and_then(|ctx| ctx.crypto_settings))
+        .unwrap_or_default();
+    settings.apply_to(config);
+}
+
 #[cfg(test)]
 mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
     use crate::errors::{DeserializationError, SerializationError};
+    use crate::packets::context::PlabbleConnectionContext;
 
     use super::*;
 
@@ -271,5 +279,54 @@ mod tests {
             ],
             bytes
         );
+    }
+
+    #[test]
+    fn packet_crypto_settings_override_context_settings() {
+        let mut config = SerializerConfig::new(Some(PlabbleConnectionContext::new()));
+        let context = config.data.as_mut().unwrap();
+        context.crypto_settings = Some(CryptoSettings {
+            sign_ed25519: true,
+            sign_ed448: false,
+            key_exchange_x25519: true,
+            ..Default::default()
+        });
+
+        let packet_settings = CryptoSettings {
+            sign_ed25519: false,
+            sign_ed448: true,
+            key_exchange_x25519: false,
+            ..Default::default()
+        };
+
+        apply_effective_crypto_settings(&mut config, Some(packet_settings));
+
+        let context = config.data.as_ref().unwrap();
+        assert_eq!(context.crypto_settings, Some(packet_settings));
+        assert_eq!(config.get_toggle("ed25519"), Some(false));
+        assert_eq!(config.get_toggle("ed448"), Some(true));
+        assert_eq!(config.get_toggle("x25519"), Some(false));
+    }
+
+    #[test]
+    fn context_crypto_settings_are_used_when_packet_omits_them() {
+        let mut config = SerializerConfig::new(Some(PlabbleConnectionContext::new()));
+        let context_settings = CryptoSettings {
+            sign_ed25519: false,
+            sign_ed448: true,
+            key_exchange_x25519: false,
+            ..Default::default()
+        };
+        config.data.as_mut().unwrap().crypto_settings = Some(context_settings);
+
+        apply_effective_crypto_settings(&mut config, None);
+
+        assert_eq!(
+            config.data.as_ref().unwrap().crypto_settings,
+            Some(context_settings)
+        );
+        assert_eq!(config.get_toggle("ed25519"), Some(false));
+        assert_eq!(config.get_toggle("ed448"), Some(true));
+        assert_eq!(config.get_toggle("x25519"), Some(false));
     }
 }

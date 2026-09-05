@@ -7,7 +7,7 @@ use crate::{
 
 #[cfg_attr(feature = "ffi", derive(uniffi::Error))]
 #[cfg_attr(feature = "ffi", uniffi(flat_error))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PlabbleProtocolError {
     SerializationError(SerializationError),
     DeserializationError(DeserializationError),

@@ -22,7 +22,7 @@ pub enum KeyExhangeRequest {
     #[toggled_by = "kem512"]
     Kem512(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 800]),
 
-    #[toggled_by = "kem758"]
+    #[toggled_by = "kem768"]
     Kem768(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1184]),
 }
 
@@ -42,7 +42,7 @@ pub enum KeyExhangeResponse {
     #[toggled_by = "kem512"]
     Kem512(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 768]),
 
-    #[toggled_by = "kem758"]
+    #[toggled_by = "kem768"]
     Kem768(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1088]),
 }
 
@@ -147,14 +147,45 @@ pub enum SigningKey {
 
 #[cfg(feature = "protocol")]
 impl SigningKey {
-    /// Get singature algorithm from signing key
+    /// Get the signature algorithm represented by this key.
     pub fn get_algorithm(&self) -> crate::crypto::SignatureAlgorithm {
         match self {
             SigningKey::Ed25519(_) => crate::crypto::SignatureAlgorithm::Ed25519,
             SigningKey::Ed448(_) => crate::crypto::SignatureAlgorithm::Ed448,
             SigningKey::Dsa44(_) => crate::crypto::SignatureAlgorithm::Dsa44,
             SigningKey::Dsa65(_) => crate::crypto::SignatureAlgorithm::Dsa65,
-            _ => panic!("Unsupported signing key algorithm"),
+            SigningKey::Falcon(_) => crate::crypto::SignatureAlgorithm::Falcon,
+            SigningKey::SlhDsaSha128s(_) => crate::crypto::SignatureAlgorithm::SlhDsaSha128s,
+        }
+    }
+}
+
+#[cfg(feature = "protocol")]
+impl VerificationKey {
+    /// Get the signature algorithm represented by this key.
+    pub fn get_algorithm(&self) -> crate::crypto::SignatureAlgorithm {
+        match self {
+            VerificationKey::Ed25519(_) => crate::crypto::SignatureAlgorithm::Ed25519,
+            VerificationKey::Ed448(_) => crate::crypto::SignatureAlgorithm::Ed448,
+            VerificationKey::Dsa44(_) => crate::crypto::SignatureAlgorithm::Dsa44,
+            VerificationKey::Dsa65(_) => crate::crypto::SignatureAlgorithm::Dsa65,
+            VerificationKey::Falcon(_) => crate::crypto::SignatureAlgorithm::Falcon,
+            VerificationKey::SlhDsaSha128s(_) => crate::crypto::SignatureAlgorithm::SlhDsaSha128s,
+        }
+    }
+}
+
+#[cfg(feature = "protocol")]
+impl CryptoSignature {
+    /// Get the algorithm used for this signature.
+    pub fn get_algorithm(&self) -> crate::crypto::SignatureAlgorithm {
+        match self {
+            CryptoSignature::Ed25519(_) => crate::crypto::SignatureAlgorithm::Ed25519,
+            CryptoSignature::Ed448(_) => crate::crypto::SignatureAlgorithm::Ed448,
+            CryptoSignature::Dsa44(_) => crate::crypto::SignatureAlgorithm::Dsa44,
+            CryptoSignature::Dsa65(_) => crate::crypto::SignatureAlgorithm::Dsa65,
+            CryptoSignature::Falcon(_) => crate::crypto::SignatureAlgorithm::Falcon,
+            CryptoSignature::SlhDsaSha128s(_) => crate::crypto::SignatureAlgorithm::SlhDsaSha128s,
         }
     }
 }

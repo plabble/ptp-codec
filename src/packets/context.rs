@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::{
     core::BucketId,
-    crypto::{derive_key, hash_256, hash_512},
+    crypto::{
+        algorithm::{SigningKey, VerificationKey},
+        derive_key, hash_256, hash_512,
+    },
     packets::base::{PlabblePacketBase, settings::CryptoSettings},
     providers::KeyProvider,
 };
@@ -38,6 +41,20 @@ pub struct PlabbleConnectionContext {
 
     /// PSK salt used in the current connection
     pub session_salt: Option<[u8; 16]>,
+
+    /// Local private keys used to sign session handshakes.
+    pub signing_keys: Vec<SigningKey>,
+
+    /// Trusted public keys from the peer certificate used to verify handshakes.
+    pub verification_keys: Vec<VerificationKey>,
+
+    /// A negotiated session key that becomes active after the session response is sent.
+    #[cfg(feature = "server")]
+    pub(crate) pending_session_key: Option<[u8; 64]>,
+
+    /// Full-encryption setting to activate together with `pending_session_key`.
+    #[cfg(feature = "server")]
+    pub(crate) pending_full_encryption: Option<bool>,
 }
 
 impl Default for PlabbleConnectionContext {
@@ -59,6 +76,12 @@ impl PlabbleConnectionContext {
             include_bucket_key_in_auth_data: false,
             session_psk: None,
             session_salt: None,
+            signing_keys: Vec::new(),
+            verification_keys: Vec::new(),
+            #[cfg(feature = "server")]
+            pending_session_key: None,
+            #[cfg(feature = "server")]
+            pending_full_encryption: None,
         }
     }
 
@@ -116,7 +139,7 @@ impl PlabbleConnectionContext {
     /// - `base`: Plabble packet base, if it is available
     /// - `alt_byte`: The byte to add to the context part to randomize the key.
     /// - `is_request`: If set, use context string `plabble.req.c` instead of `plabble.res.c`. This ensures that,
-    /// even if you got the same counter, the request is still encrypted with another key than the response
+    ///   even if you got the same counter, the request is still encrypted with another key than the response
     pub fn create_key(
         &self,
         base: Option<&PlabblePacketBase>,
@@ -177,14 +200,49 @@ impl PlabbleConnectionContext {
         server_salt: Option<[u8; 16]>,
         shared_secrets: Vec<[u8; 32]>,
     ) {
+        self.session_key = Some(Self::derive_session_key(
+            blake_3,
+            client_salt,
+            server_salt,
+            &shared_secrets,
+        ));
+    }
+
+    /// Derive a session key without changing the connection state.
+    pub fn derive_session_key(
+        blake_3: bool,
+        client_salt: Option<[u8; 16]>,
+        server_salt: Option<[u8; 16]>,
+        shared_secrets: &[[u8; 32]],
+    ) -> [u8; 64] {
         let salt = client_salt.or(server_salt).unwrap_or(*b"PLABBLE-PROTOCOL");
         let context = server_salt.unwrap_or(*b"PROTOCOL.PLABBLE");
         let ikm = hash_512(
             blake_3,
             shared_secrets.iter().map(|s| s.as_slice()).collect(),
         );
-        let session_key = derive_key(blake_3, &ikm, &salt, &context, None);
+        derive_key(blake_3, &ikm, &salt, &context, None)
+    }
+
+    /// Activate a negotiated session and reset both packet counters.
+    pub fn activate_session(&mut self, session_key: [u8; 64], full_encryption: bool) {
         self.session_key = Some(session_key);
+        self.full_encryption = full_encryption;
+        self.client_counter = 0;
+        self.server_counter = 0;
+        self.session_psk = None;
+        self.session_salt = None;
+    }
+
+    /// Activate the session prepared by the server-side request handler.
+    #[cfg(feature = "server")]
+    pub(crate) fn activate_pending_session(&mut self) -> bool {
+        let Some(session_key) = self.pending_session_key.take() else {
+            return false;
+        };
+        let full_encryption = self.pending_full_encryption.take().unwrap_or(false);
+        self.activate_session(session_key, full_encryption);
+        true
     }
 
     /// Generate a bucket key for the given bucket ID, using the session key and a fixed context string.
@@ -276,5 +334,46 @@ mod tests {
         base.psk_salt = Some([1u8; 16]);
         let key5 = context.create_key(Some(&base), 0, true).unwrap();
         assert_ne!(key4, key5);
+    }
+
+    #[test]
+    fn session_key_derivation_uses_client_salt_and_server_context() {
+        use crate::crypto::{derive_key, hash_512};
+
+        let secrets = [[4u8; 32], [5u8; 32]];
+        let client_salt = [6u8; 16];
+        let server_salt = [7u8; 16];
+        let ikm = hash_512(
+            false,
+            secrets.iter().map(|secret| secret.as_slice()).collect(),
+        );
+        let expected = derive_key(false, &ikm, &client_salt, &server_salt, None);
+
+        assert_eq!(
+            PlabbleConnectionContext::derive_session_key(
+                false,
+                Some(client_salt),
+                Some(server_salt),
+                &secrets,
+            ),
+            expected
+        );
+    }
+
+    #[test]
+    fn activating_session_resets_counters_and_transient_psk_state() {
+        let mut context = PlabbleConnectionContext::new();
+        context.client_counter = 12;
+        context.server_counter = 34;
+        context.session_psk = Some([1; 64]);
+        context.session_salt = Some([2; 16]);
+
+        context.activate_session([3; 64], true);
+
+        assert_eq!(context.session_key, Some([3; 64]));
+        assert!(context.full_encryption);
+        assert_eq!((context.client_counter, context.server_counter), (0, 0));
+        assert_eq!(context.session_psk, None);
+        assert_eq!(context.session_salt, None);
     }
 }

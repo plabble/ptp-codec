@@ -1,15 +1,16 @@
-use std::{
-    cmp,
-    collections::HashMap,
-    ops::Neg,
-    sync::Arc,
-};
+use std::{cmp, collections::HashMap, ops::Neg, sync::Arc};
 
 use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 use chrono::Utc;
 
 use crate::{
-    core::PlabbleDateTime, crypto::{algorithm::{CryptoSignature, SigningKey, VerificationKey}, calculate_mac, hash_128, hash_192, hash_256, hash_512, mac_poly1305}, providers::PlabbleBucketProvider, scripting::opcode_script::{OpAlgorithm, Opcode, OpcodeScript, ScriptError, ScriptSettings}
+    core::PlabbleDateTime,
+    crypto::{
+        algorithm::{CryptoSignature, SigningKey, VerificationKey},
+        calculate_mac, hash_128, hash_192, hash_256, hash_512, mac_poly1305,
+    },
+    providers::PlabbleBucketProvider,
+    scripting::opcode_script::{OpAlgorithm, Opcode, OpcodeScript, ScriptError, ScriptSettings},
 };
 use log::{debug, trace};
 
@@ -131,15 +132,11 @@ impl ScriptInterpreter {
                         return Err(ScriptError::BucketActionsNotAllowed);
                     }
                 }
-                Opcode::EVALSUB => {
-                    if !self.settings.allow_sandboxed_eval {
-                        return Err(ScriptError::EvalNotAllowed);
-                    }
+                Opcode::EVALSUB if !self.settings.allow_sandboxed_eval => {
+                    return Err(ScriptError::EvalNotAllowed);
                 }
-                Opcode::EVAL => {
-                    if !self.settings.allow_eval {
-                        return Err(ScriptError::EvalNotAllowed);
-                    }
+                Opcode::EVAL if !self.settings.allow_eval => {
+                    return Err(ScriptError::EvalNotAllowed);
                 }
                 _ => {}
             }
@@ -1044,318 +1041,468 @@ impl ScriptInterpreter {
 
                 self.push(StackData::Number(count))?;
             }
-            Opcode::CRYPTO(algorithm) => {
-                match algorithm {
-                    OpAlgorithm::Blake2_128 => {
-                        let hash = hash_128(false, vec![&self.pop_bytes()?]);
-                        self.push(StackData::Buffer(hash.to_vec()))?;
-                    },
-                    #[cfg(feature = "blake-3")]
-                    OpAlgorithm::Blake3_128 => {
-                        let hash = hash_128(true, vec![&self.pop_bytes()?]);
-                        self.push(StackData::Buffer(hash.to_vec()))?;
-                    },
-                    OpAlgorithm::Blake2_192 => {
-                        let hash = hash_192(false, vec![&self.pop_bytes()?]);
-                        self.push(StackData::Buffer(hash.to_vec()))?;
-                    },
-                    #[cfg(feature = "blake-3")]
-                    OpAlgorithm::Blake3_192 => {
-                        let hash = hash_192(true, vec![&self.pop_bytes()?]);
-                        self.push(StackData::Buffer(hash.to_vec()))?;
-                    },
-                    OpAlgorithm::Blake2_256 => {
-                        let hash = hash_256(false, vec![&self.pop_bytes()?]);
-                        self.push(StackData::Buffer(hash.to_vec()))?;
-                    },
-                    #[cfg(feature = "blake-3")]
-                    OpAlgorithm::Blake3_256 => {
-                        let hash = hash_256(true, vec![&self.pop_bytes()?]);
-                        self.push(StackData::Buffer(hash.to_vec()))?;
-                    },
-                    OpAlgorithm::Blake2_512 => {
-                        let hash = hash_512(false, vec![&self.pop_bytes()?]);
-                        self.push(StackData::Buffer(hash.to_vec()))?;
-                    },
-                    #[cfg(feature = "blake-3")]
-                    OpAlgorithm::Blake3_512 => {
-                        let hash = hash_512(true, vec![&self.pop_bytes()?]);
-                        self.push(StackData::Buffer(hash.to_vec()))?;
-                    },
-                    OpAlgorithm::Blake2Mac => {
-                        let key = self.pop_bytes()?;
-                        let data = self.pop_bytes()?;
-
-                        let mac = calculate_mac(false, &key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data, None);
-                        self.push(StackData::Buffer(mac.to_vec()))?;
-                    },
-                    OpAlgorithm::Blake2MacAssert => {
-                        let key = self.pop_bytes()?;
-                        let data = self.pop_bytes()?;
-                        let expected_mac = self.pop_bytes()?;
-
-                        let mac = calculate_mac(false, &key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data, None);
-                        if mac.to_vec() != expected_mac {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    #[cfg(feature = "blake-3")]
-                    OpAlgorithm::Blake3Mac => {
-                        let key = self.pop_bytes()?;
-                        let data = self.pop_bytes()?;
-
-                        let mac = calculate_mac(true, &key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data, None);
-                        self.push(StackData::Buffer(mac.to_vec()))?;
-                    },
-                    #[cfg(feature = "blake-3")]
-                    OpAlgorithm::Blake3MacAssert => {
-                        let key = self.pop_bytes()?;
-                        let data = self.pop_bytes()?;
-                        let expected_mac = self.pop_bytes()?;
-
-                        let mac = calculate_mac(true, &key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data, None);
-                        if mac.to_vec() != expected_mac {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    OpAlgorithm::Poly1305 => {
-                        let key = self.pop_bytes()?;
-                        let data = self.pop_bytes()?;
-
-                        let mac = mac_poly1305(&key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data);
-                        self.push(StackData::Buffer(mac.to_vec()))?;
-                    },
-                    OpAlgorithm::Poly1305Assert => {
-                        let key = self.pop_bytes()?;
-                        let data = self.pop_bytes()?;
-                        let expected_mac = self.pop_bytes()?;
-
-                        let mac = mac_poly1305(&key.try_into().map_err(|_| ScriptError::PreconditionFailed)?, &data);
-                        if mac.to_vec() != expected_mac {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    OpAlgorithm::SignEd25519 => {
-                        let secret_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = SigningKey::Ed25519(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .sign(&message)
-                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
-                            .ok_or(ScriptError::CryptoOperationFailed)?;
-
-                        self.push(StackData::Buffer(signature))?;
-                    },
-                    OpAlgorithm::VerifyEd25519 => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Ed25519(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Ed25519(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        self.push(StackData::Boolean(valid))?;
-                    },
-                    OpAlgorithm::VerifyAssertEd25519 => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Ed25519(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Ed25519(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        if !valid {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    OpAlgorithm::SignEd448 => {
-                        let secret_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = SigningKey::Ed448(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .sign(&message)
-                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
-                            .ok_or(ScriptError::CryptoOperationFailed)?;
-
-                        self.push(StackData::Buffer(signature))?;
-                    },
-                    OpAlgorithm::VerifyEd448 => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Ed448(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Ed448(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        self.push(StackData::Boolean(valid))?;
-                    },
-                    OpAlgorithm::VerifyAssertEd448 => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Ed448(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Ed448(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        if !valid {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    #[cfg(feature = "pqc-lite")]
-                    OpAlgorithm::SignDsa44 => {
-                        let secret_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = SigningKey::Dsa44(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .sign(&message)
-                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
-                            .ok_or(ScriptError::CryptoOperationFailed)?;
-
-                        self.push(StackData::Buffer(signature))?;
-                    },
-                    #[cfg(feature = "pqc-lite")]
-                    OpAlgorithm::VerifyDsa44 => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Dsa44(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Dsa44(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        self.push(StackData::Boolean(valid))?;
-                    },
-                    #[cfg(feature = "pqc-lite")]
-                    OpAlgorithm::VerifyAssertDsa44 => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Dsa44(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Dsa44(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        if !valid {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    #[cfg(feature = "pqc-lite")]
-                    OpAlgorithm::SignDsa65 => {
-                        let secret_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = SigningKey::Dsa65(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .sign(&message)
-                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
-                            .ok_or(ScriptError::CryptoOperationFailed)?;
-
-                        self.push(StackData::Buffer(signature))?;
-                    },
-                    #[cfg(feature = "pqc-lite")]
-                    OpAlgorithm::VerifyDsa65 => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Dsa65(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Dsa65(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        self.push(StackData::Boolean(valid))?;
-                    },
-                    #[cfg(feature = "pqc-lite")]
-                    OpAlgorithm::VerifyAssertDsa65 => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Dsa65(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Dsa65(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        if !valid {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    #[cfg(feature = "pqc-heavy")]
-                    OpAlgorithm::SignFalcon => {
-                        let secret_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = SigningKey::Falcon(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .sign(&message)
-                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
-                            .ok_or(ScriptError::CryptoOperationFailed)?;
-
-                        self.push(StackData::Buffer(signature))?;
-                    },
-                    #[cfg(feature = "pqc-heavy")]
-                    OpAlgorithm::VerifyFalcon => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Falcon(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Falcon(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        self.push(StackData::Boolean(valid))?;
-                    },
-                    #[cfg(feature = "pqc-heavy")]
-                    OpAlgorithm::VerifyAssertFalcon => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::Falcon(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::Falcon(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        if !valid {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    #[cfg(feature = "pqc-heavy")]
-                    OpAlgorithm::SignSlhDsaSha128s => {
-                        let secret_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = SigningKey::SlhDsaSha128s(secret_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .sign(&message)
-                            .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
-                            .ok_or(ScriptError::CryptoOperationFailed)?;
-
-                        self.push(StackData::Buffer(signature))?;
-                    },
-                    #[cfg(feature = "pqc-heavy")]
-                    OpAlgorithm::VerifySlhDsaSha128s => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::SlhDsaSha128s(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::SlhDsaSha128s(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        self.push(StackData::Boolean(valid))?;
-                    },
-                    #[cfg(feature = "pqc-heavy")]
-                    OpAlgorithm::VerifyAssertSlhDsaSha128s => {
-                        let public_key = self.pop_bytes()?;
-                        let message = self.pop_bytes()?;
-                        let signature = CryptoSignature::SlhDsaSha128s(self.pop_bytes()?.try_into().map_err(|_| ScriptError::PreconditionFailed)?);
-
-                        let valid = VerificationKey::SlhDsaSha128s(public_key.try_into().map_err(|_| ScriptError::PreconditionFailed)?)
-                            .verify(&message, &signature)
-                            .is_some_and(|v|v);
-
-                        if !valid {
-                            return Err(ScriptError::AssertionFailed);
-                        }
-                    },
-                    OpAlgorithm::KeyStreamXChaCha20 => todo!(),
-                    OpAlgorithm::KeyStreamAes256 => todo!(),
-                    #[allow(unreachable_patterns)]
-                    _ => return Err(ScriptError::AlgorithmNotSupported),
+            Opcode::CRYPTO(algorithm) => match algorithm {
+                OpAlgorithm::Blake2_128 => {
+                    let hash = hash_128(false, vec![&self.pop_bytes()?]);
+                    self.push(StackData::Buffer(hash.to_vec()))?;
                 }
+                #[cfg(feature = "blake-3")]
+                OpAlgorithm::Blake3_128 => {
+                    let hash = hash_128(true, vec![&self.pop_bytes()?]);
+                    self.push(StackData::Buffer(hash.to_vec()))?;
+                }
+                OpAlgorithm::Blake2_192 => {
+                    let hash = hash_192(false, vec![&self.pop_bytes()?]);
+                    self.push(StackData::Buffer(hash.to_vec()))?;
+                }
+                #[cfg(feature = "blake-3")]
+                OpAlgorithm::Blake3_192 => {
+                    let hash = hash_192(true, vec![&self.pop_bytes()?]);
+                    self.push(StackData::Buffer(hash.to_vec()))?;
+                }
+                OpAlgorithm::Blake2_256 => {
+                    let hash = hash_256(false, vec![&self.pop_bytes()?]);
+                    self.push(StackData::Buffer(hash.to_vec()))?;
+                }
+                #[cfg(feature = "blake-3")]
+                OpAlgorithm::Blake3_256 => {
+                    let hash = hash_256(true, vec![&self.pop_bytes()?]);
+                    self.push(StackData::Buffer(hash.to_vec()))?;
+                }
+                OpAlgorithm::Blake2_512 => {
+                    let hash = hash_512(false, vec![&self.pop_bytes()?]);
+                    self.push(StackData::Buffer(hash.to_vec()))?;
+                }
+                #[cfg(feature = "blake-3")]
+                OpAlgorithm::Blake3_512 => {
+                    let hash = hash_512(true, vec![&self.pop_bytes()?]);
+                    self.push(StackData::Buffer(hash.to_vec()))?;
+                }
+                OpAlgorithm::Blake2Mac => {
+                    let key = self.pop_bytes()?;
+                    let data = self.pop_bytes()?;
+
+                    let mac = calculate_mac(
+                        false,
+                        &key.try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                        &data,
+                        None,
+                    );
+                    self.push(StackData::Buffer(mac.to_vec()))?;
+                }
+                OpAlgorithm::Blake2MacAssert => {
+                    let key = self.pop_bytes()?;
+                    let data = self.pop_bytes()?;
+                    let expected_mac = self.pop_bytes()?;
+
+                    let mac = calculate_mac(
+                        false,
+                        &key.try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                        &data,
+                        None,
+                    );
+                    if mac.to_vec() != expected_mac {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                #[cfg(feature = "blake-3")]
+                OpAlgorithm::Blake3Mac => {
+                    let key = self.pop_bytes()?;
+                    let data = self.pop_bytes()?;
+
+                    let mac = calculate_mac(
+                        true,
+                        &key.try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                        &data,
+                        None,
+                    );
+                    self.push(StackData::Buffer(mac.to_vec()))?;
+                }
+                #[cfg(feature = "blake-3")]
+                OpAlgorithm::Blake3MacAssert => {
+                    let key = self.pop_bytes()?;
+                    let data = self.pop_bytes()?;
+                    let expected_mac = self.pop_bytes()?;
+
+                    let mac = calculate_mac(
+                        true,
+                        &key.try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                        &data,
+                        None,
+                    );
+                    if mac.to_vec() != expected_mac {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                OpAlgorithm::Poly1305 => {
+                    let key = self.pop_bytes()?;
+                    let data = self.pop_bytes()?;
+
+                    let mac = mac_poly1305(
+                        &key.try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                        &data,
+                    );
+                    self.push(StackData::Buffer(mac.to_vec()))?;
+                }
+                OpAlgorithm::Poly1305Assert => {
+                    let key = self.pop_bytes()?;
+                    let data = self.pop_bytes()?;
+                    let expected_mac = self.pop_bytes()?;
+
+                    let mac = mac_poly1305(
+                        &key.try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                        &data,
+                    );
+                    if mac.to_vec() != expected_mac {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                OpAlgorithm::SignEd25519 => {
+                    let secret_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = SigningKey::Ed25519(
+                        secret_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .sign(&message)
+                    .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                    .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                    self.push(StackData::Buffer(signature))?;
+                }
+                OpAlgorithm::VerifyEd25519 => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Ed25519(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Ed25519(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    self.push(StackData::Boolean(valid))?;
+                }
+                OpAlgorithm::VerifyAssertEd25519 => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Ed25519(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Ed25519(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    if !valid {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                OpAlgorithm::SignEd448 => {
+                    let secret_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = SigningKey::Ed448(
+                        secret_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .sign(&message)
+                    .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                    .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                    self.push(StackData::Buffer(signature))?;
+                }
+                OpAlgorithm::VerifyEd448 => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Ed448(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Ed448(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    self.push(StackData::Boolean(valid))?;
+                }
+                OpAlgorithm::VerifyAssertEd448 => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Ed448(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Ed448(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    if !valid {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                #[cfg(feature = "pqc-lite")]
+                OpAlgorithm::SignDsa44 => {
+                    let secret_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = SigningKey::Dsa44(
+                        secret_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .sign(&message)
+                    .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                    .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                    self.push(StackData::Buffer(signature))?;
+                }
+                #[cfg(feature = "pqc-lite")]
+                OpAlgorithm::VerifyDsa44 => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Dsa44(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Dsa44(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    self.push(StackData::Boolean(valid))?;
+                }
+                #[cfg(feature = "pqc-lite")]
+                OpAlgorithm::VerifyAssertDsa44 => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Dsa44(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Dsa44(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    if !valid {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                #[cfg(feature = "pqc-lite")]
+                OpAlgorithm::SignDsa65 => {
+                    let secret_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = SigningKey::Dsa65(
+                        secret_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .sign(&message)
+                    .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                    .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                    self.push(StackData::Buffer(signature))?;
+                }
+                #[cfg(feature = "pqc-lite")]
+                OpAlgorithm::VerifyDsa65 => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Dsa65(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Dsa65(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    self.push(StackData::Boolean(valid))?;
+                }
+                #[cfg(feature = "pqc-lite")]
+                OpAlgorithm::VerifyAssertDsa65 => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Dsa65(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Dsa65(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    if !valid {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                #[cfg(feature = "pqc-heavy")]
+                OpAlgorithm::SignFalcon => {
+                    let secret_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = SigningKey::Falcon(
+                        secret_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .sign(&message)
+                    .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                    .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                    self.push(StackData::Buffer(signature))?;
+                }
+                #[cfg(feature = "pqc-heavy")]
+                OpAlgorithm::VerifyFalcon => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Falcon(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Falcon(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    self.push(StackData::Boolean(valid))?;
+                }
+                #[cfg(feature = "pqc-heavy")]
+                OpAlgorithm::VerifyAssertFalcon => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::Falcon(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::Falcon(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    if !valid {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                #[cfg(feature = "pqc-heavy")]
+                OpAlgorithm::SignSlhDsaSha128s => {
+                    let secret_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = SigningKey::SlhDsaSha128s(
+                        secret_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .sign(&message)
+                    .and_then(|sig| sig.to_bytes(None::<&mut SerializerConfig>).ok())
+                    .ok_or(ScriptError::CryptoOperationFailed)?;
+
+                    self.push(StackData::Buffer(signature))?;
+                }
+                #[cfg(feature = "pqc-heavy")]
+                OpAlgorithm::VerifySlhDsaSha128s => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::SlhDsaSha128s(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::SlhDsaSha128s(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    self.push(StackData::Boolean(valid))?;
+                }
+                #[cfg(feature = "pqc-heavy")]
+                OpAlgorithm::VerifyAssertSlhDsaSha128s => {
+                    let public_key = self.pop_bytes()?;
+                    let message = self.pop_bytes()?;
+                    let signature = CryptoSignature::SlhDsaSha128s(
+                        self.pop_bytes()?
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    );
+
+                    let valid = VerificationKey::SlhDsaSha128s(
+                        public_key
+                            .try_into()
+                            .map_err(|_| ScriptError::PreconditionFailed)?,
+                    )
+                    .verify(&message, &signature)
+                    .is_some_and(|v| v);
+
+                    if !valid {
+                        return Err(ScriptError::AssertionFailed);
+                    }
+                }
+                OpAlgorithm::KeyStreamXChaCha20 => todo!(),
+                OpAlgorithm::KeyStreamAes256 => todo!(),
+                #[allow(unreachable_patterns)]
+                _ => return Err(ScriptError::AlgorithmNotSupported),
             },
             Opcode::TIME => {
                 let now = PlabbleDateTime(Utc::now());
@@ -1382,7 +1529,7 @@ impl ScriptInterpreter {
             Opcode::SELBLOCK => todo!(),
             Opcode::SELTX => todo!(),
             Opcode::GETENTRY => todo!(),
-            Opcode::CALLEXT(id, params) => {
+            Opcode::CALLEXT(_id, _params) => {
                 todo!()
             }
             Opcode::EVALSUB => {
@@ -3461,9 +3608,12 @@ mod tests {
         let script = OpcodeScript::new(vec![
             Opcode::PUSHINT(12345),
             Opcode::CRYPTO(OpAlgorithm::Blake3_128),
-            Opcode::PUSHL1 { len: 16, data: hex::decode("3aaf9c252153d25e4908ba74afa99076").unwrap() },
+            Opcode::PUSHL1 {
+                len: 16,
+                data: hex::decode("3aaf9c252153d25e4908ba74afa99076").unwrap(),
+            },
             Opcode::EQ,
-            Opcode::ASSERT
+            Opcode::ASSERT,
         ]);
 
         let mut int = ScriptInterpreter::new(script, None);

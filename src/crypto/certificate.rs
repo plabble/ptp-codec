@@ -7,7 +7,7 @@ use serde_with::serde_as;
 
 use crate::{
     core::PlabbleDateTime,
-    crypto::algorithm::{CryptoSignature, VerificationKey, SigningKey},
+    crypto::algorithm::{CryptoSignature, SigningKey, VerificationKey},
 };
 
 /// Plabble Certificate
@@ -47,12 +47,27 @@ pub struct Certificate {
 }
 
 impl Certificate {
+    /// Get a public verification key for a signature algorithm.
+    #[cfg(feature = "protocol")]
+    pub fn get_verification_key(
+        &self,
+        algorithm: crate::crypto::SignatureAlgorithm,
+    ) -> Option<&VerificationKey> {
+        self.body
+            .as_ref()?
+            .keys
+            .iter()
+            .find(|key| key.get_algorithm() == algorithm)
+    }
+
     /// Get signing key for a specific signature algorithm, if present in the certificate body
     #[cfg(feature = "protocol")]
-    pub fn get_signing_key(&self, algorithm: crate::crypto::SignatureAlgorithm) -> Option<&SigningKey> {
+    pub fn get_signing_key(
+        &self,
+        algorithm: crate::crypto::SignatureAlgorithm,
+    ) -> Option<&SigningKey> {
         if let Some(keys) = self.body.as_ref().and_then(|b| b.secret_keys.as_ref()) {
-            let found = keys.iter().find(|k| k.get_algorithm() == algorithm);
-            found
+            keys.iter().find(|k| k.get_algorithm() == algorithm)
         } else {
             None
         }

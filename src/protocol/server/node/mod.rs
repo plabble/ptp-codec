@@ -34,10 +34,10 @@ impl SlotHistory {
 
             if incoming.timestamp.timestamp() == self.last_update.timestamp() {
                 // If the timestamps are equal, break ties by node ID (higher wins)
-                if let Some(from) = &incoming.from {
-                    if from < self_id {
-                        return false;
-                    }
+                if let Some(from) = &incoming.from
+                    && from < self_id
+                {
+                    return false;
                 }
             }
         }

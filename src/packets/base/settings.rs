@@ -94,12 +94,21 @@ pub struct PostQuantumSettings {
 
 impl CryptoSettings {
     pub fn apply_to<T: Clone>(&self, config: &mut SerializerConfig<T>) {
-        if self.sign_ed25519 {
-            config.set_toggle("ed25519", true);
-        }
+        config.set_toggle("ed25519", self.sign_ed25519);
+        config.set_toggle("x25519", self.key_exchange_x25519);
+        config.set_toggle("ed448", self.sign_ed448);
 
-        if self.key_exchange_x25519 {
-            config.set_toggle("x25519", true);
+        if let Some(post_quantum) = self.post_quantum_settings {
+            config.set_toggle("dsa44", post_quantum.sign_pqc_dsa_44);
+            config.set_toggle("dsa65", post_quantum.sign_pqc_dsa_65);
+            config.set_toggle("falcon", post_quantum.sign_pqc_falcon);
+            config.set_toggle("slh_dsa", post_quantum.sign_pqc_slh_dsa);
+            config.set_toggle("kem512", post_quantum.key_exchange_pqc_kem_512);
+            config.set_toggle("kem768", post_quantum.key_exchange_pqc_kem_768);
+        } else {
+            for toggle in ["dsa44", "dsa65", "falcon", "slh_dsa", "kem512", "kem768"] {
+                config.set_toggle(toggle, false);
+            }
         }
     }
 }
@@ -186,5 +195,37 @@ mod tests {
         assert_eq!(settings.sign_ed448, false);
 
         assert_eq!(vec![0b0011_1011], bytes);
+    }
+
+    #[test]
+    fn apply_to_configures_all_multi_enum_toggles() {
+        let settings = CryptoSettings {
+            sign_ed25519: false,
+            key_exchange_x25519: false,
+            sign_ed448: true,
+            use_post_quantum: true,
+            post_quantum_settings: Some(PostQuantumSettings {
+                sign_pqc_dsa_44: true,
+                sign_pqc_dsa_65: false,
+                sign_pqc_falcon: true,
+                sign_pqc_slh_dsa: false,
+                key_exchange_pqc_kem_512: true,
+                key_exchange_pqc_kem_768: false,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let mut config = SerializerConfig::<()>::new(None);
+        settings.apply_to(&mut config);
+
+        assert_eq!(config.get_toggle("ed25519"), Some(false));
+        assert_eq!(config.get_toggle("x25519"), Some(false));
+        assert_eq!(config.get_toggle("ed448"), Some(true));
+        assert_eq!(config.get_toggle("dsa44"), Some(true));
+        assert_eq!(config.get_toggle("dsa65"), Some(false));
+        assert_eq!(config.get_toggle("falcon"), Some(true));
+        assert_eq!(config.get_toggle("slh_dsa"), Some(false));
+        assert_eq!(config.get_toggle("kem512"), Some(true));
+        assert_eq!(config.get_toggle("kem768"), Some(false));
     }
 }

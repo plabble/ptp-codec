@@ -106,6 +106,11 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
         let header = PlabbleResponseHeader::read_bytes(stream, Some(config))?;
         config.discriminator = Some(header.packet_type.get_discriminator());
 
+        // Allow non-encrypted, session packets that don't have a PSK to bypass the MAC
+        if !base.use_encryption && header.is_session_packet() && !base.pre_shared_key {
+            stream.set_offset_end(0);
+        }
+
         // Copy plain base/header bytes to integrity buffer for later checks
         let raw_base_and_header = stream.slice_marker(None).to_vec();
 
@@ -297,7 +302,7 @@ mod tests {
         .unwrap();
 
         let plain = "010f0001010103";
-        let mac = "b7fbd584e891fc4af0499fbfdbfda11c";
+        let mac = "61dbee4e96b2543518702eb620ebc177";
 
         let mut context = PlabbleConnectionContext::new();
         context.session_key = Some([0u8; 64]);
@@ -318,6 +323,14 @@ mod tests {
             PlabbleResponsePacket::from_bytes(&wrong, Some(&mut config))
         );
 
+        // Changing a valid body field must also invalidate the MAC.
+        let mut wrong_body = serialized.clone();
+        wrong_body[6] ^= 0x01;
+        assert_eq!(
+            Err(DeserializationError::IntegrityFailed),
+            PlabbleResponsePacket::from_bytes(&wrong_body, Some(&mut config))
+        );
+
         // Full packet encryption should encrypt the MAC as well
         let context = config.data.as_mut().unwrap();
         context.full_encryption = true;
@@ -325,7 +338,7 @@ mod tests {
         let encrypted = response.to_bytes(Some(&mut config)).unwrap();
         assert_ne!(format!("{}{}", plain, mac), hex::encode(&encrypted));
         assert_eq!(
-            "971df7105a2bc21db879f2f1d469a99882647b66676f2b",
+            "971df7105a2bc2cb9842388ff7c1d670bbd5729d710f40",
             hex::encode(&encrypted)
         );
         let decrypted = PlabbleResponsePacket::from_bytes(&encrypted, Some(&mut config)).unwrap();

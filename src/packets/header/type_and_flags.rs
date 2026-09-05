@@ -244,7 +244,7 @@ pub enum ResponsePacketType {
         with_psk: bool,
 
         #[serde(default)]
-        #[toggles("client_salt")]
+        #[toggles("server_salt")]
         with_salt: bool,
     } = 1,
     /// Response to a get request.

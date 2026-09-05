@@ -57,7 +57,7 @@ async-channel = { version = "2.5.0", optional = true }
 
 # FFI dependencies
 futures = { version = "0.3.34", optional = true }
-uniffi = { version = "0.31.0", optional = true }
+uniffi = { version = "0.31.0", optional = true } # see DEVELOPERS.md for correct version
 
 [features]
 default = ["blake-3", "pqc-lite", "pqc-heavy", "blockchain", "ffi", "wasm", "use-toml", "implementation", "protocol", "server", "client"]
@@ -84,6 +84,7 @@ ffi = ["uniffi", "client", "server", "futures"]
 unicli = []
 
 [dev-dependencies]
+futures = "0.3.34"
 toml = "1.1.5"
 hex = "0.4.3"
 serde_json = "1.0.151"

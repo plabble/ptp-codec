@@ -118,7 +118,7 @@ impl Default for BucketPermissions {
 
 /// Bucket settings
 #[serde_as]
-#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct BucketSettings {
     /// Permissions
     permissions: BucketPermissions,
@@ -128,15 +128,6 @@ pub struct BucketSettings {
     #[serde(default)]
     #[dyn_length]
     access_control_list: Vec<[u8; 16]>,
-}
-
-impl Default for BucketSettings {
-    fn default() -> Self {
-        Self {
-            permissions: Default::default(),
-            access_control_list: Vec::new(),
-        }
-    }
 }
 
 /// Bucket create request body

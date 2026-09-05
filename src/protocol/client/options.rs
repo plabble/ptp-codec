@@ -3,11 +3,12 @@ use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
 use serde_with::serde_as;
 
-use crate::crypto::KeyExchangeAlgorithm;
 use crate::packets::base::settings::CryptoSettings;
 
+pub use crate::protocol::options::get_key_exchange_algorithms;
+
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct SessionOptions {
     /// If true, switch full packet encryption after key exchange
     #[serde(default)]
@@ -35,19 +36,6 @@ pub struct SessionOptions {
     /// Examples: "!x25519", "aes256", "chacha20", "!ed448", "!ed25519", "blake3", "mldsa44", "mldsa65", "mlkem512", "mlkem768"
     #[serde(default)]
     pub algorithms: Vec<String>,
-}
-
-impl Default for SessionOptions {
-    fn default() -> Self {
-        SessionOptions {
-            enable_full_encryption: false,
-            stored_key_lifetime: None,
-            client_salt: false,
-            server_salt: false,
-            psk_id: None,
-            algorithms: Vec::new(),
-        }
-    }
 }
 
 /// Set crypto settings based on algorithm string list
@@ -80,19 +68,46 @@ pub fn set_crypto_settings(settings: &mut CryptoSettings, algorithms: Vec<String
     }
 }
 
-/// Get key exchange algorithm according to crypto settings
-pub fn get_key_exchange_algorithms(settings: &CryptoSettings) -> Vec<KeyExchangeAlgorithm> {
-    let mut algs = Vec::new();
-    if settings.key_exchange_x25519 {
-        algs.push(KeyExchangeAlgorithm::X25519);
+/// Check if the given algorithm name is valid.
+/// - `alg` is the name of the algorithm to check.
+/// - Returns `true` if the algorithm is valid, `false` otherwise.
+pub fn is_valid_algorithm(alg: &str) -> bool {
+    match alg {
+        "x25519" | "chacha20" | "aes256" | "ed25519" | "ed448" | "blake3" | "mldsa44" | "mldsa65" | "mlkem512" | "mlkem768" => true,
+        _ => false,
     }
-    if let Some(pq_settings) = settings.post_quantum_settings {
-        if pq_settings.key_exchange_pqc_kem_512 {
-            algs.push(KeyExchangeAlgorithm::Kem512);
-        }
-        if pq_settings.key_exchange_pqc_kem_768 {
-            algs.push(KeyExchangeAlgorithm::Kem768);
-        }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        packets::base::settings::CryptoSettings, protocol::client::options::set_crypto_settings,
+    };
+
+    #[test]
+    fn session_algorithm_overrides_enable_and_disable_settings() {
+        let mut settings = CryptoSettings::default();
+        set_crypto_settings(
+            &mut settings,
+            vec![
+                "!x25519".into(),
+                "aes256".into(),
+                "!chacha20".into(),
+                "ed448".into(),
+                "mlkem512".into(),
+            ],
+        );
+
+        assert!(!settings.key_exchange_x25519);
+        assert!(settings.encrypt_with_aes);
+        assert!(!settings.encrypt_with_chacha);
+        assert!(settings.sign_ed448);
+        assert!(settings.use_post_quantum);
+        assert!(
+            settings
+                .post_quantum_settings
+                .unwrap()
+                .key_exchange_pqc_kem_512
+        );
     }
-    algs
 }

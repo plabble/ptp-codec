@@ -38,7 +38,9 @@ mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer, SerializerConfig};
 
     use crate::{
-        core::PlabbleDateTime, crypto::algorithm::VerificationKey, network::{node_address::NodeAddress, node_info::NodeInfo},
+        core::PlabbleDateTime,
+        crypto::algorithm::VerificationKey,
+        network::{node_address::NodeAddress, node_info::NodeInfo},
     };
 
     #[test]

@@ -64,7 +64,7 @@ impl MerkleTree {
     /// Make new Merkle tree from a list of leaf hashes.
     fn new_tree(blake3: bool, mut nodes: Vec<MerkleNode>) -> MerkleTree {
         while nodes.len() > 1 {
-            if nodes.len() % 2 != 0 {
+            if !nodes.len().is_multiple_of(2) {
                 nodes.push(nodes.last().unwrap().clone()); // duplicate last node if odd
             }
 
@@ -72,7 +72,7 @@ impl MerkleTree {
             for pair in nodes.chunks(2) {
                 let hash = hash_192(blake3, vec![&pair[0].hash, &pair[1].hash]);
                 let parent = MerkleNode {
-                    hash: hash.into(),
+                    hash: hash,
                     left: Some(Box::new(pair[0].clone())),
                     right: Some(Box::new(pair[1].clone())),
                 };
@@ -97,20 +97,20 @@ impl MerkleTree {
                 return true;
             }
 
-            if let Some(left) = &node.left {
-                if recurse(left, target_hash, path, hashes) {
-                    path.push(false); // Left child
-                    hashes.push(node.right.as_ref().unwrap().hash);
-                    return true;
-                }
+            if let Some(left) = &node.left
+                && recurse(left, target_hash, path, hashes)
+            {
+                path.push(false); // Left child
+                hashes.push(node.right.as_ref().unwrap().hash);
+                return true;
             }
 
-            if let Some(right) = &node.right {
-                if recurse(right, target_hash, path, hashes) {
-                    path.push(true); // Right child
-                    hashes.push(node.left.as_ref().unwrap().hash);
-                    return true;
-                }
+            if let Some(right) = &node.right
+                && recurse(right, target_hash, path, hashes)
+            {
+                path.push(true); // Right child
+                hashes.push(node.left.as_ref().unwrap().hash);
+                return true;
             }
 
             false

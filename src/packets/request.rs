@@ -121,6 +121,11 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
         let header = PlabbleRequestHeader::read_bytes(stream, Some(config))?;
         config.discriminator = Some(header.packet_type.get_discriminator());
 
+        // Allow non-encrypted, session packets that don't have a PSK to bypass the MAC
+        if !base.use_encryption && header.is_session_packet() && !base.pre_shared_key {
+            stream.set_offset_end(0);
+        }
+
         // Copy plain base/header bytes to integrity buffer for later checks
         let raw_base_and_header = stream.slice_marker(None).to_vec();
 

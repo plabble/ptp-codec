@@ -53,6 +53,7 @@ macro_rules! impl_hash {
 /// - `Kem512` / `Kem768` are optional post-quantum KEM algorithms
 ///   provided when the `pqc-lite` feature is enabled.
 #[cfg(feature = "protocol")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyExchangeAlgorithm {
     X25519,
     Kem512,
@@ -60,17 +61,19 @@ pub enum KeyExchangeAlgorithm {
 }
 
 /// Supported signature algorithms
-/// 
+///
 /// - `Ed25519` is the standard EdDSA signature scheme over Curve25519.
 /// - `Ed448` is the EdDSA signature scheme over Curve448, which offers higher security but is less widely supported.
 /// - `Dsa44` and `Dsa65` are optional post-quantum signature algorithms provided when the `pqc-lite` feature is enabled.
 #[cfg(feature = "protocol")]
-#[derive(PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureAlgorithm {
     Ed25519,
     Ed448,
     Dsa44,
-    Dsa65
+    Dsa65,
+    Falcon,
+    SlhDsaSha128s,
 }
 
 /// A small stateful helper to run a key exchange for a chosen algorithm.
@@ -202,6 +205,7 @@ pub fn calculate_mac(
     }
 
     let mut hasher = <Blake2bMac128 as blake2::digest::KeyInit>::new(key.into());
+    hasher.update(data);
     if let Some(extra_data) = extra_data {
         hasher.update(extra_data);
     }
@@ -213,7 +217,7 @@ pub fn calculate_mac(
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};
 
-    use crate::crypto::derive_key;
+    use crate::crypto::{calculate_mac, derive_key};
 
     #[test]
     fn can_derive_blake2b_key() {
@@ -239,5 +243,21 @@ mod tests {
         let data = b"Hello, world! This is definitely bigger than 16 bytes.";
         let mac = super::mac_poly1305(&key, data);
         println!("{}", hex::encode(&mac));
+    }
+
+    #[test]
+    fn mac_authenticates_both_message_and_extra_data() {
+        let key = [9u8; 64];
+        let extra = b"packet base and header";
+        let original = calculate_mac(false, &key, b"body", Some(extra));
+
+        assert_ne!(
+            original,
+            calculate_mac(false, &key, b"tampered body", Some(extra))
+        );
+        assert_ne!(
+            original,
+            calculate_mac(false, &key, b"body", Some(b"tampered header"))
+        );
     }
 }

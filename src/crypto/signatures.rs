@@ -14,7 +14,7 @@ impl SigningKey {
             SigningKey::Ed448(key) => {
                 use ed448_goldilocks::{SigningKey, signature::Signer};
 
-                let key = SigningKey::try_from(&key[..]).expect("Invalid Ed448 signing key");
+                let key = SigningKey::try_from(&key[..]).ok()?;
                 let signature = key.try_sign(data).ok()?.to_bytes();
                 Some(CryptoSignature::Ed448(signature))
             }

@@ -1,4 +1,4 @@
-use binary_codec::{FromBytes, ToBytes};
+use binary_codec::{BinarySerializer, FromBytes, SerializerConfig, ToBytes};
 use serde::{Deserialize, Serialize};
 use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
@@ -6,6 +6,11 @@ use serde_with::serde_as;
 
 use crate::core::PlabbleDateTime;
 use crate::crypto::algorithm::{CryptoSignature, KeyExhangeRequest, KeyExhangeResponse};
+use crate::errors::SerializationError;
+use crate::packets::{
+    base::settings::CryptoSettings, context::PlabbleConnectionContext,
+    request::PlabbleRequestPacket,
+};
 
 /// Session request body
 #[serde_as]
@@ -36,6 +41,7 @@ pub struct SessionResponseBody {
 
     /// Server-generated salt for key derivation. Filled if request flag with_salt is set.
     #[toggled_by = "server_salt"]
+    #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
     pub salt: Option<[u8; 16]>,
 
     /// Public keys or encapsulated secret for creating a shared secret
@@ -45,6 +51,29 @@ pub struct SessionResponseBody {
     /// Signatures of the request
     #[multi_enum]
     pub signatures: Vec<CryptoSignature>,
+}
+
+impl SessionResponseBody {
+    /// Build the exact plaintext covered by session-response signatures.
+    ///
+    /// Per the protocol this is the complete plaintext request followed by the
+    /// response fields up to, but excluding, the signatures themselves.
+    pub fn signing_bytes(
+        &self,
+        request: &PlabbleRequestPacket,
+        settings: &CryptoSettings,
+    ) -> Result<Vec<u8>, SerializationError> {
+        let mut bytes = request.to_bytes(None)?;
+        let mut unsigned = self.clone();
+        unsigned.signatures.clear();
+
+        let mut config = SerializerConfig::<PlabbleConnectionContext>::new(None);
+        settings.apply_to(&mut config);
+        config.set_toggle("key_persisted", unsigned.psk_id.is_some());
+        config.set_toggle("server_salt", unsigned.salt.is_some());
+        bytes.extend(unsigned.to_bytes(Some(&mut config))?);
+        Ok(bytes)
+    }
 }
 
 #[cfg(test)]
@@ -353,5 +382,38 @@ mod tests {
 
         let deserialized = PlabbleResponsePacket::from_bytes(&bytes, None).unwrap();
         assert_eq!(packet, deserialized);
+    }
+
+    #[test]
+    fn session_response_roundtrips_server_salt_from_text_format() {
+        let packet: PlabbleResponsePacket = toml::from_str(
+            r#"
+        version = 1
+
+        [header]
+        packet_type = "Session"
+        request_counter = 0
+        with_salt = true
+
+        [body]
+        salt = "AQEBAQEBAQEBAQEBAQEBAQ"
+
+        [[body.keys]]
+        X25519 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+        [[body.signatures]]
+        Ed25519 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        "#,
+        )
+        .unwrap();
+
+        let bytes = packet.to_bytes(None).unwrap();
+        let decoded = PlabbleResponsePacket::from_bytes(&bytes, None).unwrap();
+        assert_eq!(decoded, packet);
+        let body = match decoded.body {
+            crate::packets::body::response_body::PlabbleResponseBody::Session(body) => body,
+            _ => panic!("expected session response"),
+        };
+        assert_eq!(body.salt, Some([1; 16]));
     }
 }
