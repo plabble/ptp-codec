@@ -9,31 +9,31 @@ impl SigningKey {
 
                 let key = SigningKey::from_bytes(key);
                 let signature = key.try_sign(data).ok()?.to_bytes();
-                Some(CryptoSignature::Ed25519(signature))
+                Some(CryptoSignature::Ed25519(Box::new(signature)))
             }
             SigningKey::Ed448(key) => {
                 use ed448_goldilocks::{SigningKey, signature::Signer};
 
                 let key = SigningKey::try_from(&key[..]).ok()?;
                 let signature = key.try_sign(data).ok()?.to_bytes();
-                Some(CryptoSignature::Ed448(signature))
+                Some(CryptoSignature::Ed448(Box::new(signature)))
             }
             #[cfg(feature = "pqc-lite")]
             SigningKey::Dsa44(key) => {
                 use ml_dsa::{MlDsa44, Signature, SigningKey, signature::Signer};
 
-                let key = SigningKey::<MlDsa44>::from_seed(key.into());
+                let key = SigningKey::<MlDsa44>::from_seed(key.as_ref().into());
 
                 let signature: Signature<MlDsa44> = key.try_sign(data).ok()?;
-                Some(CryptoSignature::Dsa44(signature.encode().into()))
+                Some(CryptoSignature::Dsa44(Box::new(signature.encode().into())))
             }
             #[cfg(feature = "pqc-lite")]
             SigningKey::Dsa65(key) => {
                 use ml_dsa::{MlDsa65, Signature, SigningKey, signature::Signer};
 
-                let key = SigningKey::<MlDsa65>::from_seed(key.into());
+                let key = SigningKey::<MlDsa65>::from_seed(key.as_ref().into());
                 let signature: Signature<MlDsa65> = key.try_sign(data).ok()?;
-                Some(CryptoSignature::Dsa65(signature.encode().into()))
+                Some(CryptoSignature::Dsa65(Box::new(signature.encode().into())))
             }
             // SigningKey::Falcon(_) => todo!(),
             // SigningKey::SlhDsaSha128s(_) => todo!(),
@@ -73,8 +73,8 @@ impl VerificationKey {
             VerificationKey::Dsa44(key) => {
                 if let CryptoSignature::Dsa44(signature) = signature {
                     use ml_dsa::{MlDsa44, Signature, VerifyingKey, signature::Verifier};
-                    let key = VerifyingKey::<MlDsa44>::decode(key.into());
-                    let signature = Signature::<MlDsa44>::decode(signature.into())?;
+                    let key = VerifyingKey::<MlDsa44>::decode(key.as_ref().into());
+                    let signature = Signature::<MlDsa44>::decode(signature.as_ref().into())?;
 
                     Some(key.verify(data, &signature).is_ok())
                 } else {
@@ -85,8 +85,8 @@ impl VerificationKey {
             VerificationKey::Dsa65(key) => {
                 if let CryptoSignature::Dsa65(signature) = signature {
                     use ml_dsa::{MlDsa65, Signature, VerifyingKey, signature::Verifier};
-                    let key = VerifyingKey::<MlDsa65>::decode(key.into());
-                    let signature = Signature::<MlDsa65>::decode(signature.into())?;
+                    let key = VerifyingKey::<MlDsa65>::decode(key.as_ref().into());
+                    let signature = Signature::<MlDsa65>::decode(signature.as_ref().into())?;
 
                     Some(key.verify(data, &signature).is_ok())
                 } else {
@@ -112,13 +112,13 @@ mod tests {
         let sk = SK::from_bytes(&[0u8; 32]);
         let vk = sk.verifying_key();
 
-        let sig = SigningKey::Ed25519([0u8; 32]);
+        let sig = SigningKey::Ed25519(Box::new([0u8; 32]));
 
         let signature = sig.sign(&data).unwrap();
         assert!(matches!(signature, CryptoSignature::Ed25519(_)));
 
-        let ver = VerificationKey::Ed25519(vk.to_bytes());
-        let inv = VerificationKey::Ed25519([0u8; 32]);
+        let ver = VerificationKey::Ed25519(Box::new(vk.to_bytes()));
+        let inv = VerificationKey::Ed25519(Box::new([0u8; 32]));
 
         assert_eq!(Some(true), ver.verify(&data, &signature)); // Valid
         assert_eq!(Some(false), ver.verify(&[0u8; 15], &signature)); // Invalid data
@@ -133,13 +133,13 @@ mod tests {
         let sk = SK::try_from(&[0u8; 57][..]).expect("Invalid Ed448 signing key");
         let vk = sk.verifying_key();
 
-        let sig = SigningKey::Ed448([0u8; 57]);
+        let sig = SigningKey::Ed448(Box::new([0u8; 57]));
 
         let signature = sig.sign(&data).unwrap();
         assert!(matches!(signature, CryptoSignature::Ed448(_)));
 
-        let ver = VerificationKey::Ed448(vk.to_bytes());
-        let inv = VerificationKey::Ed448([0u8; 57]);
+        let ver = VerificationKey::Ed448(Box::new(vk.to_bytes()));
+        let inv = VerificationKey::Ed448(Box::new([0u8; 57]));
 
         assert_eq!(Some(true), ver.verify(&data, &signature)); // Valid
         assert_eq!(Some(false), ver.verify(&[0u8; 15], &signature)); // Invalid data
@@ -154,13 +154,13 @@ mod tests {
         let data = [0u8; 16];
         let kp = MlDsaSigningKey::<MlDsa44>::generate();
 
-        let sig = SigningKey::Dsa44(kp.to_seed().into());
+        let sig = SigningKey::Dsa44(Box::new(kp.to_seed().into()));
 
         let signature = sig.sign(&data).unwrap();
         assert!(matches!(signature, CryptoSignature::Dsa44(_)));
 
-        let ver = VerificationKey::Dsa44(kp.verifying_key().encode().into());
-        let inv = VerificationKey::Dsa44([0u8; 1312]);
+        let ver = VerificationKey::Dsa44(Box::new(kp.verifying_key().encode().into()));
+        let inv = VerificationKey::Dsa44(Box::new([0u8; 1312]));
 
         assert_eq!(Some(true), ver.verify(&data, &signature)); // Valid
         assert_eq!(Some(false), ver.verify(&[0u8; 15], &signature)); // Invalid data
@@ -175,13 +175,13 @@ mod tests {
         let data = [0u8; 16];
         let kp = MlDsaSigningKey::<MlDsa65>::generate();
 
-        let sig = SigningKey::Dsa65(kp.to_seed().into());
+        let sig = SigningKey::Dsa65(Box::new(kp.to_seed().into()));
 
         let signature = sig.sign(&data).unwrap();
         assert!(matches!(signature, CryptoSignature::Dsa65(_)));
 
-        let ver = VerificationKey::Dsa65(kp.verifying_key().encode().into());
-        let inv = VerificationKey::Dsa65([0u8; 1952]);
+        let ver = VerificationKey::Dsa65(Box::new(kp.verifying_key().encode().into()));
+        let inv = VerificationKey::Dsa65(Box::new([0u8; 1952]));
 
         assert_eq!(Some(true), ver.verify(&data, &signature)); // Valid
         assert_eq!(Some(false), ver.verify(&[0u8; 15], &signature)); // Invalid data

@@ -1,5 +1,10 @@
 # Developers
 
+State of the project
+- Codec is complete
+- Implementation is work-in-progress
+- WASM/FFI bridge is work-in-progress
+
 Run all tests:
 ```sh
 cargo test --all-features

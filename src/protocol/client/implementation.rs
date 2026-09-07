@@ -1,13 +1,20 @@
 use crate::{
-    core::PlabbleDateTime, crypto::KeyExchange, packets::{
-        base::{PlabblePacketBase, settings::CryptoSettings}, body::{
+    core::PlabbleDateTime,
+    crypto::KeyExchange,
+    packets::{
+        base::{PlabblePacketBase, settings::CryptoSettings},
+        body::{
             error::PlabbleError, request_body::PlabbleRequestBody,
             response_body::PlabbleResponseBody, session::SessionRequestBody,
-        }, context::PlabbleConnectionContext, header::{
+        },
+        context::PlabbleConnectionContext,
+        header::{
             request_header::PlabbleRequestHeader,
             type_and_flags::{RequestPacketType, ResponsePacketType},
-        }, request::PlabbleRequestPacket,
-    }, protocol::{
+        },
+        request::PlabbleRequestPacket,
+    },
+    protocol::{
         PlabbleConnection,
         client::options::{
             SessionOptions, get_key_exchange_algorithms, is_valid_algorithm, set_crypto_settings,
@@ -124,8 +131,6 @@ impl PlabbleConnection {
         if let PlabbleResponseBody::Error(error) = &res.body {
             return Err(error.clone().into());
         }
-
-        // TODO: better errors i.e. UntrustedHost
 
         // Verify that the response packet's base fields match the signing request's base fields
         if res.base.version != signing_request.base.version

@@ -29,7 +29,7 @@ impl KeyExchange {
                 let public = PublicKey::from(&secret);
                 self.secret = Some(secret.as_bytes().to_vec());
 
-                Some(KeyExhangeRequest::X25519(public.to_bytes()))
+                Some(KeyExhangeRequest::X25519(Box::new(public.to_bytes())))
             }
             #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem512 => {
@@ -43,7 +43,7 @@ impl KeyExchange {
 
                 self.secret = Some(dc.to_bytes().to_vec());
 
-                Some(KeyExhangeRequest::Kem512(ec.to_bytes().into()))
+                Some(KeyExhangeRequest::Kem512(Box::new(ec.to_bytes().into())))
             }
             #[cfg(feature = "pqc-lite")]
             KeyExchangeAlgorithm::Kem768 => {
@@ -57,7 +57,7 @@ impl KeyExchange {
 
                 self.secret = Some(dc.to_bytes().to_vec());
 
-                Some(KeyExhangeRequest::Kem768(ec.to_bytes().into()))
+                Some(KeyExhangeRequest::Kem768(Box::new(ec.to_bytes().into())))
             }
             #[cfg(not(feature = "pqc-lite"))]
             _ => None,
@@ -79,10 +79,13 @@ impl KeyExchange {
                 if let KeyExhangeRequest::X25519(other_pub) = req {
                     let secret = EphemeralSecret::random();
                     let public = PublicKey::from(&secret);
-                    let other_pub = PublicKey::from(*other_pub);
+                    let other_pub = PublicKey::from(**other_pub);
 
                     let ss = secret.diffie_hellman(&other_pub);
-                    Some((ss.to_bytes(), KeyExhangeResponse::X25519(public.to_bytes())))
+                    Some((
+                        ss.to_bytes(),
+                        KeyExhangeResponse::X25519(Box::new(public.to_bytes())),
+                    ))
                 } else {
                     None
                 }
@@ -95,12 +98,12 @@ impl KeyExchange {
                         kem::{Encapsulate, EncapsulationKey},
                     };
                     let encapsulation_key =
-                        EncapsulationKey::<MlKem512>::new(encap_key.into()).ok()?;
+                        EncapsulationKey::<MlKem512>::new(encap_key.as_ref().into()).ok()?;
 
                     let (es, ss): (Ciphertext<MlKem512>, SharedKey) =
                         encapsulation_key.encapsulate();
 
-                    Some((ss.into(), KeyExhangeResponse::Kem512(es.into())))
+                    Some((ss.into(), KeyExhangeResponse::Kem512(Box::new(es.into()))))
                 } else {
                     None
                 }
@@ -113,12 +116,12 @@ impl KeyExchange {
                         kem::{Encapsulate, EncapsulationKey},
                     };
                     let encapsulation_key =
-                        EncapsulationKey::<MlKem768>::new(encap_key.into()).ok()?;
+                        EncapsulationKey::<MlKem768>::new(encap_key.as_ref().into()).ok()?;
 
                     let (es, ss): (Ciphertext<MlKem768>, SharedKey) =
                         encapsulation_key.encapsulate();
 
-                    Some((ss.into(), KeyExhangeResponse::Kem768(es.into())))
+                    Some((ss.into(), KeyExhangeResponse::Kem768(Box::new(es.into()))))
                 } else {
                     None
                 }
@@ -139,7 +142,7 @@ impl KeyExchange {
                 if let KeyExhangeResponse::X25519(other_pub) = res {
                     let secret: &[u8; 32] = self.secret.as_ref().unwrap()[..].try_into().unwrap();
                     let secret = StaticSecret::from(*secret);
-                    let other_pub = PublicKey::from(*other_pub);
+                    let other_pub = PublicKey::from(**other_pub);
 
                     let ss = secret.diffie_hellman(&other_pub);
                     Some(ss.to_bytes())
@@ -155,7 +158,7 @@ impl KeyExchange {
                         kem::{Decapsulate, DecapsulationKey},
                     };
 
-                    let ek: Ciphertext<MlKem512> = (*ek).into();
+                    let ek: Ciphertext<MlKem512> = (**ek).into();
                     let secret: [u8; 64] = self.secret.as_ref().unwrap()[..].try_into().unwrap();
 
                     let dc = DecapsulationKey::<MlKem512>::from_seed(secret.into());
@@ -174,7 +177,7 @@ impl KeyExchange {
                         kem::{Decapsulate, DecapsulationKey},
                     };
 
-                    let ek: Ciphertext<MlKem768> = (*ek).into();
+                    let ek: Ciphertext<MlKem768> = (**ek).into();
                     let secret: [u8; 64] = self.secret.as_ref().unwrap()[..].try_into().unwrap();
 
                     let dc = DecapsulationKey::<MlKem768>::from_seed(secret.into());

@@ -134,7 +134,7 @@ impl PlabbleConnection {
                 let server_salt = request_salt.then(rand::random);
                 // Collect the shared secrets from each key exchange
                 let shared_secrets: Vec<_> = exchanges.iter().map(|(secret, _)| *secret).collect();
-                
+
                 // Generate the session key from the collected shared secrets and salts
                 let session_key = PlabbleConnectionContext::derive_session_key(
                     settings.use_blake3,
@@ -269,7 +269,7 @@ mod tests {
         let mut connection = PlabbleConnection::new(tx, rx);
         let context = connection.config.data.as_mut().unwrap();
         context.client_counter = 1;
-        context.signing_keys = vec![SigningKey::Ed25519([11; 32])];
+        context.signing_keys = vec![SigningKey::Ed25519(Box::new([11; 32]))];
         connection
     }
 
@@ -306,7 +306,8 @@ mod tests {
             .verifying_key()
             .to_bytes();
         assert_eq!(
-            VerificationKey::Ed25519(verification_key).verify(&signing_bytes, &body.signatures[0]),
+            VerificationKey::Ed25519(Box::new(verification_key))
+                .verify(&signing_bytes, &body.signatures[0]),
             Some(true)
         );
 

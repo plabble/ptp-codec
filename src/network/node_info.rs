@@ -50,7 +50,7 @@ mod tests {
             address: NodeAddress::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 1234)),
             last_seen: PlabbleDateTime::new(0),
             crypto_settings: Default::default(),
-            verification_keys: vec![VerificationKey::Ed25519([1u8; 32])],
+            verification_keys: vec![VerificationKey::Ed25519(Box::new([1u8; 32]))],
         };
 
         let serialized = r#"

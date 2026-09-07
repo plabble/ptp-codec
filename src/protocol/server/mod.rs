@@ -111,7 +111,7 @@ mod tests {
             body: PlabbleRequestBody::Session(SessionRequestBody {
                 psk_expiration: None,
                 salt: None,
-                keys: vec![KeyExhangeRequest::X25519([1; 32])],
+                keys: vec![KeyExhangeRequest::X25519(Box::new([1; 32]))],
             }),
         }
     }
@@ -129,8 +129,8 @@ mod tests {
             body: PlabbleResponseBody::Session(SessionResponseBody {
                 psk_id: None,
                 salt: None,
-                keys: vec![KeyExhangeResponse::X25519([2; 32])],
-                signatures: vec![CryptoSignature::Ed25519([3; 64])],
+                keys: vec![KeyExhangeResponse::X25519(Box::new([2; 32]))],
+                signatures: vec![CryptoSignature::Ed25519(Box::new([3; 64]))],
             }),
         }
     }

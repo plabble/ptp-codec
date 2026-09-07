@@ -117,8 +117,12 @@ mod tests {
     }
 
     impl KeyProvider for MemoryKeyProvider {
-        fn get_bucket_key(&self, _bucket_id: &[u8; 16]) -> Option<[u8; 32]> {
+        fn get_bucket_key(&self, _bucket_id: &[u8; 16]) -> Option<[u8; 64]> {
             None
+        }
+
+        fn store_bucket_key(&self, bucket_id: [u8; 16], bucket_key: [u8; 64]) {
+            ()
         }
 
         fn get_psk(&self, psk_id: &[u8; 12]) -> Option<[u8; 64]> {
@@ -146,12 +150,12 @@ mod tests {
             let ed448_signing = ed448_goldilocks::SigningKey::try_from(&ed448_seed[..]).unwrap();
             let ed448_verification = ed448_signing.verifying_key().to_bytes();
             server.config.data.as_mut().unwrap().signing_keys = vec![
-                SigningKey::Ed25519(signing_seed),
-                SigningKey::Ed448(ed448_seed),
+                SigningKey::Ed25519(Box::new(signing_seed)),
+                SigningKey::Ed448(Box::new(ed448_seed)),
             ];
             client.config.data.as_mut().unwrap().verification_keys = vec![
-                VerificationKey::Ed25519(verification_key),
-                VerificationKey::Ed448(ed448_verification),
+                VerificationKey::Ed25519(Box::new(verification_key)),
+                VerificationKey::Ed448(Box::new(ed448_verification)),
             ];
 
             let client_keys = Arc::new(MemoryKeyProvider::default());
@@ -278,12 +282,13 @@ mod tests {
             let mut client = PlabbleConnection::new(client_tx, client_rx);
             let mut server = PlabbleConnection::new(server_tx, server_rx);
 
-            server.config.data.as_mut().unwrap().signing_keys = vec![SigningKey::Ed25519([7; 32])];
+            server.config.data.as_mut().unwrap().signing_keys =
+                vec![SigningKey::Ed25519(Box::new([7; 32]))];
             let wrong_key = ed25519_dalek::SigningKey::from_bytes(&[8; 32])
                 .verifying_key()
                 .to_bytes();
             client.config.data.as_mut().unwrap().verification_keys =
-                vec![VerificationKey::Ed25519(wrong_key)];
+                vec![VerificationKey::Ed25519(Box::new(wrong_key))];
 
             let (client_result, server_result) =
                 futures::join!(client.start_session(None), async {
@@ -322,16 +327,16 @@ mod tests {
             let dsa65 = MlDsaSigningKey::<MlDsa65>::generate();
 
             server.config.data.as_mut().unwrap().signing_keys = vec![
-                SigningKey::Ed25519(ed25519_seed),
-                SigningKey::Ed448(ed448_seed),
-                SigningKey::Dsa44(dsa44.to_seed().into()),
-                SigningKey::Dsa65(dsa65.to_seed().into()),
+                SigningKey::Ed25519(Box::new(ed25519_seed)),
+                SigningKey::Ed448(Box::new(ed448_seed)),
+                SigningKey::Dsa44(Box::new(dsa44.to_seed().into())),
+                SigningKey::Dsa65(Box::new(dsa65.to_seed().into())),
             ];
             client.config.data.as_mut().unwrap().verification_keys = vec![
-                VerificationKey::Ed25519(ed25519_verification),
-                VerificationKey::Ed448(ed448_verification),
-                VerificationKey::Dsa44(dsa44.verifying_key().encode().into()),
-                VerificationKey::Dsa65(dsa65.verifying_key().encode().into()),
+                VerificationKey::Ed25519(Box::new(ed25519_verification)),
+                VerificationKey::Ed448(Box::new(ed448_verification)),
+                VerificationKey::Dsa44(Box::new(dsa44.verifying_key().encode().into())),
+                VerificationKey::Dsa65(Box::new(dsa65.verifying_key().encode().into())),
             ];
 
             let options = SessionOptions {

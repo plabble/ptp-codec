@@ -44,8 +44,10 @@ impl SmartContract {
             .take()
             .ok_or(ScriptError::PreconditionFailed)?;
 
-        let mut settings: ScriptSettings = Default::default();
-        settings.alllow_function_declaration = true;
+        let settings = ScriptSettings {
+            alllow_function_declaration: true,
+            ..Default::default()
+        };
 
         let mut interpreter = ScriptInterpreter::new(constructor, Some(settings));
         interpreter.exec()?;

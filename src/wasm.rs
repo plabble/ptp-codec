@@ -37,6 +37,7 @@ pub struct PlabbleConnection {
 #[wasm_bindgen]
 pub struct SessionKeyProvider {
     get_bucket_key: Function,
+    store_bucket_key: Function,
     get_psk: Function,
     store_psk: Function,
 }
@@ -46,11 +47,13 @@ impl SessionKeyProvider {
     #[wasm_bindgen(constructor)]
     pub fn new(
         get_bucket_key: Function,
+        store_bucket_key: Function,
         get_psk: Function,
         store_psk: Function,
     ) -> SessionKeyProvider {
         Self {
             get_bucket_key,
+            store_bucket_key,
             get_psk,
             store_psk,
         }
@@ -58,7 +61,7 @@ impl SessionKeyProvider {
 }
 
 impl KeyProvider for SessionKeyProvider {
-    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 32]> {
+    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 64]> {
         call_js_byte_array_cb_1(&self.get_bucket_key, bucket_id)
     }
 
@@ -66,9 +69,20 @@ impl KeyProvider for SessionKeyProvider {
         call_js_byte_array_cb_1(&self.get_psk, psk_id)
     }
 
+    fn store_bucket_key(&self, bucket_id: [u8; 16], bucket_key: [u8; 64]) {
+        let bucket_id_array = Uint8Array::from(bucket_id.as_slice());
+        let bucket_key_array = Uint8Array::from(bucket_key.as_slice());
+        // TODO: error logging?
+        let _ = self.store_bucket_key.call2(
+            &JsValue::NULL,
+            &bucket_id_array.into(),
+            &bucket_key_array.into(),
+        );
+    }
+
     fn store_psk(&self, psk_id: [u8; 12], psk: [u8; 64], expiration: Option<u32>) {
-        let psk_id_array = Uint8Array::from(&psk_id[..]);
-        let psk_array = Uint8Array::from(&psk[..]);
+        let psk_id_array = Uint8Array::from(psk_id.as_slice());
+        let psk_array = Uint8Array::from(psk.as_slice());
         // TODO: error logging?
         let _ = self.store_psk.call3(
             &JsValue::NULL,

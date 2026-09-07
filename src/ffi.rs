@@ -19,6 +19,9 @@ pub trait SessionKeyProvider: Send + Sync {
     /// Given a bucket ID serialized as bytes, return the 32-byte bucket key, or None.
     fn get_bucket_key(&self, bucket_id_bytes: Vec<u8>) -> Option<Vec<u8>>;
 
+    /// Store a bucket key with the given bucket ID.
+    fn store_bucket_key(&self, bucket_id: Vec<u8>, bucket_key: Vec<u8>);
+
     /// Given a 12-byte PSK ID, return the 64-byte pre-shared key, or None.
     fn get_psk(&self, psk_id: Vec<u8>) -> Option<Vec<u8>>;
 
@@ -37,9 +40,14 @@ impl KeyProviderBridge {
 }
 
 impl KeyProvider for KeyProviderBridge {
-    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 32]> {
+    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 64]> {
         let result = self.inner.get_bucket_key(bucket_id.to_vec())?;
         result.try_into().ok()
+    }
+
+    fn store_bucket_key(&self, bucket_id: [u8; 16], bucket_key: [u8; 64]) {
+        self.inner
+            .store_bucket_key(bucket_id.to_vec(), bucket_key.to_vec());
     }
 
     fn get_psk(&self, psk_id: &[u8; 12]) -> Option<[u8; 64]> {
@@ -99,6 +107,12 @@ impl PlabbleConnection {
     /// Returns the raw bytes to send over the transport, or None if nothing is queued.
     pub async fn poll_outgoing(&self) -> Option<Vec<u8>> {
         self.tx.recv().await.ok()
+    }
+}
+
+impl Default for PlabbleConnection {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

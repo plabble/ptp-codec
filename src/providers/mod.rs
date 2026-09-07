@@ -5,8 +5,11 @@ use crate::protocol::error::PlabbleProtocolError;
 
 // Key/storage provider for Plabble Connection
 pub trait KeyProvider: Send + Sync {
-    /// Given a bucket ID serialized as bytes, return the 32-byte bucket key, or None.
-    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 32]>;
+    /// Given a bucket ID serialized as bytes, return the 64-byte bucket key, or None.
+    fn get_bucket_key(&self, bucket_id: &[u8; 16]) -> Option<[u8; 64]>;
+
+    /// Store the 64-byte bucket key for the given bucket ID
+    fn store_bucket_key(&self, bucket_id: [u8; 16], bucket_key: [u8; 64]);
 
     /// Given a 12-byte PSK ID, return the 64-byte pre-shared key, or None.
     fn get_psk(&self, psk_id: &[u8; 12]) -> Option<[u8; 64]>;

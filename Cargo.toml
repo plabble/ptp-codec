@@ -20,7 +20,7 @@ path = "src/uniffi-bindgen.rs"
 aes = "0.9.3"
 aes-gcm = "0.11.1"
 base64 = "0.23.1"
-binary-codec = "0.6.7"
+binary-codec = "0.6.8"
 # binary-codec = { path = "../Binary-Codec/binary-codec" }
 blake2 = "0.11.0"
 blake3 = { version = "1.8.7", optional = true }
@@ -60,7 +60,7 @@ futures = { version = "0.3.34", optional = true }
 uniffi = { version = "0.31.0", optional = true } # see DEVELOPERS.md for correct version
 
 [features]
-default = ["blake-3", "pqc-lite", "pqc-heavy", "blockchain", "wasm", "use-toml", "implementation", "protocol", "server", "client"]
+default = ["blake-3", "pqc-lite", "pqc-heavy", "blockchain", "ffi", "wasm", "use-toml", "implementation", "protocol", "server", "client"]
 
 # Crypto settings
 blake-3 = ["blake3"]

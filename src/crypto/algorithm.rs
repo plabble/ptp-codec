@@ -17,13 +17,13 @@ use serde_with::serde_as;
 #[no_discriminator]
 pub enum KeyExhangeRequest {
     #[toggled_by = "x25519"]
-    X25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    X25519(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 32]>),
 
     #[toggled_by = "kem512"]
-    Kem512(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 800]),
+    Kem512(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 800]>),
 
     #[toggled_by = "kem768"]
-    Kem768(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1184]),
+    Kem768(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 1184]>),
 }
 
 /// Cryptographic keys used for key exchange request
@@ -37,13 +37,13 @@ pub enum KeyExhangeRequest {
 #[no_discriminator]
 pub enum KeyExhangeResponse {
     #[toggled_by = "x25519"]
-    X25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    X25519(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 32]>),
 
     #[toggled_by = "kem512"]
-    Kem512(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 768]),
+    Kem512(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 768]>),
 
     #[toggled_by = "kem768"]
-    Kem768(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1088]),
+    Kem768(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 1088]>),
 }
 
 /// Cryptographic signatures used in various algorithms
@@ -61,22 +61,22 @@ pub enum KeyExhangeResponse {
 #[no_discriminator]
 pub enum CryptoSignature {
     #[toggled_by = "ed25519"]
-    Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 64]),
+    Ed25519(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 64]>),
 
     #[toggled_by = "ed448"]
-    Ed448(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 114]),
+    Ed448(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 114]>),
 
     #[toggled_by = "dsa44"]
-    Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 2420]),
+    Dsa44(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 2420]>),
 
     #[toggled_by = "dsa65"]
-    Dsa65(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 3309]),
+    Dsa65(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 3309]>),
 
     #[toggled_by = "falcon"]
-    Falcon(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1462]),
+    Falcon(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 1462]>),
 
     #[toggled_by = "slh_dsa"]
-    SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 7856]),
+    SlhDsaSha128s(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 7856]>),
 }
 
 /// Public verification keys used in various algorithms for verifying a digital signature
@@ -94,22 +94,22 @@ pub enum CryptoSignature {
 #[no_discriminator]
 pub enum VerificationKey {
     #[toggled_by = "ed25519"]
-    Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    Ed25519(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 32]>),
 
     #[toggled_by = "ed448"]
-    Ed448(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 57]),
+    Ed448(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 57]>),
 
     #[toggled_by = "dsa44"]
-    Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1312]),
+    Dsa44(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 1312]>),
 
     #[toggled_by = "dsa65"]
-    Dsa65(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1952]),
+    Dsa65(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 1952]>),
 
     #[toggled_by = "falcon"]
-    Falcon(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 1793]),
+    Falcon(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 1793]>),
 
     #[toggled_by = "slh_dsa"]
-    SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    SlhDsaSha128s(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 32]>),
 }
 
 /// Secret siging keys used in various algorithms for creating a digital signature
@@ -127,22 +127,22 @@ pub enum VerificationKey {
 #[no_discriminator]
 pub enum SigningKey {
     #[toggled_by = "ed25519"]
-    Ed25519(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    Ed25519(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 32]>),
 
     #[toggled_by = "ed448"]
-    Ed448(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 57]),
+    Ed448(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 57]>),
 
     #[toggled_by = "dsa44"]
-    Dsa44(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    Dsa44(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 32]>),
 
     #[toggled_by = "dsa65"]
-    Dsa65(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 32]),
+    Dsa65(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 32]>),
 
     #[toggled_by = "falcon"]
-    Falcon(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 2305]),
+    Falcon(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 2305]>),
 
     #[toggled_by = "slh_dsa"]
-    SlhDsaSha128s(#[serde_as(as = "Base64<UrlSafe, Unpadded>")] [u8; 64]),
+    SlhDsaSha128s(#[serde_as(as = "Box<Base64<UrlSafe, Unpadded>>")] Box<[u8; 64]>),
 }
 
 #[cfg(feature = "protocol")]

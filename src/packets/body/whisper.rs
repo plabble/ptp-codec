@@ -260,7 +260,7 @@ mod tests {
                 from: None,
                 version: 7,
                 timestamp: PlabbleDateTime::new(0),
-                signatures: vec![CryptoSignature::Ed25519([0u8; 64])],
+                signatures: vec![CryptoSignature::Ed25519(Box::new([0u8; 64]))],
             },
         };
 

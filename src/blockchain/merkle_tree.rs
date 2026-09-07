@@ -72,7 +72,7 @@ impl MerkleTree {
             for pair in nodes.chunks(2) {
                 let hash = hash_192(blake3, vec![&pair[0].hash, &pair[1].hash]);
                 let parent = MerkleNode {
-                    hash: hash,
+                    hash,
                     left: Some(Box::new(pair[0].clone())),
                     right: Some(Box::new(pair[1].clone())),
                 };

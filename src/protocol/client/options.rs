@@ -68,16 +68,6 @@ pub fn set_crypto_settings(settings: &mut CryptoSettings, algorithms: Vec<String
     }
 }
 
-/// Check if the given algorithm name is valid.
-/// - `alg` is the name of the algorithm to check.
-/// - Returns `true` if the algorithm is valid, `false` otherwise.
-pub fn is_valid_algorithm(alg: &str) -> bool {
-    match alg {
-        "x25519" | "chacha20" | "aes256" | "ed25519" | "ed448" | "blake3" | "mldsa44" | "mldsa65" | "mlkem512" | "mlkem768" => true,
-        _ => false,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
