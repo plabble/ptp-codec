@@ -3,8 +3,6 @@ use crate::crypto::{
     algorithm::{KeyExhangeRequest, KeyExhangeResponse},
 };
 
-use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
-
 impl KeyExchange {
     /// Create new key exchange session for a specific algorithm
     pub fn new(algorithm: KeyExchangeAlgorithm) -> Self {
@@ -23,7 +21,7 @@ impl KeyExchange {
     pub fn make_request(&mut self) -> Option<KeyExhangeRequest> {
         match self.algorithm {
             KeyExchangeAlgorithm::X25519 => {
-                use x25519_dalek::PublicKey;
+                use x25519_dalek::{PublicKey, StaticSecret};
 
                 let secret = StaticSecret::random();
                 let public = PublicKey::from(&secret);
@@ -77,6 +75,7 @@ impl KeyExchange {
         match self.algorithm {
             KeyExchangeAlgorithm::X25519 => {
                 if let KeyExhangeRequest::X25519(other_pub) = req {
+                    use x25519_dalek::{PublicKey, EphemeralSecret};
                     let secret = EphemeralSecret::random();
                     let public = PublicKey::from(&secret);
                     let other_pub = PublicKey::from(**other_pub);
@@ -140,6 +139,7 @@ impl KeyExchange {
         match self.algorithm {
             KeyExchangeAlgorithm::X25519 => {
                 if let KeyExhangeResponse::X25519(other_pub) = res {
+                    use x25519_dalek::{PublicKey, StaticSecret};
                     let secret: &[u8; 32] = self.secret.as_ref().unwrap()[..].try_into().unwrap();
                     let secret = StaticSecret::from(*secret);
                     let other_pub = PublicKey::from(**other_pub);

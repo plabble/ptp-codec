@@ -13,8 +13,10 @@ use crate::packets::body::{
     register::RegisterRequestBody,
     session::SessionRequestBody,
     stream::StreamRequestBody,
-    whisper::WhisperRequestBody,
 };
+
+#[cfg(feature = "server")]
+use crate::packets::body::whisper::WhisperRequestBody;
 
 /// An enumeration representing the different types of request bodies
 /// that can be sent in a Plabble request.
@@ -51,6 +53,7 @@ pub enum PlabbleRequestBody {
     Put(PutRequestBody) = 6,
     Delete(BucketQuery) = 7,
     Subscribe(BucketQuery) = 8,
+    #[cfg(feature = "server")]
     Whisper(#[variant_by = "type"] WhisperRequestBody) = 9,
     Register(RegisterRequestBody) = 10,
     Identify(IdentifyRequestBody) = 11,

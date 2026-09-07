@@ -2,7 +2,7 @@ use binary_codec::{BinaryDeserializer, BinarySerializer};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
-/// Plabble DateTime since epoch (01-01-2025T00:00:00Z)
+/// Plabble DateTime since epoch (01-01-2025T00:00:00Z), stored as u32
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(transparent)]
 pub struct PlabbleDateTime(pub DateTime<Utc>);

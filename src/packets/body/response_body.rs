@@ -6,9 +6,12 @@ use crate::{
     packets::body::{
         bucket::BucketBody, certificate::CertificateResponseBody, custom::CustomBody,
         error::PlabbleError, opcode::OpCodeResponseBody, proxy::ProxyResponseBody,
-        session::SessionResponseBody, stream::StreamResponseBody, whisper::WhisperResponseBody,
+        session::SessionResponseBody, stream::StreamResponseBody,
     },
 };
+
+#[cfg(feature = "server")]
+use crate::packets::body::whisper::WhisperResponseBody;
 
 /// An enumeration representing the different types of response bodies
 /// that can be sent in a Plabble response.
@@ -50,6 +53,7 @@ pub enum PlabbleResponseBody {
         Option<BucketBody>,
     ) = 7,
     Subscribe = 8,
+    #[cfg(feature = "server")]
     Whisper(#[variant_by = "type"] WhisperResponseBody) = 9,
     Register(Certificate) = 10,
     Identity = 11,

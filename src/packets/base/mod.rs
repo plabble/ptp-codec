@@ -170,6 +170,7 @@ fn apply_effective_crypto_settings(
     let settings = packet_settings
         .or_else(|| config.data.as_ref().and_then(|ctx| ctx.crypto_settings))
         .unwrap_or_default();
+    
     settings.apply_to(config);
 }
 

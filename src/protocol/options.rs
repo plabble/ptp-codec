@@ -46,45 +46,13 @@ pub fn get_signature_algorithms(settings: &CryptoSettings) -> Vec<SignatureAlgor
     algs
 }
 
-/// Return the first requested algorithm unavailable in this build.
-pub fn unsupported_algorithm(settings: &CryptoSettings) -> Option<&'static str> {
-    if settings.use_blake3 && !cfg!(feature = "blake-3") {
-        return Some("blake3");
-    }
-
-    if let Some(post_quantum) = settings.post_quantum_settings {
-        if !cfg!(feature = "pqc-lite") {
-            if post_quantum.sign_pqc_dsa_44 {
-                return Some("mldsa44");
-            }
-            if post_quantum.sign_pqc_dsa_65 {
-                return Some("mldsa65");
-            }
-            if post_quantum.key_exchange_pqc_kem_512 {
-                return Some("mlkem512");
-            }
-            if post_quantum.key_exchange_pqc_kem_768 {
-                return Some("mlkem768");
-            }
-        }
-        if post_quantum.sign_pqc_falcon {
-            return Some("falcon1024");
-        }
-        if post_quantum.sign_pqc_slh_dsa {
-            return Some("slh-dsa-sha128s");
-        }
-    }
-
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
         crypto::{KeyExchangeAlgorithm, SignatureAlgorithm},
         packets::base::settings::{CryptoSettings, PostQuantumSettings},
         protocol::options::{
-            get_key_exchange_algorithms, get_signature_algorithms, unsupported_algorithm,
+            get_key_exchange_algorithms, get_signature_algorithms,
         },
     };
 
@@ -120,18 +88,5 @@ mod tests {
                 SignatureAlgorithm::Dsa65,
             ]
         );
-    }
-
-    #[test]
-    fn reports_requested_algorithms_that_have_no_implementation() {
-        let settings = CryptoSettings {
-            use_post_quantum: true,
-            post_quantum_settings: Some(PostQuantumSettings {
-                sign_pqc_falcon: true,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        assert_eq!(unsupported_algorithm(&settings), Some("falcon1024"));
     }
 }

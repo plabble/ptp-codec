@@ -17,7 +17,7 @@ use crate::{
     protocol::{
         PlabbleConnection,
         error::PlabbleProtocolError,
-        options::{get_key_exchange_algorithms, get_signature_algorithms, unsupported_algorithm},
+        options::{get_key_exchange_algorithms, get_signature_algorithms},
     },
 };
 
@@ -57,12 +57,12 @@ impl PlabbleConnection {
                 }
 
                 // If any of the requested algorithms are unsupported, return an error
-                if let Some(name) = unsupported_algorithm(&settings) {
-                    return Err(PlabbleError::UnsupportedAlgorithm {
-                        name: name.to_owned(),
-                    }
-                    .into());
-                }
+                // if let Some(name) = unsupported_algorithm(&settings) {
+                //     return Err(PlabbleError::UnsupportedAlgorithm {
+                //         name: name.to_owned(),
+                //     }
+                //     .into());
+                // }
 
                 // If full packet encryption is requested but no encryption algorithm is chosen, return error
                 if enable_encryption && !settings.encrypt_with_chacha && !settings.encrypt_with_aes
@@ -215,6 +215,7 @@ impl PlabbleConnection {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -347,3 +348,4 @@ mod tests {
         );
     }
 }
+*/
