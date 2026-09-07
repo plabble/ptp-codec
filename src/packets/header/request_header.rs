@@ -36,9 +36,12 @@ impl PlabbleRequestHeader {
         }
     }
 
-    /// Indicates if SESSION packet
-    pub fn is_session_packet(&self) -> bool {
-        matches!(self.packet_type, RequestPacketType::Session { .. })
+    /// Bootstrap packets may be exchanged before shared key material exists.
+    pub fn is_bootstrap_packet(&self) -> bool {
+        matches!(
+            self.packet_type,
+            RequestPacketType::Certificate { .. } | RequestPacketType::Session { .. }
+        )
     }
 
     pub fn preprocess(&self) {

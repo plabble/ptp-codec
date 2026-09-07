@@ -1,7 +1,6 @@
 # Plabble Transport Protocol
 This repository provides a Rust implementation of the Plabble Transport Protocol.
 
-> Implementation status: the packet models and codec layer are the primary implemented part. The optional high-level server dispatcher is still a work in progress; most request handlers are not implemented yet.
 
 # Plabble Protocol
 
@@ -135,7 +134,8 @@ request_counter = 1     # counter of the request to reply to (the server counts 
 1. The client sends the [ID of the certificate](#certificate-id) it wants to request (or no ID if it wants the certificate of the server), a challenge (or no challenge if the client is not interested in proving the servers' identity)
 2. The server retrieves the certificates the client requested, and signs the challenge + certificate(s) bytes
 3. The client verifies if the signature is correct
-4. The client stores the certificates in its certificate store so it doesn't need to request it another time
+4. The client validates the returned leaf-to-root chain against a locally trusted root
+5. Only after both checks succeed, the client stores the certificates so it doesn't need to request them another time
 
 ### Certificate request
 Request header flags:
@@ -200,6 +200,11 @@ request_counter = 1
 ```
 
 > The client should only trust a certificate if the chain is verified and the signatures are correct!
+
+Implementation notes and edge cases:
+- A CERTIFICATE request/response without a PSK is a bootstrap exchange and therefore cannot carry a keyed MAC before a session exists. The response signatures protect the challenge and exact certificate bytes. An ERROR response emitted before key establishment is necessarily unauthenticated as well. Once a session exists, the normal session MAC still applies when packet encryption is disabled.
+- `query_mode` MUST match the presence of `body.id`, and `challenge` MUST match the presence of `body.challenge`; mismatches produce `InvalidRequest`.
+- An empty chain, an incorrect requested ID, an invalid certificate ID, an untrusted chain or an invalid response signature produces `CertificateInvalid`. An unknown requested ID produces `CertificateNotFound`.
 
 ## Session
 - **Goal**: _exchange keys_ with a server, create a [Session Key](#session-key).
@@ -368,6 +373,9 @@ Response body:
 Notes:
 - Values in the TOML examples are typically encoded as base64 when represented in text (see `BucketBody` in the crate).
 - When `subscribe` is set the server semantics for update delivery are implementation-dependent (push over the current connection or via separate subscription messages) but should follow the protocol's subscription guarantees.
+- `binary_keys` MUST match the `BucketRange` variant and `with_limit` MUST match the presence of `limit`; mismatches produce `InvalidRequest` before storage is contacted.
+- `range_mode_until` is valid only for a range containing exactly one serialized bound (the first tuple value in the in-memory Rust model). Empty and two-bound ranges with this flag produce `InvalidRequest`.
+- Range inclusivity is storage-defined, but MUST be consistent for GET, DELETE and SUBSCRIBE on one server. An empty match is a successful empty `BucketBody`, not `BucketNotFound`.
 
 ## Stream
 - **Goal**: _Read from or write (stream) bytes to a slot_ inside a bucket.
@@ -457,6 +465,10 @@ new_size = 7
 ```
 
 > When `data` is present in TOML examples it is the Base64 URL-safe (unpadded) representation used by the codec.
+
+Edge cases:
+- `binary_keys` MUST match the `SlotRange` variant and `write_mode` MUST exactly match the presence of request `data`.
+- A read response contains `data` and no `new_size`; a write response contains `new_size` and no `data`. Any other combination is invalid.
 
 ## Post
 - **Goal**: _Create a new bucket on the server_ ...
@@ -576,7 +588,6 @@ acl_del = ["AAAAAAAAAAAAAAAAAAAAAAAAAAA"]
 ### PATCH response
 Empty response without flags.
 
-
 ## PUT
 - **Goal**: _Add or append data to one or more slots in a bucket._
 - Implementation: [bucket.rs](./src/packets/body/bucket.rs)
@@ -629,6 +640,8 @@ body.Binary = { name = "AAAA", alias = "AAAAAA" }
 
 ### PUT response
 Empty response without flags.
+
+`assert_keys` is valid only together with `append`. In that mode any supplied key that already exists makes the whole operation fail atomically with `KeyAlreadyExists`.
 
 ## DELETE
 - **Goal**: _Remove entries from a bucket or delete the entire bucket._
@@ -690,6 +703,8 @@ Response header flags:
 Response body (only if `return_deleted` is set):
 - `Delete` responses carry a `BucketBody` (see [implementation](./src/packets/body/bucket.rs)). For numeric buckets this is a key-value set with numbers and binary values, for binary it is a key-value set with both binary keys and values. - ONLY if `return_deleted` is set in the request.
 
+An empty range (both bounds absent) deletes the complete bucket; a non-empty range deletes only matching slots. If `return_deleted` is false the provider and response MUST return no body. If it is true, deletion and collection of the returned values MUST be atomic. `with_limit` MUST match the presence of `limit`.
+
 ## Subscribe
 - **Goal**: _Subscribe to updates_ for one or more keys or a key range inside a bucket (or unsubscribe).
 - Implementation: [bucket.rs](./src/packets/body/bucket.rs)
@@ -726,6 +741,8 @@ range.Numeric = [5, 25]
 
 ### Subscribe response
 Empty response without flags (server-specific subscription messages follow on updates).
+
+Subscriptions are scoped to the current connection/session and MUST be removed when that session ends. Repeating the same subscribe SHOULD be idempotent. Unsubscribing a range with no matching active subscription produces `SubscriptionNotFound`. A SUBSCRIBE body cannot contain a GET/DELETE limit.
 
 ## Whisper
 - **Goal**: Exchange node-discovery, liveness and bucket-replication messages between servers.
@@ -1249,8 +1266,13 @@ max_version = 3
 2. **UnsupportedAlgorithm**: Requested algotithm (in cryptography settings) is not supported by the server. Body: `name` The name of the algorithm(s) that is not supported, UTF-8 [dynint](#plabble-dynamic-int) length encoded. _Occurence_: any packet, but especially [Session](#session), [Certificate](#certificate) and other packets that use cryptography settings. 
 3. **UnsupportedSubProtocol**: Requested [subprotocol](#custom) is not supported. _Occurence_: only in [Custom](#custom) packets.
 4. **InvalidRequest**: The request is malformed or invalid for the requested operation.
+5. **AuthenticationRequired**: The operation requires an established authenticated session. _Occurrence_: especially [POST](#post), and typed high-level bucket client operations.
+6. **PermissionDenied**: The authenticated caller does not have the required bucket permission.
 10. **BucketNotFound**: Requested bucket was not found
 11. **BucketAlreadyExists**: Bucket with that ID already exists. _Occurence_: [Post](#post)
+12. **KeyAlreadyExists**: An asserted key already exists during append. _Occurrence_: [PUT](#put) with `assert_keys`.
+13. **BucketLocked**: The requested permission or ACL change is blocked by the bucket lock settings. _Occurrence_: [PATCH](#patch).
+14. **SubscriptionNotFound**: No matching active subscription exists. _Occurrence_: [SUBSCRIBE](#subscribe) with `unsubscribe`.
 110. **CertificateNotFound**: Requested certificate (by id) was not found. _Occurence_: [Certificate](#certificate-request)
 111. **CertificateInvalid**: Requested certificate was not valid. _Occurence_: [Certificate](#certificate)
 210. **OpcodeScriptError**: An error occurred during OPCODE script execution. Body: `ScriptError` (see `interpreter.rs` for details). _Occurence_: [OPCODE](#opcode)
@@ -1333,7 +1355,7 @@ We don't want an attacker to relate a PSK ID to a bucket key, so the PSK ID is a
 
 ### Authentication
 Plabble has two ways of ensuring the integrity of packets.
-When the `use_encryption` flag in the base packet is off, it will use a Message Authentication Code (MAC).
+When the `use_encryption` flag in the base packet is off, it will use a Message Authentication Code (MAC). The bootstrap exceptions are a CERTIFICATE or SESSION exchange, plus an associated ERROR response, without a PSK and without an existing session key, because no shared MAC key exists yet.
 If the encryption flag is on, Plabble uses Authenticated Encryption with Associated Data (AEAD).
 
 ### Key generation

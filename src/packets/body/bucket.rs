@@ -19,10 +19,10 @@ pub struct BucketQuery {
     #[serde(default)]
     #[dyn_int]
     #[toggled_by = "limit"]
-    limit: Option<u32>,
+    pub limit: Option<u32>,
 
     #[variant_by = "binary_keys"]
-    range: BucketRange,
+    pub range: BucketRange,
 }
 
 /// Bucket put request structure used for inserting data into a bucket
@@ -34,7 +34,7 @@ pub struct BucketQuery {
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 pub struct PutRequestBody {
     #[variant_by = "binary_keys"]
-    body: BucketBody,
+    pub body: BucketBody,
 }
 
 /// Bucket body structure used for representing the data within a bucket.
@@ -71,9 +71,9 @@ pub enum BucketBody {
 ///
 /// # Members
 /// - `Numeric`: A tuple containing two optional `u32` values representing optionally
-///  the start and/or end of the numeric range
+///   the start and/or end of the numeric range
 /// - `Binary`: A tuple containing two optional `String` values representing optionally
-///  the start and/or end of the binary range.
+///   the start and/or end of the binary range.
 #[derive(Debug, FromBytes, ToBytes, Serialize, Deserialize, PartialEq, Clone)]
 #[no_discriminator]
 pub enum BucketRange {

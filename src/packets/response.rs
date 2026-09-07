@@ -69,11 +69,12 @@ impl BinarySerializer<PlabbleConnectionContext, SerializationError> for PlabbleR
         // Write the body bytes to the stream
         stream.write_bytes(&body_bytes);
 
-        // If MAC is enabled and inside session, calculate and add it to the packet
-        // Note that SESSION packets without PSK do never have a MAC, because there is no shared key yet
+        // Bootstrap responses without a PSK precede shared key material.
         if !self.base.use_encryption
             && let Some(ctx) = &config.data
-            && (!self.header.is_session_packet() || self.base.pre_shared_key)
+            && (!self.header.is_bootstrap_packet()
+                || self.base.pre_shared_key
+                || ctx.session_key.is_some())
         {
             let mac_key = ctx
                 .create_key(Some(&self.base), 0xFF, false)
@@ -106,9 +107,20 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
         let header = PlabbleResponseHeader::read_bytes(stream, Some(config))?;
         config.discriminator = Some(header.packet_type.get_discriminator());
 
-        // Allow non-encrypted, session packets that don't have a PSK to bypass the MAC
-        if !base.use_encryption && header.is_session_packet() && !base.pre_shared_key {
-            stream.set_offset_end(0);
+        // Reserve the trailing MAC after parsing the header. Bootstrap packets
+        // may be shorter than a MAC and have no shared key yet.
+        if !base.use_encryption
+            && let Some(context) = &config.data
+        {
+            let unauthenticated = header.is_bootstrap_packet()
+                && !base.pre_shared_key
+                && context.session_key.is_none();
+            if !unauthenticated && stream.bytes_left() < 16 {
+                return Err(DeserializationError::NotEnoughBytes(
+                    (16 - stream.bytes_left()) as u64,
+                ));
+            }
+            stream.set_offset_end(if unauthenticated { 0 } else { 16 });
         }
 
         // Copy plain base/header bytes to integrity buffer for later checks
@@ -134,10 +146,10 @@ impl BinaryDeserializer<PlabbleConnectionContext, DeserializationError> for Plab
         let body = PlabbleResponseBody::from_bytes(&body_bytes, Some(config))?;
 
         // Verify the MAC if that is enabled (and context provided)
-        // Note that SESSION packets without PSK do never have a MAC, because there is no shared key yet
+        // Bootstrap packets without a PSK never have a MAC.
         if !base.use_encryption
             && let Some(ctx) = &config.data
-            && (!header.is_session_packet() || base.pre_shared_key)
+            && (!header.is_bootstrap_packet() || base.pre_shared_key || ctx.session_key.is_some())
         {
             let expected: [u8; 16] = stream.slice_end().try_into().map_err(|_| {
                 DeserializationError::UnexpectedLength(16, stream.slice_end().len() as u64)
@@ -307,6 +319,11 @@ mod tests {
         let mut context = PlabbleConnectionContext::new();
         context.session_key = Some([0u8; 64]);
         let mut config = SerializerConfig::new(Some(context));
+
+        assert_eq!(
+            Err(DeserializationError::NotEnoughBytes(13)),
+            PlabbleResponsePacket::from_bytes(&hex::decode(plain).unwrap(), Some(&mut config))
+        );
 
         let serialized = response.to_bytes(Some(&mut config)).unwrap();
         assert_eq!(format!("{}{}", plain, mac), hex::encode(&serialized));

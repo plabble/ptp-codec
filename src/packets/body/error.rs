@@ -28,12 +28,27 @@ pub enum PlabbleError {
     /// The request is not valid
     InvalidRequest = 4,
 
+    /// The operation requires an established, authenticated session.
+    AuthenticationRequired = 5,
+
+    /// The authenticated caller is not allowed to perform the operation.
+    PermissionDenied = 6,
+
     /* bucket errors: 10-100 */
     /// Bucket by ID not found (or existence denied)
     BucketNotFound = 10,
 
     /// Bucket with that ID already exists
     BucketAlreadyExists = 11,
+
+    /// An asserted key already exists and therefore cannot be appended.
+    KeyAlreadyExists = 12,
+
+    /// The requested bucket setting or ACL is locked.
+    BucketLocked = 13,
+
+    /// No matching active subscription exists.
+    SubscriptionNotFound = 14,
 
     /* certificate errors: 110-115 */
     /// Certificate by ID not found
@@ -53,7 +68,12 @@ pub enum PlabbleError {
 mod tests {
     use binary_codec::{BinaryDeserializer, BinarySerializer};
 
-    use crate::packets::response::PlabbleResponsePacket;
+    use crate::packets::{
+        base::PlabblePacketBase,
+        body::{error::PlabbleError, response_body::PlabbleResponseBody},
+        header::{response_header::PlabbleResponseHeader, type_and_flags::ResponsePacketType},
+        response::PlabbleResponsePacket,
+    };
 
     #[test]
     fn can_serialize_and_deserialize_unsupported_version_error_response() {
@@ -124,5 +144,28 @@ mod tests {
         );
 
         assert_eq!(response, deserialized);
+    }
+
+    #[test]
+    fn bucket_and_authentication_errors_keep_their_wire_codes() {
+        for (error, code) in [
+            (PlabbleError::AuthenticationRequired, 5),
+            (PlabbleError::PermissionDenied, 6),
+            (PlabbleError::KeyAlreadyExists, 12),
+            (PlabbleError::BucketLocked, 13),
+            (PlabbleError::SubscriptionNotFound, 14),
+        ] {
+            let response = PlabbleResponsePacket {
+                base: PlabblePacketBase::default(),
+                header: PlabbleResponseHeader::new(ResponsePacketType::Error, Some(0)),
+                body: PlabbleResponseBody::Error(error),
+            };
+            let bytes = response.to_bytes(None).unwrap();
+            assert_eq!(bytes[4], code);
+            assert_eq!(
+                PlabbleResponsePacket::from_bytes(&bytes, None).unwrap(),
+                response
+            );
+        }
     }
 }

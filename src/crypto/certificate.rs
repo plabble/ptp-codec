@@ -17,33 +17,33 @@ pub struct Certificate {
     /// If set to true, this is a full certificate
     #[toggles("full_cert")]
     #[serde(default = "default_true")]
-    full_cert: bool,
+    pub full_cert: bool,
 
     /// If set to true, this is a root certificate
     #[toggles("root_cert")]
     #[serde(default)]
-    root_cert: bool,
+    pub root_cert: bool,
 
     /// If set to true, the certificate includes secret keys
     #[toggles("secret_keys")]
     #[serde(default)]
-    with_secret_keys: bool,
+    pub with_secret_keys: bool,
 
     // 3 bits reserved for future use
     /// The unique certificate ID - this is NOT a fingerprint for it does not contain the keys or signatures but only the data
     /// This is a hash of the following certificate data:
     /// - Blake2b_128(valid_from, valid_until, issuer_uri, data)
     #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
-    id: [u8; 16],
+    pub id: [u8; 16],
 
     /// URI where this certificate can be found
     #[dyn_length]
-    uri: String,
+    pub uri: String,
 
     /// Certificate content, if full certificate
     #[toggled_by = "full_cert"]
     #[serde(flatten)]
-    body: Option<CertificateBody>,
+    pub body: Option<CertificateBody>,
 }
 
 impl Certificate {
@@ -78,36 +78,36 @@ impl Certificate {
 #[derive(Debug, FromBytes, ToBytes, PartialEq, Serialize, Deserialize, Clone)]
 pub struct CertificateBody {
     /// From when the certificate was valid
-    valid_from: PlabbleDateTime,
+    pub valid_from: PlabbleDateTime,
 
     /// Until when the certificate is valid
-    valid_until: PlabbleDateTime,
+    pub valid_until: PlabbleDateTime,
 
     /// Who issued the certificate (if not a root cert or self-signed)
     #[toggled_by = "!root_cert"]
     #[dyn_length]
-    issuer_uri: Option<String>,
+    pub issuer_uri: Option<String>,
 
     /// The certificate data, for instance CA=plabble;CN=Root certificate
     #[dyn_length]
-    data: String,
+    pub data: String,
 
     /// The public keys this certificate contains/are issued with this certificate
     #[multi_enum]
-    keys: Vec<VerificationKey>,
+    pub keys: Vec<VerificationKey>,
 
     /// Signatures for each algorithm in this certificate, by the issuer
     /// Every signature contains the following data:
     /// - The public key for the specific algorithm (the issued key)
     /// - Blake2b_128(valid_from, valid_to, issuer_uri, data)
     #[multi_enum]
-    signatures: Vec<CryptoSignature>,
+    pub signatures: Vec<CryptoSignature>,
 
     /// Secret keys, if present
     #[multi_enum]
     #[toggled_by = "secret_keys"]
     #[serde(default)]
-    secret_keys: Option<Vec<SigningKey>>,
+    pub secret_keys: Option<Vec<SigningKey>>,
 }
 
 impl CertificateBody {

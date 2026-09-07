@@ -13,12 +13,12 @@ pub struct StreamRequestBody {
     #[dyn_length]
     #[toggled_by = "write_mode"]
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
-    data: Option<Vec<u8>>,
+    pub data: Option<Vec<u8>>,
 
     /// The slot to be streamed, which can be identified by a numeric ID or a binary key
     /// plus the range of bytes to select
     #[variant_by = "binary_keys"]
-    range: SlotRange,
+    pub range: SlotRange,
 }
 
 /// Response body for stream operations, which can include either the new size of the slot (for writes) or the data read from the slot (for reads).
@@ -29,13 +29,13 @@ pub struct StreamResponseBody {
     #[serde(default)]
     #[dyn_int]
     #[toggled_by = "write_mode"]
-    new_size: Option<u64>,
+    pub new_size: Option<u64>,
 
     /// Optional data read from the slot, present only in read mode
     #[serde(default)]
     #[toggled_by = "!write_mode"]
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
-    data: Option<Vec<u8>>,
+    pub data: Option<Vec<u8>>,
 }
 
 /// Range of bytes within a slot to be streamed. Can be binary or numeric depending on the slot type

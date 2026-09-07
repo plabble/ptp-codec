@@ -18,6 +18,8 @@ pub enum PlabbleProtocolError {
     UnexpectedResponse,
     FailedToProcessRequest,
     FailedToProcessResponse,
+    ProtocolProviderUnavailable,
+    KeyProviderUnavailable,
     InputParsingFailed,
     OutputSerializationFailed,
 }
@@ -52,6 +54,8 @@ impl fmt::Display for PlabbleProtocolError {
             Self::UnexpectedResponse => write!(f, "Unexpected response"),
             Self::FailedToProcessRequest => write!(f, "Failed to process request"),
             Self::FailedToProcessResponse => write!(f, "Failed to process response"),
+            Self::ProtocolProviderUnavailable => write!(f, "Protocol provider unavailable"),
+            Self::KeyProviderUnavailable => write!(f, "Key provider unavailable"),
             Self::InputParsingFailed => write!(f, "Input parsing failed"),
             Self::OutputSerializationFailed => write!(f, "Output serialization failed"),
         }

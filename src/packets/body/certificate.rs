@@ -1,4 +1,4 @@
-use binary_codec::{FromBytes, ToBytes};
+use binary_codec::{BinarySerializer, FromBytes, SerializerConfig, ToBytes};
 use serde::{Deserialize, Serialize};
 use serde_with::base64::{Base64, UrlSafe};
 use serde_with::formats::Unpadded;
@@ -6,6 +6,10 @@ use serde_with::serde_as;
 
 use crate::crypto::algorithm::CryptoSignature;
 use crate::crypto::certificate::Certificate;
+use crate::{
+    errors::SerializationError,
+    packets::{base::settings::CryptoSettings, context::PlabbleConnectionContext},
+};
 
 /// Certificate request body
 #[serde_as]
@@ -14,12 +18,12 @@ pub struct CertificateRequestBody {
     /// Id of the certificate to query
     #[toggled_by = "query_mode"]
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
-    id: Option<[u8; 16]>,
+    pub id: Option<[u8; 16]>,
 
     /// Client-side generated random challenge the server MUST sign when provided, to prove its identity
     #[toggled_by = "challenge"]
     #[serde_as(as = "Option<Base64<UrlSafe, Unpadded>>")]
-    challenge: Option<[u8; 16]>,
+    pub challenge: Option<[u8; 16]>,
 }
 
 /// Certificate response body
@@ -28,10 +32,27 @@ pub struct CertificateResponseBody {
     /// Signatures of the server to prove its identity and authenticity of the message
     /// For each algorithm in the crypto settings header, generate a signature of the challenge (optionally) + all full certificates (in order)
     #[multi_enum]
-    signatures: Vec<CryptoSignature>,
+    pub signatures: Vec<CryptoSignature>,
 
     /// Certificate chain (list in order, first certificate = bottom of chain, last certificate = top of chain)
-    certificates: Vec<Certificate>,
+    pub certificates: Vec<Certificate>,
+}
+
+impl CertificateResponseBody {
+    /// Build the exact bytes signed by a CERTIFICATE response.
+    pub fn signing_bytes(
+        &self,
+        challenge: Option<&[u8; 16]>,
+        settings: &CryptoSettings,
+    ) -> Result<Vec<u8>, SerializationError> {
+        let mut bytes = challenge.map_or_else(Vec::new, |value| value.to_vec());
+        let mut config = SerializerConfig::<PlabbleConnectionContext>::new(None);
+        settings.apply_to(&mut config);
+        for certificate in &self.certificates {
+            bytes.extend(certificate.to_bytes(Some(&mut config))?);
+        }
+        Ok(bytes)
+    }
 }
 
 #[cfg(test)]

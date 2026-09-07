@@ -17,74 +17,74 @@ use crate::packets::body::bucket::BucketRange;
 pub struct BucketPermissions {
     /// Allow everyone to read slots from this bucket
     #[serde(default = "default_true")]
-    public_read: bool,
+    pub public_read: bool,
     /// Allow everyone to append a slot to the bucket
     #[serde(default)]
-    public_append: bool,
+    pub public_append: bool,
     /// Allow everyone to update a slot
     #[serde(default)]
-    public_write: bool,
+    pub public_write: bool,
     /// Allow everyone to delete a slot
     #[serde(default)]
-    public_delete: bool,
+    pub public_delete: bool,
     /// Allow everyone to execute OPCODE scripts interacting with this bucket (read/write/append/delete)
     #[serde(default)]
-    public_script_execution: bool,
+    pub public_script_execution: bool,
 
     /// Allow authenticated users on the ACL to read slots from this bucket
     #[serde(default = "default_true")]
-    protected_read: bool,
+    pub protected_read: bool,
     /// Allow authenticated users on the ACL to append a slot to the bucket
     #[serde(default)]
-    protected_append: bool,
+    pub protected_append: bool,
     /// Allow authenticated users on the ACL to update a slot
     #[serde(default)]
-    protected_write: bool,
+    pub protected_write: bool,
     /// Allow authenticated users on the ACL to delete a slot
     #[serde(default)]
-    protected_delete: bool,
+    pub protected_delete: bool,
     /// Allow authenticated users on the ACL to execute OPCODE scripts interacting with this bucket (read/write/append/delete)
     #[serde(default)]
-    protected_script_execution: bool,
+    pub protected_script_execution: bool,
     /// Allow authenticated users on the ACL to delete this bucket
     #[serde(default)]
-    protected_bucket_delete: bool,
+    pub protected_bucket_delete: bool,
 
     /// Allow authenticated users using the bucket key to read slots from this bucket
     #[serde(default = "default_true")]
-    private_read: bool,
+    pub private_read: bool,
     /// Allow authenticated users using the bucket key to append a slot to the bucket
     #[serde(default = "default_true")]
-    private_append: bool,
+    pub private_append: bool,
     /// Allow authenticated users using the bucket key to update a slot
     #[serde(default = "default_true")]
-    private_write: bool,
+    pub private_write: bool,
     /// Allow authenticated users using the bucket key to delete a slot
     #[serde(default = "default_true")]
-    private_delete: bool,
+    pub private_delete: bool,
     /// Allow authenticated users using the bucket key to execute OPCODE scripts interacting with this bucket (read/write/append/delete)
     #[serde(default)]
-    private_script_execution: bool,
+    pub private_script_execution: bool,
     /// Allow authenticated users using the bucket key delete this bucket
     #[serde(default = "default_true")]
-    private_bucket_delete: bool,
+    pub private_bucket_delete: bool,
 
     /// If public read is off and a user queries this bucket, let the server tell
     /// them this bucket does not exist
     #[serde(default)]
-    deny_existence: bool,
+    pub deny_existence: bool,
 
     /// If set, permissions cannot be updated
     #[serde(default)]
-    lock_permissions: bool,
+    pub lock_permissions: bool,
 
     /// If set, ACL cannot be updated
     #[serde(default)]
-    lock_acl: bool,
+    pub lock_acl: bool,
 
     /// If set, replication is allowed
     #[serde(default)]
-    allow_replication: bool,
+    pub allow_replication: bool,
     // 3 reserved flags (total: 21/24 = 3 bytes)
 }
 
@@ -121,13 +121,13 @@ impl Default for BucketPermissions {
 #[derive(FromBytes, ToBytes, Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct BucketSettings {
     /// Permissions
-    permissions: BucketPermissions,
+    pub permissions: BucketPermissions,
 
     /// Access Control List (ACL) with user IDs
     #[serde_as(as = "Vec<Base64<UrlSafe, Unpadded>>")]
     #[serde(default)]
     #[dyn_length]
-    access_control_list: Vec<[u8; 16]>,
+    pub access_control_list: Vec<[u8; 16]>,
 }
 
 /// Bucket create request body

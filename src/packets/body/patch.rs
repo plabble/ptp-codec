@@ -12,19 +12,19 @@ use crate::packets::body::post::BucketPermissions;
 pub struct PatchRequestBody {
     /// If toggled by flags, update the permissions of the bucket
     #[toggled_by = "update_perm"]
-    permissions: Option<BucketPermissions>,
+    pub permissions: Option<BucketPermissions>,
 
     /// If toggled by flags, add the following ACL entries (user IDs/user certificate IDs) to the bucket (without overwriting existing ACL)
     #[toggled_by = "acl_add"]
     #[serde_as(as = "Option<Vec<Base64<UrlSafe, Unpadded>>>")]
     #[dyn_length]
-    acl_add: Option<Vec<[u8; 16]>>,
+    pub acl_add: Option<Vec<[u8; 16]>>,
 
     /// If toggled by flags, remove the following ACL entries (user IDs/user certificate IDs) from the bucket
     #[toggled_by = "acl_del"]
     #[serde_as(as = "Option<Vec<Base64<UrlSafe, Unpadded>>>")]
     #[dyn_length]
-    acl_del: Option<Vec<[u8; 16]>>,
+    pub acl_del: Option<Vec<[u8; 16]>>,
 }
 
 #[cfg(test)]

@@ -264,9 +264,11 @@ pub mod helpers {
 
     pub struct ExampleKeyProvider;
     impl KeyProvider for ExampleKeyProvider {
-        fn get_bucket_key(&self, _bucket_id: &[u8; 16]) -> Option<[u8; 32]> {
-            Some([0; 32])
+        fn get_bucket_key(&self, _bucket_id: &[u8; 16]) -> Option<[u8; 64]> {
+            Some([0; 64])
         }
+
+        fn store_bucket_key(&self, _bucket_id: [u8; 16], _bucket_key: [u8; 64]) {}
 
         fn get_psk(&self, _psk_id: &[u8; 12]) -> Option<[u8; 64]> {
             Some([0; 64])
